@@ -1,13 +1,13 @@
 import { loadScript } from "./loadScript";
-import { verifyPayment } from "./formpost";
+import { paymentsApi } from "../api/payments";
 
 const YOUR_RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY
 
-export const processPayment = async ({ 
-  paymentData, 
-  userDetails, 
-  onSuccess, 
-  onFailure 
+export const processPayment = async ({
+  paymentData,
+  userDetails,
+  onSuccess,
+  onFailure
 }) => {
   const razorpayLoaded = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
 
@@ -25,7 +25,7 @@ export const processPayment = async ({
     description: "Complete your registration",
     handler: async (response) => {
       try {
-        await verifyPayment(response.razorpay_order_id, response.razorpay_payment_id);
+        await paymentsApi.verifyPayment(response.razorpay_order_id, response.razorpay_payment_id);
         onSuccess();
       } catch (error) {
         console.error("Payment verification failed:", error);

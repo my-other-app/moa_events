@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import "@/styles/home.css";
 
 import RegisterButton from "@/components/registerbutton";
-import { fetchEvent } from "@/utils/fetchevent";
+import { eventsApi } from "@/api/events";
 import Snackbar from "./snackbar";
 
 import logo from "../assets/wordmark 1.svg";
@@ -35,9 +35,8 @@ const Home = () => {
   };
 
   const handleRegister = () => {
-    navigate("/register", {
+    navigate(`/register/${eventData.id}`, {
       state: {
-        eventId: eventData.id,
         additionalDetails: eventData.additional_details || [],
       },
     });
@@ -46,22 +45,21 @@ const Home = () => {
   useEffect(() => {
     if (!eventId) return;
 
-    setLoading(true); // Show loader immediately
+    setLoading(true);
 
     const getEvents = async () => {
       try {
-        const fetchedEvents = await fetchEvent(eventId);
+        const fetchedEvents = await eventsApi.fetchEvent(eventId);
         setEventData(fetchedEvents);
-        console.log("Event fetched:", fetchedEvents);
       } catch (error) {
         console.error("Error fetching event:", error);
       } finally {
-        setTimeout(() => setLoading(false), 1000); // Small delay
+        setTimeout(() => setLoading(false), 1000);
       }
     };
 
     getEvents();
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventData) return;

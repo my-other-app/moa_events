@@ -1,6 +1,6 @@
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { fetchTicketDetails } from "@/utils/ticketdetails";
+import { eventsApi } from "@/api/events";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { QRCodeCanvas } from "qrcode.react";
@@ -8,21 +8,19 @@ import "@/styles/ticket.css";
 import Download from "@/components/download";
 
 const Ticket = () => {
-  const location = useLocation();
-  // const { ticketid } = location.state || {};
   const { ticketid } = useParams();
   const [ticketData, setTicketData] = useState(null);
 
   useEffect(() => {
     if (!ticketid) return;
     const getTicketDetails = async () => {
-      const data = await fetchTicketDetails(ticketid);
+      const data = await eventsApi.fetchTicketDetails(ticketid);
       setTicketData(data);
     };
-  
+
     getTicketDetails();
   }, [ticketid]);
-  
+
 
   const generatePDF = () => {
     const ticketElement = document.getElementById("ticket");

@@ -1,11 +1,9 @@
-import { useNavigate } from "react-router-dom";
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import "../styles/registerbutton.css";
 import "../styles/download.css";
 
 const Download = () => {
-  const navigate = useNavigate();
 
   const generatePDF = () => {
     const ticketElement = document.getElementById("ticket")

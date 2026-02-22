@@ -1,19 +1,24 @@
-import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import "@/styles/form.css";
-import { postFormData, createPaymentOrder } from "../utils/formpost";
-import { processPayment } from "../utils/payment";
 
+import { eventsApi } from "@/api/events";
+import { paymentsApi } from "@/api/payments";
+import { processPayment } from "@/utils/payment";
 import Continue from "@/components/continue";
 
 import logo from "../assets/wordmark 1.svg";
 import leftarrow from "../assets/left-arrow.svg";
 
 const Form = () => {
-  const [ticketData, setTicketData] = useState(null);
   const navigate = useNavigate();
+  const { eventId } = useParams();
   const { state } = useLocation();
-  const { eventId, additionalDetails } = state || { eventId: null, additionalDetails: [] };
+  const [additionalDetails, setAdditionalDetails] = useState(
+    state?.additionalDetails || []
+  );
+
+  const [loadingEvent, setLoadingEvent] = useState(!state?.additionalDetails);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -21,6 +26,25 @@ const Form = () => {
     email: "",
     whatsappNumber: "",
   });
+
+  // If page was refreshed, location.state is lost. Fetch the event to get additional details.
+  useEffect(() => {
+    if (loadingEvent && eventId) {
+      const getEvent = async () => {
+        try {
+          const fetchedEvent = await eventsApi.fetchEvent(eventId);
+          if (fetchedEvent && fetchedEvent.additional_details) {
+            setAdditionalDetails(fetchedEvent.additional_details);
+          }
+        } catch (error) {
+          console.error("Error fetching event details on reload:", error);
+        } finally {
+          setLoadingEvent(false);
+        }
+      };
+      getEvent();
+    }
+  }, [eventId, loadingEvent]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,22 +66,22 @@ const Form = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+
     const payload = {
       full_name: formData.name,
       email: formData.email,
       phone: formData.whatsappNumber,
       additional_details: additionalDetails.length > 0 ? formData.additional_details : {},
     };
-  
+
     try {
-      const responseData = await postFormData(eventId, payload);
-  
+      const responseData = await eventsApi.registerForEvent(eventId, payload);
+
       if (responseData && responseData.ticket_id) {
         if (responseData.pay_amount > 0) {
           // Payment required
-          const paymentData = await createPaymentOrder(eventId, responseData.event_registration_id);
-  
+          const paymentData = await paymentsApi.createPaymentOrder(eventId, responseData.event_registration_id);
+
           if (paymentData) {
             processPayment({
               paymentData,
@@ -77,9 +101,9 @@ const Form = () => {
       }
     } catch (error) {
       console.error("Form submission error:", error);
+      alert(error.message || "Registration failed. Please try again.");
     }
   };
-  
 
   return (
     <div className="form-form-container">
@@ -163,20 +187,20 @@ const Form = () => {
           </div>
 
           {additionalDetails.map((detail) => (
-          <div key={detail.key}>
-            <label>{detail.label}</label>
-            {detail.field_type === "text" ? (
-              <input type="text" name={detail.key} onChange={(e) => handleAdditionalChange(detail.key, e.target.value)} required={detail.required} />
-            ) : detail.field_type === "select" ? (
-              <select name={detail.key} onChange={(e) => handleAdditionalChange(detail.key, e.target.value)} required={detail.required}>
-                <option value="">Select an option</option>
-                {detail.options.map((option, index) => (
-                  <option key={index} value={option}>{option}</option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-        ))}
+            <div key={detail.key}>
+              <label>{detail.label}</label>
+              {detail.field_type === "text" ? (
+                <input type="text" name={detail.key} onChange={(e) => handleAdditionalChange(detail.key, e.target.value)} required={detail.required} />
+              ) : detail.field_type === "select" ? (
+                <select name={detail.key} onChange={(e) => handleAdditionalChange(detail.key, e.target.value)} required={detail.required}>
+                  <option value="">Select an option</option>
+                  {detail.options.map((option, index) => (
+                    <option key={index} value={option}>{option}</option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+          ))}
 
           <button
             type="submit"
