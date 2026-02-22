@@ -1,0 +1,76 @@
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
+.snackbar {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    margin: 0 2rem 0 2rem;
+    padding: 15px 20px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    width: 50%;
+    font-size: 1.2rem;
+    color: #000;
+    font-weight: bold;
+    z-index: 200;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@media (max-width: 768px) {
+    .snackbar {
+        width: 100%;
+        margin: 0;
+        bottom: 0;
+        border-radius: 0;
+    }
+}
+
+.snackbar-message {
+    margin: 0;
+    padding-bottom: 8px;
+    font-family: "Bebas Neue", sans-serif;
+    font-weight: 300;
+    font-size: 1.5rem;
+  }
+  
+  .snackbar-close-btn {
+    width: 100%;
+    padding: 10px;
+    background-color: #2a2d36;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 8px;
+  }
+  
+  .snackbar-close-btn:hover {
+    background-color: #1e2027;
+  }
+
+/* Snackbar animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+}

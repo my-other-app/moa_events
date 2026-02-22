@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+.not-found {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-align: center;
+    background-color: #0a0a0a;
+    color: white;
+    font-family: "Arial", sans-serif;
+  }
+  
+  .error-code {
+    font-family: "Bebas Neue", sans-serif;
+    font-size: 6rem;
+    font-weight: 400;
+    animation: float 2s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0); }
+  }
+  
+  .error-message {
+    font-family: "DM Sans", sans-serif;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+  }
+  
+  .home-button {
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: bold;
+    background-color: #0a0a0a;
+    color: white;
+    border: white 2px solid;    
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  
+  .home-button:hover {
+    background-color: #1e1e1e;
+  }
+  
