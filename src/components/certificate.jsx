@@ -46,10 +46,17 @@ const Certificate = () => {
     };
 
     // Resolve style values with defaults
-    const accentColor = style?.accent_color || "#1db9a0";
-    const bgColor = style?.bg_color || "#121212";
-    const textColor = style?.text_color || "#ffffff";
-    const fontFamily = style?.font || "Inter";
+    const accent = style?.accent_color || "#1db9a0";
+    const bg = style?.bg_color || "#121212";
+    const text = style?.text_color || "#ffffff";
+    const secondaryText = style?.secondary_text_color || "#aaaaaa";
+    const font = style?.font || "Inter";
+    const titleFont = style?.title_font || font;
+    const certTitle = style?.certificate_title || "Certificate of Participation";
+    const borderStyle = style?.border_style || "none";
+    const borderColor = style?.border_color || accent;
+    const showQr = style?.show_qr_code !== false;
+    const showId = style?.show_certificate_id !== false;
 
     if (loading) {
         return (
@@ -76,95 +83,139 @@ const Certificate = () => {
     }
 
     return (
-        <div className="cert-page-container" style={{ fontFamily: `"${fontFamily}", sans-serif` }}>
-            {/* Google Font */}
-            <link
-                href={`https://fonts.googleapis.com/css2?family=${fontFamily}:wght@300;400;600;700&display=swap`}
-                rel="stylesheet"
-            />
+        <div className="cert-page-container" style={{ fontFamily: `"${font}", sans-serif` }}>
+            {/* Google Fonts */}
+            <link href={`https://fonts.googleapis.com/css2?family=${font}:wght@300;400;600;700&display=swap`} rel="stylesheet" />
+            {titleFont !== font && (
+                <link href={`https://fonts.googleapis.com/css2?family=${titleFont}:wght@400;600;700&display=swap`} rel="stylesheet" />
+            )}
 
-            <div className="cert-preview" id="certificate" style={{ background: accentColor }}>
-                <div className="cert-preview-inner" style={{ background: bgColor, color: textColor }}>
-                    {/* Logo */}
-                    {style?.logo_url && (
-                        <img
-                            src={style.logo_url}
-                            alt="Logo"
-                            style={{ maxHeight: 60, marginBottom: 12, objectFit: "contain" }}
-                        />
+            <div
+                className="cert-preview"
+                id="certificate"
+                style={{
+                    background: accent,
+                    ...(borderStyle !== "none" ? { border: `3px ${borderStyle} ${borderColor}` } : {}),
+                }}
+            >
+                <div
+                    className="cert-preview-inner"
+                    style={{
+                        background: bg,
+                        color: text,
+                        position: "relative",
+                        overflow: "hidden",
+                        ...(style?.background_image_url ? {
+                            backgroundImage: `url(${style.background_image_url})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                        } : {}),
+                    }}
+                >
+                    {/* Background overlay */}
+                    {style?.background_image_url && (
+                        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 0 }} />
                     )}
 
-                    {/* Header */}
-                    <div className="cert-preview-org" style={{ color: accentColor }}>
-                        {ticketData.event?.club?.name || ""}
-                    </div>
-                    <h1 className="cert-preview-title">Certificate of Participation</h1>
+                    <div style={{ position: "relative", zIndex: 1 }}>
+                        {/* Logos */}
+                        {(style?.logo_url || style?.secondary_logo_url) && (
+                            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 14 }}>
+                                {style?.logo_url && <img src={style.logo_url} alt="Logo" style={{ maxHeight: 55, objectFit: "contain" }} />}
+                                {style?.secondary_logo_url && <img src={style.secondary_logo_url} alt="Partner Logo" style={{ maxHeight: 45, objectFit: "contain" }} />}
+                            </div>
+                        )}
 
-                    {/* Custom text */}
-                    {style?.custom_text && (
-                        <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
-                            {style.custom_text}
-                        </p>
-                    )}
+                        {/* Organization */}
+                        <div className="cert-preview-org" style={{ color: accent }}>
+                            {ticketData.event?.club?.name || ""}
+                        </div>
 
-                    {/* Body */}
-                    <p className="cert-preview-subtitle">This is to certify that</p>
-                    <div className="cert-preview-name" style={{ color: accentColor, borderBottomColor: accentColor }}>
-                        {ticketData.full_name || "N/A"}
-                    </div>
+                        {/* Title */}
+                        <h1 className="cert-preview-title" style={{ fontFamily: `"${titleFont}", serif` }}>
+                            {certTitle}
+                        </h1>
 
-                    <div className="cert-preview-details">
-                        has successfully participated in
-                        <br />
-                        <span className="cert-event-name">
-                            {ticketData.event?.name || "N/A"}
-                        </span>
-                        <br />
-                        held on{" "}
-                        {ticketData.event?.event_datetime
-                            ? new Date(ticketData.event.event_datetime).toLocaleDateString(
-                                "en-IN",
-                                { day: "2-digit", month: "short", year: "numeric" }
-                            )
-                            : "N/A"}
-                    </div>
+                        {/* Custom body text */}
+                        {style?.custom_body_text && (
+                            <p style={{ fontSize: 13, fontStyle: "italic", color: secondaryText, marginBottom: 12 }}>
+                                {style.custom_body_text}
+                            </p>
+                        )}
 
-                    {/* Signature */}
-                    {style?.signature_url && (
-                        <div style={{ marginBottom: 16 }}>
-                            <img
-                                src={style.signature_url}
-                                alt="Signature"
-                                style={{ maxHeight: 48, objectFit: "contain" }}
-                            />
-                            <div style={{ fontSize: 10, opacity: 0.4, marginTop: 4 }}>
-                                Authorized Signatory
+                        {/* Recipient */}
+                        <p className="cert-preview-subtitle" style={{ color: secondaryText }}>This is to certify that</p>
+                        <div className="cert-preview-name" style={{ color: accent, borderBottomColor: accent }}>
+                            {ticketData.full_name || "N/A"}
+                        </div>
+
+                        <div className="cert-preview-details" style={{ color: secondaryText }}>
+                            has successfully participated in
+                            <br />
+                            <span className="cert-event-name" style={{ color: text }}>
+                                {ticketData.event?.name || "N/A"}
+                            </span>
+                            <br />
+                            held on{" "}
+                            {ticketData.event?.event_datetime
+                                ? new Date(ticketData.event.event_datetime).toLocaleDateString(
+                                    "en-IN",
+                                    { day: "2-digit", month: "short", year: "numeric" }
+                                )
+                                : "N/A"}
+                        </div>
+
+                        {/* Signatures */}
+                        {(style?.signature_1_url || style?.signature_2_url) && (
+                            <div style={{ display: "flex", justifyContent: "center", gap: 48, marginBottom: 18 }}>
+                                {style?.signature_1_url && (
+                                    <div style={{ textAlign: "center" }}>
+                                        <img src={style.signature_1_url} alt="Signature" style={{ maxHeight: 44, objectFit: "contain", marginBottom: 4 }} />
+                                        <div style={{ width: 110, height: 1, background: secondaryText, margin: "0 auto 4px" }} />
+                                        {style?.signature_1_name && <div style={{ fontSize: 11, fontWeight: 600 }}>{style.signature_1_name}</div>}
+                                        {style?.signature_1_title && <div style={{ fontSize: 9, color: secondaryText }}>{style.signature_1_title}</div>}
+                                    </div>
+                                )}
+                                {style?.signature_2_url && (
+                                    <div style={{ textAlign: "center" }}>
+                                        <img src={style.signature_2_url} alt="Signature" style={{ maxHeight: 44, objectFit: "contain", marginBottom: 4 }} />
+                                        <div style={{ width: 110, height: 1, background: secondaryText, margin: "0 auto 4px" }} />
+                                        {style?.signature_2_name && <div style={{ fontSize: 11, fontWeight: 600 }}>{style.signature_2_name}</div>}
+                                        {style?.signature_2_title && <div style={{ fontSize: 9, color: secondaryText }}>{style.signature_2_title}</div>}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* QR Code */}
+                        {showQr && (
+                            <div className="cert-preview-qr">
+                                <QRCodeCanvas value={`certificate:${ticketid}`} size={80} level="H" includeMargin={true} />
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="cert-preview-footer">
+                            {showId && (
+                                <div>
+                                    <div className="cert-footer-label" style={{ color: secondaryText }}>Certificate ID</div>
+                                    <div className="cert-footer-value">{ticketid}</div>
+                                </div>
+                            )}
+                            <div style={{ textAlign: "right" }}>
+                                <div className="cert-footer-label" style={{ color: secondaryText }}>Organized By</div>
+                                <div className="cert-footer-value">
+                                    {ticketData.event?.club?.name || "N/A"}
+                                </div>
                             </div>
                         </div>
-                    )}
 
-                    {/* QR */}
-                    <div className="cert-preview-qr">
-                        <QRCodeCanvas
-                            value={`certificate:${ticketid}`}
-                            size={80}
-                            level="H"
-                            includeMargin={true}
-                        />
-                    </div>
-
-                    {/* Footer */}
-                    <div className="cert-preview-footer">
-                        <div>
-                            <div className="cert-footer-label">Certificate ID</div>
-                            <div className="cert-footer-value">{ticketid}</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                            <div className="cert-footer-label">Organized By</div>
-                            <div className="cert-footer-value">
-                                {ticketData.event?.club?.name || "N/A"}
+                        {/* Custom footer */}
+                        {style?.custom_footer_text && (
+                            <div style={{ textAlign: "center", fontSize: 11, color: secondaryText, marginTop: 14 }}>
+                                {style.custom_footer_text}
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -172,7 +223,7 @@ const Certificate = () => {
             <button
                 className="cert-download-button"
                 onClick={handleDownload}
-                style={{ background: accentColor }}
+                style={{ background: accent }}
             >
                 DOWNLOAD CERTIFICATE
             </button>
