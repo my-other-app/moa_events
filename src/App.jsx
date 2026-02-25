@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Home from "@/components/home";
 import Form from "@/components/form";
 import Ticket from "@/components/ticket";
+import Certificate from "@/components/certificate";
 import NotFound from "@/components/notfound";
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         <Route path="*" element={<NotFound />} />
         <Route path="/register/:eventId" element={<Form />} />
         <Route path="/tickets/:ticketid" element={<Ticket />} />
+        <Route path="/certificates/:ticketid" element={<Certificate />} />
       </Routes>
     </Router>
   );
