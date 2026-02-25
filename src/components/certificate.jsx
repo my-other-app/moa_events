@@ -8,20 +8,25 @@ import Download from "@/components/download";
 const Certificate = () => {
     const { ticketid } = useParams();
     const [ticketData, setTicketData] = useState(null);
+    const [style, setStyle] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         if (!ticketid) return;
-        const getTicketDetails = async () => {
+        const loadData = async () => {
             try {
-                const data = await eventsApi.fetchTicketDetails(ticketid);
+                const [data, styleData] = await Promise.all([
+                    eventsApi.fetchTicketDetails(ticketid),
+                    eventsApi.fetchCertificateStyle(ticketid),
+                ]);
                 if (!data) {
                     setError("Certificate not found");
                 } else if (!data.is_attended) {
                     setError("Certificate is only available after attendance is marked");
                 } else {
                     setTicketData(data);
+                    setStyle(styleData || {});
                 }
             } catch (err) {
                 setError("Failed to load certificate");
@@ -29,7 +34,7 @@ const Certificate = () => {
                 setLoading(false);
             }
         };
-        getTicketDetails();
+        loadData();
     }, [ticketid]);
 
     const handleDownload = () => {
@@ -39,6 +44,12 @@ const Certificate = () => {
             "_blank"
         );
     };
+
+    // Resolve style values with defaults
+    const accentColor = style?.accent_color || "#1db9a0";
+    const bgColor = style?.bg_color || "#121212";
+    const textColor = style?.text_color || "#ffffff";
+    const fontFamily = style?.font || "Inter";
 
     if (loading) {
         return (
@@ -65,18 +76,40 @@ const Certificate = () => {
     }
 
     return (
-        <div className="cert-page-container">
-            <div className="cert-preview" id="certificate">
-                <div className="cert-preview-inner">
+        <div className="cert-page-container" style={{ fontFamily: `"${fontFamily}", sans-serif` }}>
+            {/* Google Font */}
+            <link
+                href={`https://fonts.googleapis.com/css2?family=${fontFamily}:wght@300;400;600;700&display=swap`}
+                rel="stylesheet"
+            />
+
+            <div className="cert-preview" id="certificate" style={{ background: accentColor }}>
+                <div className="cert-preview-inner" style={{ background: bgColor, color: textColor }}>
+                    {/* Logo */}
+                    {style?.logo_url && (
+                        <img
+                            src={style.logo_url}
+                            alt="Logo"
+                            style={{ maxHeight: 60, marginBottom: 12, objectFit: "contain" }}
+                        />
+                    )}
+
                     {/* Header */}
-                    <div className="cert-preview-org">
+                    <div className="cert-preview-org" style={{ color: accentColor }}>
                         {ticketData.event?.club?.name || ""}
                     </div>
                     <h1 className="cert-preview-title">Certificate of Participation</h1>
 
+                    {/* Custom text */}
+                    {style?.custom_text && (
+                        <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 12 }}>
+                            {style.custom_text}
+                        </p>
+                    )}
+
                     {/* Body */}
                     <p className="cert-preview-subtitle">This is to certify that</p>
-                    <div className="cert-preview-name">
+                    <div className="cert-preview-name" style={{ color: accentColor, borderBottomColor: accentColor }}>
                         {ticketData.full_name || "N/A"}
                     </div>
 
@@ -95,6 +128,20 @@ const Certificate = () => {
                             )
                             : "N/A"}
                     </div>
+
+                    {/* Signature */}
+                    {style?.signature_url && (
+                        <div style={{ marginBottom: 16 }}>
+                            <img
+                                src={style.signature_url}
+                                alt="Signature"
+                                style={{ maxHeight: 48, objectFit: "contain" }}
+                            />
+                            <div style={{ fontSize: 10, opacity: 0.4, marginTop: 4 }}>
+                                Authorized Signatory
+                            </div>
+                        </div>
+                    )}
 
                     {/* QR */}
                     <div className="cert-preview-qr">
@@ -122,7 +169,11 @@ const Certificate = () => {
                 </div>
             </div>
 
-            <button className="cert-download-button" onClick={handleDownload}>
+            <button
+                className="cert-download-button"
+                onClick={handleDownload}
+                style={{ background: accentColor }}
+            >
                 DOWNLOAD CERTIFICATE
             </button>
             <Download />

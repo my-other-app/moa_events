@@ -44,4 +44,14 @@ export const eventsApi = {
             return null;
         }
     },
+
+    fetchCertificateStyle: async (ticketId) => {
+        try {
+            const response = await apiClient.get(`/api/v1/events/certificates/${ticketId}/style`);
+            return response.data;
+        } catch (error) {
+            console.error("Error fetching certificate style:", error);
+            return null;
+        }
+    },
 };

@@ -41,14 +41,11 @@
 .cert-preview {
     width: 100%;
     max-width: 680px;
-    background: #1db9a0;
     border-radius: 20px;
     padding: 14px;
 }
 
 .cert-preview-inner {
-    background: #121212;
-    color: #fff;
     border-radius: 16px;
     padding: 40px 36px;
     text-align: center;
@@ -59,7 +56,6 @@
     font-size: 12px;
     letter-spacing: 5px;
     text-transform: uppercase;
-    color: #1db9a0;
     margin-bottom: 8px;
     font-weight: 600;
 }
@@ -80,9 +76,7 @@
 .cert-preview-name {
     font-size: 24px;
     font-weight: 700;
-    color: #1db9a0;
     padding: 8px 0;
-    border-bottom: 2px solid #1db9a0;
     display: inline-block;
     min-width: 300px;
     margin-bottom: 20px;
@@ -134,7 +128,6 @@
 
 /* Download Button */
 .cert-download-button {
-    background: #1db9a0;
     color: #000;
     border: none;
     padding: 14px 48px;
@@ -147,9 +140,9 @@
 }
 
 .cert-download-button:hover {
-    background: #17a08a;
+    filter: brightness(0.9);
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(29, 185, 160, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 /* Responsive */
