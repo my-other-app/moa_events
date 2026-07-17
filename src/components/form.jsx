@@ -19,6 +19,7 @@ const Form = () => {
   );
 
   const [loadingEvent, setLoadingEvent] = useState(!state?.additionalDetails);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -66,6 +67,8 @@ const Form = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     const payload = {
       full_name: formData.name,
@@ -91,17 +94,25 @@ const Form = () => {
                 phone: formData.whatsappNumber,
               },
               onSuccess: () => navigate(`/tickets/${responseData.ticket_id}`),
-              onFailure: () => alert("Payment failed, please try again."),
+              onFailure: () => {
+                alert("Payment failed, please try again.");
+                setIsSubmitting(false);
+              },
             });
+          } else {
+            setIsSubmitting(false);
           }
         } else {
           // No payment needed, proceed to ticket
           navigate(`/tickets/${responseData.ticket_id}`);
         }
+      } else {
+        setIsSubmitting(false);
       }
     } catch (error) {
       console.error("Form submission error:", error);
       alert(error.message || "Registration failed. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -205,12 +216,13 @@ const Form = () => {
           <button
             type="submit"
             className="form-continue-button"
+            disabled={isSubmitting}
           >
-            CONTINUE
+            {isSubmitting ? "SUBMITTING..." : "CONTINUE"}
           </button>
         </form>
       </div>
-      <Continue handleSubmit={handleSubmit} />
+      <Continue handleSubmit={handleSubmit} disabled={isSubmitting} />
     </div>
   );
 };

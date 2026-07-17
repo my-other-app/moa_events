@@ -28,7 +28,7 @@ const Certificate = () => {
                     setTicketData(data);
                     setStyle(styleData || {});
                 }
-            } catch (err) {
+            } catch {
                 setError("Failed to load certificate");
             } finally {
                 setLoading(false);

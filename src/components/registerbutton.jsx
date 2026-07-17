@@ -7,7 +7,7 @@ const RegisterButton = ({ eventData, countdown, isRegistrationClosed }) => {
 
   const handleRegister = () => {
     if (!isRegistrationClosed) {
-      navigate("/register", {
+      navigate(`/register/${eventData.id}`, {
         state: {
           eventId: eventData.id,
           additionalDetails: eventData.additional_details || [],

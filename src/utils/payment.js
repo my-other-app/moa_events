@@ -40,6 +40,11 @@ export const processPayment = async ({
     theme: {
       color: "#3399cc",
     },
+    modal: {
+      ondismiss: () => {
+        onFailure();
+      },
+    },
   };
 
   const rzp = new window.Razorpay(options);

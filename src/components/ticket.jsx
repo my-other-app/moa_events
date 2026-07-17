@@ -1,8 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { eventsApi } from "@/api/events";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { QRCodeCanvas } from "qrcode.react";
 import "@/styles/ticket.css";
 import Download from "@/components/download";
@@ -10,33 +8,35 @@ import Download from "@/components/download";
 const Ticket = () => {
   const { ticketid } = useParams();
   const [ticketData, setTicketData] = useState(null);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!ticketid) return;
+    setError(false);
     const getTicketDetails = async () => {
       const data = await eventsApi.fetchTicketDetails(ticketid);
-      setTicketData(data);
+      if (data) {
+        setTicketData(data);
+      } else {
+        setError(true);
+      }
     };
 
     getTicketDetails();
-  }, [ticketid]);
+  }, [ticketid, retryCount]);
 
 
-  const generatePDF = () => {
-    const ticketElement = document.getElementById("ticket");
-    if (!ticketElement) return;
-
-    html2canvas(ticketElement, { scale: 2 }).then((canvas) => {
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "px",
-        format: [canvas.width, canvas.height],
-      });
-      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
-      pdf.save("ticket.pdf");
-    });
-  };
+  if (error) {
+    return (
+      <div className="ticket-container">
+        <p>Failed to load ticket details. Please check your connection and try again.</p>
+        <button className="download-button" onClick={() => setRetryCount((c) => c + 1)}>
+          RETRY
+        </button>
+      </div>
+    );
+  }
 
   if (!ticketData) {
     return <div>Loading ticket details...</div>;
@@ -110,9 +110,6 @@ const Ticket = () => {
         </div>
       </div>
 
-      <button className="download-button" onClick={generatePDF}>
-        DOWNLOAD TICKET
-      </button>
       <Download />
     </div>
   );

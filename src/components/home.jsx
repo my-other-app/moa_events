@@ -24,6 +24,8 @@ const Home = () => {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [showSnackbar, setShowSnackbar] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const handleSnackbar = (message) => {
     setSnackbarMessage(message);
@@ -46,20 +48,26 @@ const Home = () => {
     if (!eventId) return;
 
     setLoading(true);
+    setError(false);
 
     const getEvents = async () => {
       try {
         const fetchedEvents = await eventsApi.fetchEvent(eventId);
-        setEventData(fetchedEvents);
+        if (fetchedEvents) {
+          setEventData(fetchedEvents);
+        } else {
+          setError(true);
+        }
       } catch (error) {
         console.error("Error fetching event:", error);
+        setError(true);
       } finally {
         setTimeout(() => setLoading(false), 1000);
       }
     };
 
     getEvents();
-  }, [eventId]);
+  }, [eventId, retryCount]);
 
   useEffect(() => {
     if (!eventData) return;
@@ -100,6 +108,15 @@ const Home = () => {
 
     return `${hours}:${minutes} ${ampm}`;
   };
+
+  if (error) {
+    return (
+      <div className="loader-container">
+        <p>Failed to load this event. Please check your connection and try again.</p>
+        <button onClick={() => setRetryCount((c) => c + 1)}>RETRY</button>
+      </div>
+    );
+  }
 
   if (!eventData) return <p></p>;
 
