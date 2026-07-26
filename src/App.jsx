@@ -9,7 +9,7 @@ import NotFound from "@/components/notfound";
 function App() {
   const RedirectToExternal = () => {
     useEffect(() => {
-      window.location.href = "https://finnet.app";
+      window.location.href = "https://myotherapp.in";
     }, []);
 
     return null;
