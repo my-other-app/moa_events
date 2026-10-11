@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import "@/styles/form.css";
 
 import { eventsApi } from "@/api/events";
+import { currentRef } from "../utils/ref";
 import { paymentsApi } from "@/api/payments";
 import { processPayment } from "@/utils/payment";
 import Continue from "@/components/continue";
@@ -70,11 +71,14 @@ const Form = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
+    const ref = currentRef();
     const payload = {
       full_name: formData.name,
       email: formData.email,
       phone: formData.whatsappNumber,
       additional_details: additionalDetails.length > 0 ? formData.additional_details : {},
+      // The tracking link that brought them, when one did.
+      ...(ref ? { ref } : {}),
     };
 
     try {
