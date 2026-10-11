@@ -15,6 +15,51 @@ import hourglass from "../assets/hourglass.svg";
 import PlaceMarker from "../assets/Place Marker.svg";
 import Trophy from "../assets/Trophy.svg";
 
+const agendaTime = (iso, tz) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+const agendaDay = (iso, tz) =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "long", day: "numeric", month: "long" }).format(new Date(iso));
+const dayOf = (iso, tz) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+
+/** The run of show, grouped by day when it spans more than one; parallel tracks are marked. */
+export const Agenda = ({ agenda }) => {
+  const tz = agenda.timezone || "Asia/Kolkata";
+  const days = [...new Set(agenda.items.map((i) => dayOf(i.starts_at, tz)))];
+  return (
+    <section className="agenda" aria-labelledby="agenda-heading">
+      <h3 id="agenda-heading">Agenda</h3>
+      {days.map((day) => (
+        <div key={day} className="agenda-day">
+          {days.length > 1 && <div className="agenda-day-heading">{agendaDay(agenda.items.find((i) => dayOf(i.starts_at, tz) === day).starts_at, tz)}</div>}
+          <ul className="agenda-list">
+            {agenda.items
+              .filter((i) => dayOf(i.starts_at, tz) === day)
+              .map((i) => (
+                <li key={i.id} className="agenda-item">
+                  <div className="agenda-time">
+                    {agendaTime(i.starts_at, tz)}
+                    {i.ends_at && <span className="agenda-time-end">– {agendaTime(i.ends_at, tz)}</span>}
+                  </div>
+                  <div className="agenda-body">
+                    <div className="agenda-title">
+                      {i.title}
+                      {i.parallel && <span className="agenda-parallel">Parallel</span>}
+                    </div>
+                    {(i.speaker || i.location) && (
+                      <div className="agenda-meta">{[i.speaker, i.location].filter(Boolean).join(" · ")}</div>
+                    )}
+                    {i.description && <div className="agenda-desc">{i.description}</div>}
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
+    </section>
+  );
+};
+
 const Home = () => {
   const navigate = useNavigate();
   const { eventId } = useParams();
@@ -43,6 +88,19 @@ const Home = () => {
       },
     });
   };
+
+  const [agenda, setAgenda] = useState(null);
+
+  useEffect(() => {
+    if (!eventId) return;
+    let alive = true;
+    eventsApi.fetchAgenda(eventId).then((a) => {
+      if (alive && a && Array.isArray(a.items)) setAgenda(a);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -240,6 +298,10 @@ const Home = () => {
           </div>
 
           <div className="description">{eventData.about}</div>
+
+          {agenda && agenda.items.length > 0 && (
+            <Agenda agenda={agenda} />
+          )}
 
           <div className="help-section">
             <h3>Need Help?</h3>

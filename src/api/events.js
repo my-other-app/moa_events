@@ -35,6 +35,17 @@ export const eventsApi = {
         }
     },
 
+    /** The run of show. Public; an empty list when the organiser has not written one. */
+    fetchAgenda: async (eventId) => {
+        try {
+            const response = await apiClient.get(`/api/v1/events/${eventId}/agenda`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching the agenda for ${eventId}:`, error);
+            return null;
+        }
+    },
+
     fetchTicketDetails: async (ticketId) => {
         try {
             const response = await apiClient.get(`/api/v1/events/tickets/${ticketId}`);
