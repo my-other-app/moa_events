@@ -7,6 +7,7 @@ import { eventsApi } from "@/api/events";
 vi.mock("@/api/events", () => ({
     eventsApi: {
         fetchEvent: vi.fn().mockResolvedValue(null),
+        fetchStoreCatalog: vi.fn().mockResolvedValue({ enabled: false, items: [] }),
         registerForEvent: vi.fn(),
     },
 }));
