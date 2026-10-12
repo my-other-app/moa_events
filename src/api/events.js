@@ -1,6 +1,17 @@
 import apiClient from "./client";
 
 export const eventsApi = {
+    /** What the event sells with its ticket; `{enabled:false, items:[]}` when nothing. */
+    fetchStoreCatalog: async (eventId) => {
+        try {
+            const response = await apiClient.get(`/api/v1/events/${eventId}/store/catalog`);
+            return response.data;
+        } catch (error) {
+            console.error(`Error fetching the store for event ${eventId}:`, error);
+            return { enabled: false, items: [] };
+        }
+    },
+
     fetchEvent: async (eventId) => {
         try {
             const response = await apiClient.get(`/api/v1/events/info/${eventId}`);

@@ -6,6 +6,8 @@ import { eventsApi } from "@/api/events";
 import { currentRef } from "../utils/ref";
 import { paymentsApi } from "@/api/payments";
 import { processPayment } from "@/utils/payment";
+import MerchPicker from "./merchpicker";
+import { picksToPayload } from "../utils/picks";
 import Continue from "@/components/continue";
 
 import logo from "../assets/wordmark 1.svg";
@@ -21,6 +23,8 @@ const Form = () => {
 
   const [loadingEvent, setLoadingEvent] = useState(!state?.additionalDetails);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [picks, setPicks] = useState({});
+  const [catalogItems, setCatalogItems] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -80,6 +84,9 @@ const Form = () => {
       // The tracking link that brought them, when one did.
       ...(ref ? { ref } : {}),
     };
+    // What they picked from the shelf, paid with the ticket.
+    const store = picksToPayload(catalogItems, picks);
+    if (store.length > 0) payload.store = store;
 
     try {
       const responseData = await eventsApi.registerForEvent(eventId, payload);
@@ -217,6 +224,7 @@ const Form = () => {
             </div>
           ))}
 
+          <MerchPicker eventId={eventId} picks={picks} onChange={setPicks} onItems={setCatalogItems} />
           <button
             type="submit"
             className="form-continue-button"
