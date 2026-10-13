@@ -4,6 +4,9 @@ import "@/styles/home.css";
 
 import RegisterButton from "@/components/registerbutton";
 import { eventsApi } from "@/api/events";
+import { liveApi } from "@/api/live";
+import { roomIsActive } from "@/utils/live";
+import "@/styles/live.css";
 import Snackbar from "./snackbar";
 
 import logo from "../assets/wordmark 1.svg";
@@ -90,6 +93,20 @@ const Home = () => {
   };
 
   const [agenda, setAgenda] = useState(null);
+  // The room: a banner, a poll or a quiz up right now earns a strip at the top.
+  const [live, setLive] = useState(null);
+
+  useEffect(() => {
+    if (!eventId) return;
+    let alive = true;
+    const look = () => liveApi.fetchFeed(eventId).then((f) => alive && setLive(f)).catch(() => {});
+    look();
+    const t = setInterval(look, 30000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -217,6 +234,17 @@ const Home = () => {
       </div>
 
       <main className="main-content">
+        {roomIsActive(live) && (
+          <div className="live-strip" role="status">
+            <div>
+              <span className="live-dot">Live now</span>
+              <p>{live.banner ? live.banner.text : live.quiz?.live ? "The quiz is on — join with the code on the screen" : live.poll ? live.poll.prompt : "Questions are being taken from the floor"}</p>
+            </div>
+            <button type="button" className="live-btn" onClick={() => navigate(`/${eventData.id}/live`)}>
+              Open the live room
+            </button>
+          </div>
+        )}
         <div className="banner-container">
           <img
             src={eventData.poster.original}
