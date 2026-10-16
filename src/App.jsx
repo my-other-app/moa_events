@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Form from "@/components/form";
+import Register from "@/components/register/register";
 import Ticket from "@/components/ticket";
 import Certificate from "@/components/certificate";
 import NotFound from "@/components/notfound";
@@ -31,7 +31,7 @@ export function AppRoutes() {
       <Route path="/events/:slug" element={<EventPage />} />
       <Route
         path="/events/:slug/register"
-        element={<EventScoped sub="register">{(event) => <Form eventId={String(event.id)} eventSlug={event.slug} />}</EventScoped>}
+        element={<EventScoped sub="register">{(event, page) => <Register event={event} club={page?.club ?? null} />}</EventScoped>}
       />
       <Route path="/events/:slug/live" element={<EventScoped sub="live">{(event) => <Live eventId={String(event.id)} eventSlug={event.slug} />}</EventScoped>} />
       <Route

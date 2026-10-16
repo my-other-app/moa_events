@@ -13,23 +13,23 @@ const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /** Looks the event up by whatever the address calls it. */
 function useEvent(ref) {
-  const [state, setState] = useState({ status: "loading", event: null, ref });
+  const [state, setState] = useState({ status: "loading", event: null, page: null, ref });
   const [attempt, setAttempt] = useState(0);
   const valid = REF.test(ref || "");
   useEffect(() => {
     if (!valid) return undefined;
     let alive = true;
-    setState((s) => (s.ref === ref && s.status === "ready" ? s : { status: "loading", event: null, ref }));
+    setState((s) => (s.ref === ref && s.status === "ready" ? s : { status: "loading", event: null, page: null, ref }));
     discoverApi.event(ref, { fresh: attempt > 0 }).then(
-      (page) => alive && setState({ status: "ready", event: page.event, ref }),
-      (e) => alive && setState({ status: e?.notFound ? "missing" : "error", event: null, ref })
+      (page) => alive && setState({ status: "ready", event: page.event, page, ref }),
+      (e) => alive && setState({ status: e?.notFound ? "missing" : "error", event: null, page: null, ref })
     );
     return () => {
       alive = false;
     };
   }, [ref, valid, attempt]);
-  if (!valid) return { status: "missing", event: null, retry: () => {} };
-  const current = state.ref === ref ? state : { status: "loading", event: null };
+  if (!valid) return { status: "missing", event: null, page: null, retry: () => {} };
+  const current = state.ref === ref ? state : { status: "loading", event: null, page: null };
   return { ...current, retry: () => setAttempt((a) => a + 1) };
 }
 
@@ -83,15 +83,16 @@ export function LegacyEventRedirect({ sub = "" }) {
 /**
  * The event's own pages under /events/{slug}/…: the registration form, the
  * live room, the competition. They work with the event's numeric id, so the
- * slug is turned into one first; `children` is called with the event.
+ * slug is turned into one first; `children` is called with the event, and
+ * the whole page it came with (its club, say) for the pages that show more.
  */
 export function EventScoped({ sub, children }) {
   const { slug } = useParams();
   const { search, hash } = useLocation();
-  const { status, event, retry } = useEvent(slug);
+  const { status, event, page, retry } = useEvent(slug);
   if (status === "missing") return <NotFound />;
   if (status === "error") return <Failed onRetry={retry} />;
   if (status === "loading") return <Holding />;
   if (event.slug && event.slug !== slug) return <Navigate replace to={{ pathname: eventPath(event, sub), search, hash }} />;
-  return children(event);
+  return children(event, page);
 }

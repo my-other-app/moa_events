@@ -103,13 +103,16 @@ describe("the routes", () => {
   });
 
   it("shows the registration form at /events/{slug}/register, working with the event's id", async () => {
+    eventsApi.fetchEvent.mockResolvedValueOnce({ id: 123, additional_details: [] });
     at("/events/hack-night-04/register");
-    expect(await screen.findByPlaceholderText("Enter Your Name")).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Full name/)).toBeInTheDocument();
     expect(discoverApi.event).toHaveBeenCalledWith("hack-night-04", expect.anything());
     await waitFor(() => expect(eventsApi.fetchEvent).toHaveBeenCalledWith("123"));
     expect(eventsApi.fetchStoreCatalog).toHaveBeenCalledWith("123");
+    // The club comes with the event, for the summary beside the form.
+    expect(screen.getByText("by Circuit Society")).toBeInTheDocument();
     // Back goes to the event's own page, by its slug.
-    fireEvent.click(screen.getByRole("button", { name: /Back/ }));
+    fireEvent.click(screen.getByRole("link", { name: /Back to event/ }));
     expect(where()).toBe("/events/hack-night-04");
   });
 
