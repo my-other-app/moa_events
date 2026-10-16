@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import apiClient from "@/api/client";
 import "@/styles/live.css";
+import { countVisit } from "@/utils/visit";
 
 /**
  * A club's published website, served whole from the API as one HTML page
@@ -19,11 +20,17 @@ const ClubSite = () => {
     let alive = true;
     apiClient
       .get(`/api/v1/sites/${slug}`, { skipAuth: true, responseType: "text", transformResponse: [(d) => d] })
-      .then((r) => alive && setHtml(r.data))
+      .then((r) => {
+        if (!alive) return;
+        setHtml(r.data);
+        countVisit(slug, params);
+      })
       .catch(() => alive && setMissing(true));
     return () => {
       alive = false;
     };
+    // The visit is counted once per page, not again when the follow hint changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   if (missing) {
