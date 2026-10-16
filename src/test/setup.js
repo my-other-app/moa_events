@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
-// jsdom doesn't implement window.alert
-window.alert = vi.fn();
+// jsdom doesn't implement window.alert (and the api/ functions' tests run on plain Node, with no window).
+if (typeof window !== 'undefined') window.alert = vi.fn();
 
 // Node 25+'s experimental built-in `localStorage` global shadows jsdom's
 // working implementation with a stub that isn't actually functional in this
