@@ -6,8 +6,9 @@ import { roomIsActive } from "@/utils/live";
 import { formatCount, formatPrice, imageUrl, statusPill } from "@/utils/format";
 import { linkify, safeHref } from "@/utils/linkify";
 import { buildIcs, calendarTimes, googleCalendarUrl, icsFilename, icsHref } from "@/utils/calendar";
-import { dateTile, eventEnd, eventPath, eventRef, registerState, seatsLeft, summary, whenLine } from "@/utils/eventpage";
+import { eventEnd, eventPath, registerState, seatsLeft, summary, whenLine } from "@/utils/eventpage";
 import { Img } from "./bits";
+import { EventCover } from "./cover";
 import Icon from "./icons";
 
 /* ---------- small things ---------- */
@@ -134,43 +135,16 @@ export function EpSection({ id, title, children, className = "", aside = null })
 
 /* ---------- the poster ---------- */
 
-const hash = (s) => {
-  let h = 2166136261;
-  for (const ch of String(s)) h = Math.imul(h ^ ch.codePointAt(0), 16777619);
-  return h >>> 0;
-};
-
 /**
- * The cover an event without a poster gets: its name set big on the
- * slate, the date on a yellow tile, and a pattern that differs (a little)
- * from one event to the next. Never a broken image.
+ * The cover an event without a poster gets: the same drawn cover its card
+ * shows, so the event looks the same on the card and on its page.
  */
-export function Cover({ event, club }) {
-  const tile = dateTile(event.starts_at);
-  const seed = hash(eventRef(event) || event.name);
-  const variant = seed % 4;
-  const angle = 120 + (seed % 50);
-  return (
-    <div className={`ep-cover ep-cover--v${variant}`} style={{ "--ep-angle": `${angle}deg` }} aria-hidden="true">
-      <span className="ep-cover-ring" />
-      <span className="ep-cover-dots" />
-      {tile ? (
-        <span className="ep-cover-date">
-          <strong>{tile.day}</strong>
-          <span>{tile.month}</span>
-        </span>
-      ) : null}
-      <div className="ep-cover-bottom">
-        {event.category ? <span className="ep-cover-kicker">{event.category.name}</span> : null}
-        <span className="ep-cover-title">{event.name}</span>
-        {club ? <span className="ep-cover-club">{club.name}</span> : null}
-      </div>
-    </div>
-  );
+export function Cover({ event }) {
+  return <EventCover event={event} />;
 }
 
 /** The poster at 4:5 with the status pill on it, or the generated cover. Not lazy: it's the first thing seen. */
-export function Poster({ event, club }) {
+export function Poster({ event }) {
   const src = imageUrl(event.poster, "original");
   const [failed, setFailed] = useState(null);
   const pill = statusPill(event);
@@ -179,7 +153,7 @@ export function Poster({ event, club }) {
       {src && failed !== src ? (
         <img src={src} alt={`Poster for ${event.name}`} decoding="async" fetchPriority="high" onError={() => setFailed(src)} />
       ) : (
-        <Cover event={event} club={club} />
+        <Cover event={event} />
       )}
       {pill ? <span className={`dc-pill dc-pill--${pill.tone}`}>{pill.label}</span> : null}
     </div>

@@ -168,7 +168,7 @@ describe("an event's page", () => {
 
     // No poster: the generated cover, never a broken image.
     expect(document.querySelector(".ep-poster img")).toBeNull();
-    expect(document.querySelector(".ep-cover")).not.toBeNull();
+    expect(document.querySelector(".ep-poster .dc-cover")).not.toBeNull();
 
     const text = document.querySelector("article").textContent;
     expect(text).not.toMatch(/(?<![\d:.,])0(?!\d)/);
