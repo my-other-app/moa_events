@@ -12,8 +12,14 @@ const CODE = /^[a-z0-9]{4,16}$/i;
 
 export function rememberRef(search = typeof window === "undefined" ? "" : window.location.search) {
   try {
-    const ref = new URLSearchParams(search).get("ref");
+    const params = new URLSearchParams(search);
+    const ref = params.get("ref");
+    // `sref` is the club website's own code, on its event buttons. It is the
+    // weaker claim: someone who reached the site through one of the club's
+    // links keeps that link's credit, and the site gets the rest.
+    const sref = params.get("sref");
     if (ref && CODE.test(ref)) sessionStorage.setItem(KEY, ref.toLowerCase());
+    else if (sref && CODE.test(sref) && !sessionStorage.getItem(KEY)) sessionStorage.setItem(KEY, sref.toLowerCase());
   } catch {
     // Storage can be unavailable in a private tab; the sign-up still works, just uncredited.
   }
