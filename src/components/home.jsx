@@ -5,6 +5,7 @@ import "@/styles/home.css";
 import RegisterButton from "@/components/registerbutton";
 import { eventsApi } from "@/api/events";
 import { liveApi } from "@/api/live";
+import { competitionApi } from "@/api/competition";
 import { roomIsActive } from "@/utils/live";
 import "@/styles/live.css";
 import Snackbar from "./snackbar";
@@ -95,6 +96,17 @@ const Home = () => {
   const [agenda, setAgenda] = useState(null);
   // The room: a banner, a poll or a quiz up right now earns a strip at the top.
   const [live, setLive] = useState(null);
+  // A competition on the event: the strip that leads a registered guest to their team.
+  const [competition, setCompetition] = useState(null);
+
+  useEffect(() => {
+    if (!eventId) return;
+    let alive = true;
+    competitionApi.leaderboard(eventId).then((b) => alive && setCompetition(b)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -242,6 +254,17 @@ const Home = () => {
             </div>
             <button type="button" className="live-btn" onClick={() => navigate(`/${eventData.id}/live`)}>
               Open the live room
+            </button>
+          </div>
+        )}
+        {competition?.enabled && (
+          <div className="live-strip" role="status">
+            <div>
+              <span className="live-dot">Competition</span>
+              <p>{competition.public && competition.rows.length ? `${competition.rows[0].name} leads the board` : "Form a team from your ticket, pick a track, and hand in your work here."}</p>
+            </div>
+            <button type="button" className="live-btn" onClick={() => navigate(`/${eventData.id}/compete`)}>
+              Your team
             </button>
           </div>
         )}
