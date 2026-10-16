@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "@/styles/home.css";
+import { formatTime } from "@/utils/format";
 
 import RegisterButton from "@/components/registerbutton";
 import { eventsApi } from "@/api/events";
@@ -9,8 +10,9 @@ import { competitionApi } from "@/api/competition";
 import { roomIsActive } from "@/utils/live";
 import "@/styles/live.css";
 import Snackbar from "./snackbar";
+import { SiteHeader } from "@/components/discover/chrome";
+import { usePageMeta } from "@/utils/meta";
 
-import logo from "../assets/wordmark 1.svg";
 import shareicon from "../assets/Icon.svg";
 import calendar from "../assets/Calendar.svg";
 import clock from "../assets/clock.svg";
@@ -18,8 +20,6 @@ import money from "../assets/money.svg";
 import hourglass from "../assets/hourglass.svg";
 import PlaceMarker from "../assets/Place Marker.svg";
 import Trophy from "../assets/Trophy.svg";
-
-const IST_TIME = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
 
 const agendaTime = (iso, tz) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
@@ -94,6 +94,11 @@ const Home = () => {
       },
     });
   };
+
+  usePageMeta(
+    eventData?.name ? `${eventData.name} · MyOtherApp` : null,
+    typeof eventData?.about === "string" ? eventData.about.slice(0, 155) : null
+  );
 
   const [agenda, setAgenda] = useState(null);
   // The room: a banner, a poll or a quiz up right now earns a strip at the top.
@@ -187,10 +192,7 @@ const Home = () => {
 
   // The start time in India time. This used to add 5:30 to the browser's own
   // clock, so anyone already in India saw it five and a half hours late.
-  const convertToIST = (iso) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? "" : IST_TIME.format(d);
-  };
+  const convertToIST = (iso) => formatTime(iso);
 
   if (error) {
     return (
@@ -221,11 +223,12 @@ const Home = () => {
   }
 
   return (
+    <>
+    <SiteHeader />
     <div className="hackathon-page">
       <div className="header">
-        <div className="logo">
-          <img src={logo} alt="Calendar icon" className="logo-icon" />
-        </div>
+        {/* The wordmark now lives in the site header above. */}
+        <div className="logo" />
         <button
           className="register-btn"
           onClick={handleRegister}
@@ -371,6 +374,7 @@ const Home = () => {
         <Snackbar message={snackbarMessage} onClose={closeSnackbar} />
       )}
     </div>
+    </>
   );
 };
 
