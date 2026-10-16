@@ -1,3 +1,5 @@
+import "@/styles/registerbutton.css";
+
 const Continue = ({ handleSubmit, disabled }) => {
   return (
     <div className="mobile-register-container continue-btn">

@@ -13,9 +13,15 @@ import Continue from "@/components/continue";
 import logo from "../assets/wordmark 1.svg";
 import leftarrow from "../assets/left-arrow.svg";
 
-const Form = () => {
+/**
+ * The registration form. Under /events/{slug}/register it is handed the
+ * event's id and slug; the id from the address is the fallback.
+ */
+const Form = ({ eventId: eventIdProp, eventSlug } = {}) => {
   const navigate = useNavigate();
-  const { eventId } = useParams();
+  const params = useParams();
+  const eventId = eventIdProp ?? params.eventId;
+  const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
   const { state } = useLocation();
   const [additionalDetails, setAdditionalDetails] = useState(
     state?.additionalDetails || []
@@ -136,7 +142,7 @@ const Form = () => {
       </div>
 
       <div className="form-back-button">
-        <button className="back-button" onClick={() => navigate(`/${eventId}`)}>
+        <button className="back-button" onClick={() => navigate(eventPage)}>
           <span className="form-arrow">
             <img src={leftarrow} alt="" />
           </span>{" "}

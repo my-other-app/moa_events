@@ -1,3 +1,20 @@
+/* The floating buttons on the registration form (Continue) and the certificate (Download). */
+.register-btn {
+  background-color: #2c3440;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 12px 24px;
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.register-btn:hover {
+  background-color: #1e2530;
+}
+
 .mobile-register-container {
     position: fixed;
     bottom: 0;

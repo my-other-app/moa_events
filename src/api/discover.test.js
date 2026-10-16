@@ -1,14 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import apiClient from "./client";
+import { fullEvent, sparseEvent } from "@/test/eventFixture";
 import {
   clubsQuery,
   discoverApi,
   eventsQuery,
   filtersToSearch,
+  forgetEvents,
   isEmptyHome,
   parseClubPage,
   parseEvent,
+  parseEventPage,
   parseHome,
+  parseSitemap,
   parseThread,
   parseWhere,
   readClubFilters,
@@ -62,6 +66,9 @@ describe("reading the responses", () => {
       status: "upcoming",
     });
     expect(parseEvent({ id: 9, status: "exploded", going: "12", fee: "199.00" })).toMatchObject({ status: "upcoming", going: 12, fee: 199 });
+    // The card links to /events/{slug}, so the slug has to come through.
+    expect(parseEvent({ id: 9, slug: "hack-night-04" }).slug).toBe("hack-night-04");
+    expect(parseEvent({ id: 9 }).slug).toBeNull();
   });
 
   it("drops rows it cannot link to", () => {
@@ -111,6 +118,39 @@ describe("reading the responses", () => {
   });
 });
 
+describe("reading an event's page", () => {
+  it("reads every part of a full event, and leaves this event out of its own 'more' row", () => {
+    const p = parseEventPage(fullEvent());
+    expect(p.event).toMatchObject({ id: 123, slug: "hack-night-04", fee: 250, prize_amount: 50000, capacity: 120, seats_left: 18, lat: 18.5293, status: "upcoming", registration_open: true });
+    expect(p.event.category).toEqual({ id: 9, name: "Hackathon" });
+    expect(p.club.name).toBe("Circuit Society");
+    expect(p.speakers.map((s) => s.name)).toEqual(["Ananya Iyer", "Rahul Menon"]);
+    expect(p.agenda.items).toHaveLength(2);
+    expect(p.team_source).toBe("event");
+    expect(p.more_from_club.map((e) => e.slug)).toEqual(["solder-sprint"]);
+    expect(p.similar[0].slug).toBe("ctf-night");
+  });
+
+  it("turns the zeros of an unfilled form into nothing, never 0", () => {
+    const { event } = parseEventPage(sparseEvent());
+    expect(event).toMatchObject({ fee: null, prize_amount: null, capacity: null, seats_left: null, going: 0, about: null, lat: null, lng: null });
+    expect(parseEventPage(sparseEvent({ event: { ...sparseEvent().event, lat: 0, lng: 0 } })).event.lat).toBeNull();
+  });
+
+  it("says nothing without the event itself, and copes with wrong-typed parts", () => {
+    expect(parseEventPage({ club: { name: "x" } })).toBeNull();
+    const p = parseEventPage({ event: { id: 5, status: "weird", agenda: null }, speakers: "x", agenda: { items: [{ title: "no time" }, { starts_at: "2026-10-18T10:00:00Z", title: "ok" }] }, team: [{ name: "A" }], team_source: "bogus" });
+    expect(p.event.status).toBe("upcoming");
+    expect(p.speakers).toEqual([]);
+    expect(p.agenda.items.map((i) => i.title)).toEqual(["ok"]);
+    expect(p.team_source).toBe("none");
+  });
+
+  it("reads the sitemap, dropping rows without a slug", () => {
+    expect(parseSitemap({ events: [{ slug: "a", updated_at: "2026-10-16T10:00:00Z" }, { slug: null }], clubs: "x" })).toEqual({ events: [{ slug: "a", updated_at: "2026-10-16T10:00:00Z" }], clubs: [] });
+  });
+});
+
 describe("the calls", () => {
   let adapter;
   beforeEach(() => {
@@ -132,6 +172,37 @@ describe("the calls", () => {
     expect(config.headers.Authorization).toBeUndefined();
     expect(page.items[0].name).toBe("Hack Night");
     expect(page.where.city).toBe("Pune");
+  });
+
+  it("looks an event up once for its slug and its id, and remembers it for a minute", async () => {
+    forgetEvents();
+    adapter.mockImplementation(async (config) => ({ data: fullEvent(), status: 200, headers: {}, config }));
+    const [a, b] = await Promise.all([discoverApi.event("123"), discoverApi.event("123")]);
+    expect(a).toBe(b);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    expect(adapter.mock.calls[0][0].url).toBe("/api/v1/discover/events/123");
+    expect(adapter.mock.calls[0][0].headers.Authorization).toBeUndefined();
+    // The page it redirects to asks by slug: already known.
+    expect((await discoverApi.event("hack-night-04")).event.id).toBe(123);
+    expect(adapter).toHaveBeenCalledTimes(1);
+    // A retry asks again.
+    await discoverApi.event("hack-night-04", { fresh: true });
+    expect(adapter).toHaveBeenCalledTimes(2);
+    forgetEvents();
+  });
+
+  it("says an event that isn't public is not found, and doesn't remember a failure", async () => {
+    forgetEvents();
+    adapter.mockImplementation(async (config) => {
+      const e = new Error("404");
+      e.config = config;
+      e.response = { status: 404, config };
+      throw e;
+    });
+    await expect(discoverApi.event("nope")).rejects.toMatchObject({ notFound: true });
+    adapter.mockImplementation(async (config) => ({ data: sparseEvent({ event: { ...sparseEvent().event, slug: "nope" } }), status: 200, headers: {}, config }));
+    expect((await discoverApi.event("nope")).event.slug).toBe("nope");
+    forgetEvents();
   });
 
   it("tells a missing club apart from a failure", async () => {

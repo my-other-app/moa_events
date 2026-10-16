@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { Agenda } from "./home.jsx";
+import { Agenda } from "./discover/agenda.jsx";
 
 const agenda = {
     timezone: "Asia/Kolkata",
