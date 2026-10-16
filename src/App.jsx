@@ -7,6 +7,7 @@ import Certificate from "@/components/certificate";
 import NotFound from "@/components/notfound";
 import Live from "@/components/live";
 import Compete from "@/components/compete";
+import ClubSite from "@/components/clubsite";
 import Play from "@/components/play";
 import Feedback from "@/components/feedback";
 
@@ -26,6 +27,7 @@ function App() {
         <Route path="/:eventId" element={<Home />} />
         <Route path="/:eventId/live" element={<Live />} />
         <Route path="/:eventId/compete" element={<Compete />} />
+        <Route path="/clubs/:slug" element={<ClubSite />} />
         <Route path="/play/:eventId" element={<Play />} />
         <Route path="/feedback/:eventId/:registrationId" element={<Feedback />} />
         <Route path="*" element={<NotFound />} />
