@@ -1,0 +1,225 @@
+/* The competition page shares the live room's frame (.live-page, .live-top, .live-btn, .live-banner). */
+.cp-card {
+  background: #151918;
+  border: 1px solid #2a302d;
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 12px;
+}
+.cp-card h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.cp-sub {
+  margin: 4px 0 0;
+  color: #9aa39e;
+  font-size: 13px;
+}
+.cp-h3 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  color: #9aa39e;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cp-note {
+  margin: 10px 0 0;
+  color: #9aa39e;
+  font-size: 13px;
+}
+.cp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cp-input {
+  flex: 1 1 160px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  color: #eef1ee;
+  background: #0b0e0d;
+  border: 1px solid #2a302d;
+  border-radius: 12px;
+}
+.cp-input:focus {
+  outline: none;
+  border-color: #4fcdb0;
+  box-shadow: 0 0 0 3px rgba(79, 205, 176, 0.25);
+}
+.cp-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.cp-team,
+.cp-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #2a302d;
+  border-radius: 12px;
+}
+.cp-track {
+  display: block;
+}
+.cp-track p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #c9cfcb;
+}
+.cp-team strong,
+.cp-track strong {
+  display: block;
+  font-size: 14px;
+}
+.cp-team small,
+.cp-track small,
+.cp-mentor small {
+  display: block;
+  color: #9aa39e;
+  font-size: 12px;
+}
+.cp-members {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cp-members li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #1b201e;
+  font-size: 13px;
+}
+.cp-seek {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #222826;
+}
+.cp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.cp-check input {
+  accent-color: #4fcdb0;
+  width: 18px;
+  height: 18px;
+}
+.cp-status {
+  margin: 10px 0 0;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #1b201e;
+  color: #c9cfcb;
+}
+.cp-status.is-complete {
+  background: #12302a;
+  color: #b4e5bc;
+}
+.cp-status.is-in_progress {
+  background: #33280f;
+  color: #f8dfa5;
+}
+.cp-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.cp-field span {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.cp-field em {
+  font-style: normal;
+  color: #9aa39e;
+  font-size: 11px;
+  margin-left: 6px;
+}
+.cp-field .cp-input {
+  width: 100%;
+}
+.cp-mentor {
+  margin-top: 14px;
+}
+.cp-mentor strong {
+  font-size: 14px;
+}
+.cp-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.cp-slot {
+  min-width: 84px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: #eef1ee;
+  background: transparent;
+  border: 1px dashed #2a302d;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.cp-slot small {
+  display: block;
+  font-size: 11px;
+  color: #9aa39e;
+}
+.cp-slot.is-mine {
+  border-style: solid;
+  border-color: #4fcdb0;
+  background: #12302a;
+}
+.cp-slot.is-taken {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cp-board {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.cp-board li {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #2a302d;
+  border-radius: 12px;
+}
+.cp-board li.is-mine {
+  border-color: #4fcdb0;
+}
+.cp-rank {
+  font-family: ui-monospace, monospace;
+  color: #9aa39e;
+}
+.cp-name small {
+  display: block;
+  color: #9aa39e;
+  font-size: 12px;
+}
+.cp-score {
+  font-family: ui-monospace, monospace;
+  font-size: 16px;
+}

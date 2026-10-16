@@ -1,15 +1,28 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { eventsApi } from "@/api/events";
+import { competitionApi } from "@/api/competition";
+import { Link } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import "@/styles/ticket.css";
 import Download from "@/components/download";
 
 const Ticket = () => {
   const { ticketid } = useParams();
+  const [competition, setCompetition] = useState(null);
   const [ticketData, setTicketData] = useState(null);
   const [error, setError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    const id = ticketData?.event?.id;
+    if (!id) return;
+    let alive = true;
+    competitionApi.leaderboard(id).then((b) => alive && setCompetition(b)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [ticketData?.event?.id]);
 
   useEffect(() => {
     if (!ticketid) return;
@@ -110,6 +123,11 @@ const Ticket = () => {
         </div>
       </div>
 
+      {competition?.enabled && ticketData.event?.id ? (
+        <Link to={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>
+          Your team and submission
+        </Link>
+      ) : null}
       <Download />
     </div>
   );
