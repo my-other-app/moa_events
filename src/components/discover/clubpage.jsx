@@ -3,12 +3,15 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { discoverApi } from "@/api/discover";
 import { countVisit } from "@/utils/visit";
 import { usePageMeta } from "@/utils/meta";
-import { formatCount, imageUrl, initial } from "@/utils/format";
+import { formatCount, imageUrl } from "@/utils/format";
+import { faceLook, initials } from "@/utils/cover";
 import { SitePage } from "./chrome";
 import { AppPrompt, Avatar, EmptyState, ErrorState, Img, Section } from "./bits";
+import { ClubCover } from "./cover";
 import { EventCard } from "./eventcard";
 import { ThreadCard } from "./threadcard";
 import Icon from "./icons";
+import "@/styles/cards-hero.css";
 
 const SOCIALS = [
   ["instagram", "Instagram", "instagram"],
@@ -55,29 +58,66 @@ function ClubSkeleton() {
   );
 }
 
-function Person({ person }) {
-  const links = [
-    ["instagram", "Instagram"],
-    ["linkedin", "LinkedIn"],
-    ["x", "X"],
-    ["website", "Website"],
-  ]
-    .map(([k, label]) => [k, label, safeUrl(person.links[k])])
-    .filter(([, , url]) => url);
+const PERSON_LINKS = [
+  ["instagram", "Instagram", "instagram"],
+  ["linkedin", "LinkedIn", "linkedin"],
+  ["x", "X", "x"],
+  ["website", "Website", "globe"],
+];
+
+/** A face for a person: their photo, or their initials on a colour that is always theirs. */
+function Face({ name, photo }) {
+  const look = faceLook(name);
+  const fallback = (
+    <span className="dc-member-initials" style={{ background: look.palette.bg, color: look.palette.ink }} aria-hidden="true">
+      {initials(name)}
+    </span>
+  );
   return (
-    <li className="dc-person">
-      <Avatar name={person.name} src={person.photo} size={72} alt="" />
-      <span className="dc-person-name">{person.name}</span>
-      {person.role ? <span className="dc-person-role">{person.role}</span> : null}
+    <span className="dc-member-face">
+      <Img src={imageUrl(photo, "medium")} alt="" fallback={fallback} />
+    </span>
+  );
+}
+
+/** One of the people behind the club, with only the links they gave that are safe to follow. */
+function Member({ person }) {
+  const links = PERSON_LINKS.map(([k, label, icon]) => [k, label, icon, safeUrl(person.links[k])]).filter(([, , , url]) => url);
+  return (
+    <li className="dc-member">
+      <Face name={person.name} photo={person.photo} />
+      <span className="dc-member-name">{person.name}</span>
+      {person.role ? <span className="dc-member-role">{person.role}</span> : null}
       {links.length ? (
-        <span className="dc-person-links">
-          {links.map(([k, label, url]) => (
-            <a key={k} href={url} target="_blank" rel="noopener noreferrer" aria-label={`${person.name} on ${label}`}>
-              <Icon name={k === "website" ? "globe" : k} size={16} />
+        <span className="dc-member-links">
+          {links.map(([k, label, icon, url]) => (
+            <a key={k} href={url} target="_blank" rel="noopener noreferrer" aria-label={`${person.name} on ${label}`} title={label}>
+              <Icon name={icon} size={16} />
             </a>
           ))}
         </span>
       ) : null}
+    </li>
+  );
+}
+
+/** A partner on the logo wall: the logo large, the name and what they do for the club below. */
+function Partner({ partner }) {
+  return (
+    <li className="dc-ptile">
+      <span className="dc-ptile-logo">
+        <Img
+          src={imageUrl(partner.logo, "medium")}
+          alt=""
+          fallback={
+            <span className="dc-ptile-initials" aria-hidden="true">
+              {initials(partner.name)}
+            </span>
+          }
+        />
+      </span>
+      <span className="dc-ptile-name">{partner.name}</span>
+      {partner.role ? <span className="dc-ptile-role">{partner.role}</span> : null}
     </li>
   );
 }
@@ -187,7 +227,7 @@ export default function ClubPage() {
     <SitePage>
       <div className="dc-wrap">
         <div className="dc-club-cover">
-          <Img src={imageUrl(club.cover, "original")} alt="" />
+          <Img src={imageUrl(club.cover, "original")} alt="" fallback={<ClubCover club={club} w={240} h={80} />} />
         </div>
         <div className="dc-club-id">
           <Avatar name={club.name} src={club.logo} size={104} alt={`${club.name} logo`} />
@@ -237,9 +277,9 @@ export default function ClubPage() {
 
         <Section id="upcoming" title="Upcoming events" className="dc-club-section">
           {data.upcoming.length ? (
-            <div className="dc-grid dc-grid--4">
+            <div className="dc-rail dc-rail--cards">
               {data.upcoming.map((e) => (
-                <EventCard key={e.id} event={e} />
+                <EventCard key={e.id} event={e} showClub={false} />
               ))}
             </div>
           ) : (
@@ -297,37 +337,29 @@ export default function ClubPage() {
 
         {data.past.length ? (
           <Section id="past" title="Past events" className="dc-club-section">
-            <div className="dc-grid dc-grid--4">
-              {data.past.slice(0, 8).map((e) => (
-                <EventCard key={e.id} event={e} />
+            <div className="dc-rowlist">
+              {data.past.slice(0, 9).map((e) => (
+                <EventCard key={e.id} event={e} variant="row" />
               ))}
             </div>
           </Section>
         ) : null}
 
         {data.team.length ? (
-          <Section id="team" title="Team" className="dc-club-section">
-            <ul className="dc-team">
+          <Section id="team" title="Team" sub={`The people behind ${club.name}`} className="dc-club-section">
+            <ul className="dc-crew">
               {data.team.map((p, i) => (
-                <Person key={`${p.name}-${i}`} person={p} />
+                <Member key={`${p.name}-${i}`} person={p} />
               ))}
             </ul>
           </Section>
         ) : null}
 
         {data.partners.length ? (
-          <Section id="partners" title="Partners" className="dc-club-section">
-            <ul className="dc-partners">
+          <Section id="partners" title="Partners" sub={`Who backs ${club.name}`} className="dc-club-section">
+            <ul className="dc-pwall">
               {data.partners.map((p, i) => (
-                <li key={`${p.name}-${i}`} className="dc-partner">
-                  <span className="dc-partner-logo">
-                    <Img src={imageUrl(p.logo, "thumbnail")} alt={`${p.name} logo`} fallback={<span aria-hidden="true">{initial(p.name)}</span>} />
-                  </span>
-                  <div>
-                    <strong>{p.name}</strong>
-                    {p.role ? <span>{p.role}</span> : null}
-                  </div>
-                </li>
+                <Partner key={`${p.name}-${i}`} partner={p} />
               ))}
             </ul>
           </Section>

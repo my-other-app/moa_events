@@ -9,3 +9,6 @@ export const CLUBS_URL = "https://clubs-next.myotherapp.in";
 export const CONTACT_EMAIL = "support@myotherapp.in";
 
 export const SITE_NAME = "MyOtherApp";
+
+/** The site's own address: canonical links and the links people share start here. */
+export const SITE_URL = "https://myotherapp.in";

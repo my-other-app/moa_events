@@ -5,6 +5,11 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
   { ignores: ['dist'] },
+  // The Vercel functions under api/ run on Node.
+  {
+    files: ['api/**/*.js'],
+    languageOptions: { globals: globals.node },
+  },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {

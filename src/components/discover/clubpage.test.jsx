@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const get = vi.fn();
@@ -69,6 +69,9 @@ describe("a club's page", () => {
     expect(screen.getByText("Following happens in the MyOtherApp app — open the club there and tap Follow.")).toBeInTheDocument();
     expect(screen.getByText("We build things that blink")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Hack Night 04" })).toHaveAttribute("href", "/68");
+    // On the club's own page its cards don't repeat its name; past events are the compact rows.
+    expect(screen.getByRole("link", { name: "Hack Night 04" }).closest("article").querySelector(".dc-evcard-club")).toBeNull();
+    expect(screen.getByRole("link", { name: "Solder Sprint" }).closest("article")).toHaveClass("dc-evcard--row", "is-ended");
     expect(screen.getByText("Closing soon")).toBeInTheDocument();
     expect(screen.getByText("Kits are in!")).toBeInTheDocument();
     expect(screen.getByText("Asha Rao")).toBeInTheDocument();
@@ -79,13 +82,74 @@ describe("a club's page", () => {
     expect(screen.getByRole("link", { name: /Instagram/ })).toHaveAttribute("href", "https://instagram.com/circuit");
     // A link that is not http(s) is never offered.
     expect(screen.queryByRole("link", { name: /YouTube/ })).toBeNull();
-    expect(document.title).toBe("Circuit Society · MyOtherApp");
+    // The title is set in an effect, which can land a beat after the page paints.
+    await waitFor(() => expect(document.title).toBe("Circuit Society · MyOtherApp"));
 
     fireEvent.click(screen.getByRole("button", { name: "Follow in the app" }));
     const dialog = screen.getByRole("dialog", { name: "Follow Circuit Society" });
     expect(within(dialog).getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute("href", expect.stringContaining("play.google.com"));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows the team with only the links that are safe to follow, and the partners as a logo wall", async () => {
+    get.mockResolvedValue({
+      data: {
+        ...page,
+        team: [
+          {
+            name: "Asha Rao",
+            role: "President",
+            photo: "https://cdn.example/asha.jpg",
+            links: { instagram: "javascript:alert(1)", linkedin: "https://linkedin.com/in/asha", x: "ftp://x.com/asha", website: "asha.dev" },
+          },
+          { name: "Rahul Menon", role: null, photo: null, links: { instagram: "data:text/html,hi", x: "javascript://%0aalert(1)" } },
+          { name: "", role: "Ghost", links: {} },
+        ],
+        partners: [
+          { name: "Acme Labs", role: "Venue partner", logo: "https://cdn.example/acme.png" },
+          { name: "Kerala Startup Mission", role: null, logo: null },
+        ],
+      },
+    });
+    show("/clubs/circuit-society");
+    const team = await screen.findByRole("region", { name: "Team" }, { timeout: 5000 });
+    const people = within(team).getAllByRole("listitem");
+    expect(people).toHaveLength(2); // a member without a name is dropped
+    const asha = within(people[0]);
+    expect(asha.getByText("Asha Rao")).toBeInTheDocument();
+    expect(asha.getByText("President")).toBeInTheDocument();
+    expect(people[0].querySelector("img")).toHaveAttribute("src", "https://cdn.example/asha.jpg");
+    const links = asha.getAllByRole("link");
+    expect(links.map((a) => a.getAttribute("href"))).toEqual(["https://linkedin.com/in/asha", "https://asha.dev/"]);
+    for (const a of links) {
+      expect(a).toHaveAttribute("target", "_blank");
+      expect(a).toHaveAttribute("rel", "noopener noreferrer");
+    }
+    expect(asha.getByRole("link", { name: "Asha Rao on Website" })).toBeInTheDocument();
+    // No photo: their initials. No safe links: no link row at all.
+    expect(within(people[1]).getByText("RM")).toBeInTheDocument();
+    expect(within(people[1]).queryAllByRole("link")).toHaveLength(0);
+    expect(people[1].querySelector(".dc-member-links")).toBeNull();
+
+    const partners = within(screen.getByRole("region", { name: "Partners" })).getAllByRole("listitem");
+    // The logo is decoration next to the name, so screen readers hear the name once.
+    expect(partners[0].querySelector("img")).toHaveAttribute("src", "https://cdn.example/acme.png");
+    expect(partners[0].querySelector("img")).toHaveAttribute("alt", "");
+    expect(within(partners[0]).getByText("Venue partner")).toBeInTheDocument();
+    expect(within(partners[1]).getByText("KM")).toBeInTheDocument();
+    expect(within(partners[1]).getByText("Kerala Startup Mission")).toBeInTheDocument();
+  });
+
+  it("hides the team and partners when there are none", async () => {
+    get.mockResolvedValue({ data: { ...page, team: [], partners: [] } });
+    show("/clubs/circuit-society");
+    expect(await screen.findByRole("heading", { level: 1, name: "Circuit Society" }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 2, name: "Team" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "Partners" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Team/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Partners/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /^Past events/ })).toHaveAttribute("href", "#past");
   });
 
   it("leaves out empty sections and the website button when there is no site", async () => {

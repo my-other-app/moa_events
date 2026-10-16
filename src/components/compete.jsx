@@ -204,8 +204,11 @@ function MyTeam({ eventId, me, onChange, say }) {
   );
 }
 
-const Compete = () => {
-  const { eventId } = useParams();
+/** Under /events/{slug}/compete it is handed the event's id and slug; the id from the address is the fallback. */
+const Compete = ({ eventId: eventIdProp, eventSlug } = {}) => {
+  const params = useParams();
+  const eventId = eventIdProp ?? params.eventId;
+  const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
   const [me, setMe] = useState(null);
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
@@ -231,7 +234,7 @@ const Compete = () => {
     return (
       <div className="live-page">
         <div className="live-top">
-          <Link to={`/${eventId}`}>← Event</Link>
+          <Link to={eventPage}>← Event</Link>
           <h1>Competition</h1>
         </div>
         <p className="cp-note">{error}</p>
@@ -246,7 +249,7 @@ const Compete = () => {
   return (
     <div className="live-page">
       <div className="live-top">
-        <Link to={`/${eventId}`}>← Event</Link>
+        <Link to={eventPage}>← Event</Link>
         <h1>Competition</h1>
       </div>
       {toast ? (

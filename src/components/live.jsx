@@ -210,9 +210,14 @@ const Questions = ({ eventId, feed, onChange }) => {
   );
 };
 
-/** The room on a phone: the banner, the poll that is up, the quiz if it runs, the questions. */
-const Live = () => {
-  const { eventId } = useParams();
+/**
+ * The room on a phone: the banner, the poll that is up, the quiz if it runs, the questions.
+ * Under /events/{slug}/live it is handed the event's id and slug; the id from the address is the fallback.
+ */
+const Live = ({ eventId: eventIdProp, eventSlug } = {}) => {
+  const params = useParams();
+  const eventId = eventIdProp ?? params.eventId;
+  const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
   const [feed, setFeed] = useState(null);
   const [error, setError] = useState(false);
   const timer = useRef(null);
@@ -245,7 +250,7 @@ const Live = () => {
   return (
     <div className="live-page">
       <div className="live-top">
-        <Link to={`/${eventId}`}>← Event</Link>
+        <Link to={eventPage}>← Event</Link>
         <h1>{feed.event.name}</h1>
         <span className="live-dot">Live</span>
       </div>

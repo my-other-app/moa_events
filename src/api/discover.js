@@ -173,6 +173,7 @@ export function parseEvent(e) {
   const category = obj(o.category);
   return {
     id: o.id,
+    slug: str(o.slug),
     name: str(o.name) || "Untitled event",
     poster: o.poster || null,
     starts_at: str(o.starts_at),
@@ -312,6 +313,19 @@ export function parseClubsPage(d) {
   return { ...page(o, list(o.items, parseClub)), where: parseWhere(o.where), interests: list(o.interests, parseInterest) };
 }
 
+/** Someone on a club's or an event's team, with their links. */
+function parsePerson(m) {
+  const mo = obj(m);
+  if (!mo || !str(mo.name)) return null;
+  const links = obj(mo.links) || {};
+  return {
+    name: mo.name,
+    role: str(mo.role),
+    photo: mo.photo || null,
+    links: { instagram: str(links.instagram), linkedin: str(links.linkedin), x: str(links.x), website: str(links.website) },
+  };
+}
+
 export function parseClubPage(d) {
   const o = obj(d) || {};
   const club = parseClub(o.club);
@@ -321,17 +335,7 @@ export function parseClubPage(d) {
     upcoming: list(o.upcoming, parseEvent),
     past: list(o.past, parseEvent),
     threads: list(o.threads, parseThread),
-    team: list(o.team, (m) => {
-      const mo = obj(m);
-      if (!mo || !str(mo.name)) return null;
-      const links = obj(mo.links) || {};
-      return {
-        name: mo.name,
-        role: str(mo.role),
-        photo: mo.photo || null,
-        links: { instagram: str(links.instagram), linkedin: str(links.linkedin), x: str(links.x), website: str(links.website) },
-      };
-    }),
+    team: list(o.team, parsePerson),
     partners: list(o.partners, (p) => {
       const po = obj(p);
       if (!po || !str(po.name)) return null;
@@ -345,6 +349,127 @@ export function parseThreadsPage(d) {
   return page(o, list(o.items, parseThread));
 }
 
+/* ---------- one event's page ---------- */
+
+/** A positive amount or nothing: a fee, prize or capacity of 0 means "not set", never "0". */
+const positive = (v) => {
+  const x = nOrNull(v);
+  return x !== null && x > 0 ? x : null;
+};
+const isoOrNull = (v) => {
+  const s = str(v);
+  return s && !Number.isNaN(new Date(s).getTime()) ? s : null;
+};
+const textOf = (v) => (typeof v === "string" && v.trim() ? v.replace(/\r\n?/g, "\n").trim() : null);
+
+/** The event itself, as GET /discover/events/{ref} sends it. */
+export function parseEventDetail(e) {
+  const o = obj(e);
+  if (!o || idOf(o.id) === null) return null;
+  const category = obj(o.category);
+  const contact = obj(o.contact) || {};
+  const lat = nOrNull(o.lat);
+  const lng = nOrNull(o.lng);
+  // 0,0 is the sea off Ghana: a venue nobody picked.
+  const placed = lat !== null && lng !== null && !(lat === 0 && lng === 0) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  const seats = nOrNull(o.seats_left);
+  const capacity = positive(o.capacity);
+  return {
+    id: o.id,
+    slug: str(o.slug),
+    name: str(o.name) || "Untitled event",
+    about: textOf(o.about),
+    poster: o.poster || null,
+    poster_thumb: o.poster_thumb || null,
+    starts_at: isoOrNull(o.starts_at),
+    ends_at: isoOrNull(o.ends_at),
+    duration_hours: positive(o.duration_hours),
+    timezone: str(o.timezone) || "Asia/Kolkata",
+    is_online: Boolean(o.is_online),
+    location_name: str(o.location_name),
+    location_link: str(o.location_link),
+    lat: placed ? lat : null,
+    lng: placed ? lng : null,
+    has_fee: Boolean(o.has_fee),
+    fee: positive(o.fee),
+    has_prize: Boolean(o.has_prize),
+    prize_amount: positive(o.prize_amount),
+    capacity,
+    going: Math.max(0, n(o.going)),
+    seats_left: capacity !== null && seats !== null ? Math.max(0, Math.floor(seats)) : null,
+    reg_opens_at: isoOrNull(o.reg_opens_at),
+    reg_closes_at: isoOrNull(o.reg_closes_at),
+    status: STATUSES.has(o.status) ? o.status : "upcoming",
+    registration_open: Boolean(o.registration_open),
+    category: category && idOf(category.id) !== null && str(category.name) ? { id: category.id, name: str(category.name) } : null,
+    interests: Array.isArray(o.interests) ? o.interests.map((i) => (typeof i === "string" ? str(i) : str(obj(i)?.name))).filter(Boolean) : [],
+    guidelines: textOf(o.guidelines),
+    contact: { name: str(contact.name), email: str(contact.email), phone: str(contact.phone) },
+    url: str(o.url),
+  };
+}
+
+const parseSpeaker = (s) => {
+  const o = obj(s);
+  if (!o || !str(o.name)) return null;
+  return {
+    id: idOf(o.id),
+    name: o.name.trim(),
+    designation: str(o.designation),
+    photo: o.photo || null,
+    bio: textOf(o.bio),
+    link: str(o.link),
+  };
+};
+
+/** The run of show, in the shape the agenda has always had; items without a time are dropped. */
+export function parseAgenda(a) {
+  const o = obj(a) || {};
+  const items = list(o.items, (item, i) => {
+    const io = obj(item);
+    if (!io || !isoOrNull(io.starts_at) || !str(io.title)) return null;
+    return {
+      id: idOf(io.id) ?? `item-${i}`,
+      starts_at: io.starts_at,
+      ends_at: isoOrNull(io.ends_at),
+      title: io.title,
+      description: textOf(io.description),
+      speaker: str(io.speaker),
+      location: str(io.location),
+      parallel: Boolean(io.parallel),
+    };
+  });
+  return { timezone: str(o.timezone) || "Asia/Kolkata", items };
+}
+
+const TEAM_SOURCES = new Set(["event", "club"]);
+
+/** Everything the event page shows; null when the event itself is missing. */
+export function parseEventPage(d) {
+  const o = obj(d) || {};
+  const event = parseEventDetail(o.event);
+  if (!event) return null;
+  const others = (rows) => list(rows, parseEvent).filter((e) => String(e.id) !== String(event.id));
+  const team = list(o.team, parsePerson);
+  return {
+    event,
+    club: parseClub(o.club),
+    speakers: list(o.speakers, parseSpeaker),
+    agenda: parseAgenda(o.agenda),
+    team,
+    team_source: team.length && TEAM_SOURCES.has(o.team_source) ? o.team_source : "none",
+    more_from_club: others(o.more_from_club),
+    similar: others(o.similar),
+  };
+}
+
+/** What the sitemap lists: every public event and club, by slug. */
+export function parseSitemap(d) {
+  const o = obj(d) || {};
+  const rows = (v) => list(v, (r) => (str(obj(r)?.slug) ? { slug: r.slug, updated_at: isoOrNull(r.updated_at) } : null));
+  return { events: rows(o.events), clubs: rows(o.clubs) };
+}
+
 /* ---------- the calls ---------- */
 
 const get = (url, params) => apiClient.get(url, { params, skipAuth: true }).then((r) => r.data);
@@ -355,6 +480,46 @@ const tag = (error) => {
   e.notFound = error?.response?.status === 404;
   throw e;
 };
+
+/*
+ * One event is asked for by slug or by id, often twice in a row: an old
+ * /{id} link looks it up to redirect, then the page it lands on shows it;
+ * "Register" needs its id a moment later. The answer is kept for a minute
+ * under every name it goes by, and a request already on its way is shared.
+ */
+const EVENT_TTL = 60 * 1000;
+const events = new Map();
+
+/** Forgets every event looked up so far (for tests, and a retry after an error). */
+export function forgetEvents() {
+  events.clear();
+}
+
+function lookUpEvent(ref, { fresh = false } = {}) {
+  const key = String(ref);
+  const hit = events.get(key);
+  if (!fresh && hit && Date.now() - hit.at < EVENT_TTL) return hit.promise;
+  const promise = get(`/api/v1/discover/events/${encodeURIComponent(key)}`).then((d) => {
+    const parsed = parseEventPage(d);
+    if (!parsed) {
+      const e = new Error("No such event");
+      e.notFound = true;
+      throw e;
+    }
+    return parsed;
+  }, tag);
+  const entry = { at: Date.now(), promise };
+  events.set(key, entry);
+  promise.then(
+    (p) => {
+      for (const k of [p.event.slug, p.event.id]) if (k !== null && k !== undefined) events.set(String(k), entry);
+    },
+    () => {
+      if (events.get(key) === entry) events.delete(key);
+    }
+  );
+  return promise;
+}
 
 export const discoverApi = {
   locate: () => get("/api/v1/discover/locate").then(parseWhere, tag),
@@ -390,4 +555,10 @@ export const discoverApi = {
     }, tag),
 
   comments: (id) => get(`/api/v1/threads/${encodeURIComponent(id)}/comments`).then((d) => list(d, parseComment), tag),
+
+  /** One public event's page by slug or numeric id; rejects with `notFound` when it isn't public. */
+  event: (ref, options) => lookUpEvent(ref, options),
+
+  /** Every public event and club, for the sitemap. */
+  sitemap: () => get("/api/v1/discover/sitemap").then(parseSitemap, tag),
 };
