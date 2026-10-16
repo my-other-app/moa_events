@@ -9,7 +9,8 @@ import "@/styles/cards-hero.css";
 /**
  * A club in a list: its cover (or one drawn in the event covers' family),
  * the logo over it, what it is about, where, and how alive it is. The whole
- * card opens the club's page.
+ * card opens the club's page. A list that doesn't know what's coming up
+ * (the clubs you follow) passes `upcoming_events: null`, and that count goes.
  */
 export function ClubCard({ club, headingLevel = 3 }) {
   const Heading = `h${headingLevel}`;
@@ -46,9 +47,11 @@ export function ClubCard({ club, headingLevel = 3 }) {
           <span>
             <strong>{formatCount(club.followers)}</strong> {club.followers === 1 ? "follower" : "followers"}
           </span>
-          <span className={upcoming > 0 ? "dc-clubcard-upcoming is-on" : "dc-clubcard-upcoming"}>
-            <strong>{formatCount(upcoming)}</strong> upcoming
-          </span>
+          {upcoming === null || upcoming === undefined ? null : (
+            <span className={upcoming > 0 ? "dc-clubcard-upcoming is-on" : "dc-clubcard-upcoming"}>
+              <strong>{formatCount(upcoming)}</strong> upcoming
+            </span>
+          )}
         </p>
       </div>
     </article>

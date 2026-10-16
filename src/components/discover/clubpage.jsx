@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { accountApi } from "@/api/account";
 import { discoverApi } from "@/api/discover";
+import { useAuth } from "@/auth/context";
+import { currentRef } from "@/utils/ref";
 import { countVisit } from "@/utils/visit";
 import { usePageMeta } from "@/utils/meta";
 import { formatCount, imageUrl } from "@/utils/format";
@@ -123,9 +126,75 @@ function Partner({ partner }) {
 }
 
 /**
+ * Following a club as the signed-in person. The button flips the moment it
+ * is pressed (and the count with it), and flips back if the server says no.
+ * "Already following" and "not following" from the server are the state the
+ * person asked for, not errors.
+ */
+function useClubFollow(clubId, signedIn) {
+  const [s, setS] = useState({ known: false, on: false, busy: false, error: null, delta: 0 });
+  const acted = useRef(false);
+
+  useEffect(() => {
+    acted.current = false;
+    setS({ known: false, on: false, busy: false, error: null, delta: 0 });
+    if (!signedIn || clubId === null || clubId === undefined) return undefined;
+    let alive = true;
+    accountApi.isFollowing(clubId).then(
+      (on) => alive && !acted.current && setS((x) => ({ ...x, known: true, on })),
+      () => alive && !acted.current && setS((x) => ({ ...x, known: true }))
+    );
+    return () => {
+      alive = false;
+    };
+  }, [clubId, signedIn]);
+
+  const set = useCallback(
+    (want) => {
+      if (clubId === null || clubId === undefined) return;
+      acted.current = true;
+      const step = want ? 1 : -1;
+      setS((x) => ({ ...x, known: true, on: want, busy: true, error: null, delta: x.delta + step }));
+      (want ? accountApi.follow(clubId, currentRef()) : accountApi.unfollow(clubId)).then(
+        (changed) => setS((x) => ({ ...x, busy: false, delta: changed ? x.delta : x.delta - step })),
+        () =>
+          setS((x) => ({
+            ...x,
+            on: !want,
+            busy: false,
+            delta: x.delta - step,
+            error: want ? "Couldn't follow just now. Try again." : "Couldn't unfollow just now. Try again.",
+          }))
+      );
+    },
+    [clubId]
+  );
+
+  return { ...s, set };
+}
+
+function FollowButton({ follow, ghost = false }) {
+  return (
+    <button
+      type="button"
+      className={`dc-btn ac-follow${follow.on ? " is-on" : ghost ? " dc-btn--ghost" : ""}`}
+      aria-pressed={follow.on}
+      aria-busy={follow.busy || undefined}
+      onClick={() => {
+        if (!follow.busy) follow.set(!follow.on);
+      }}
+    >
+      <Icon name={follow.on ? "check" : "plus"} size={18} />
+      {follow.on ? "Following" : "Follow"}
+    </button>
+  );
+}
+
+/**
  * A club's page: who they are, what's coming up, what they've been posting,
- * what they've run, the people behind it and who backs them. Following
- * happens in the app; the website button goes to the club's own site.
+ * what they've run, the people behind it and who backs them. Signed in,
+ * Follow follows here; signed out, following happens in the app (or after
+ * signing in). The website button goes to the club's own site.
  */
 export default function ClubPage() {
   const { slug } = useParams();
@@ -134,6 +203,8 @@ export default function ClubPage() {
   const [attempt, setAttempt] = useState(0);
   const [prompt, setPrompt] = useState(false);
   const counted = useRef(null);
+  const auth = useAuth();
+  const signedIn = auth.status === "signed-in";
 
   useEffect(() => {
     let alive = true;
@@ -159,17 +230,34 @@ export default function ClubPage() {
 
   const data = state.data;
   const club = data?.club;
+  const follow = useClubFollow(club?.id ?? null, signedIn);
   usePageMeta(
     club ? `${club.name} · MyOtherApp` : state.status === "missing" ? "Club not found · MyOtherApp" : null,
     club ? club.tagline || (club.about ? club.about.slice(0, 155) : `Events and posts from ${club.name} on MyOtherApp.`) : null
   );
 
-  const followHint = params.get("follow") ? (
-    <div className="dc-banner" role="status">
-      <strong>Follow</strong>
-      <span>Following happens in the MyOtherApp app — open the club there and tap Follow.</span>
-    </div>
-  ) : null;
+  const signInToFollow = () => {
+    setPrompt(false);
+    auth.openSignIn({ reason: "follow", onDone: () => follow.set(true) });
+  };
+
+  const followHint =
+    params.get("follow") && !signedIn ? (
+      <div className="dc-banner" role="status">
+        <strong>Follow</strong>
+        {auth.enabled ? (
+          <span>
+            Following happens in the MyOtherApp app — open the club there and tap Follow, or{" "}
+            <button type="button" className="ac-linkbtn" onClick={signInToFollow}>
+              sign in to follow here
+            </button>
+            .
+          </span>
+        ) : (
+          <span>Following happens in the MyOtherApp app — open the club there and tap Follow.</span>
+        )}
+      </div>
+    ) : null;
 
   if (state.status === "loading") {
     return (
@@ -208,6 +296,7 @@ export default function ClubPage() {
     );
   }
 
+  const followers = Math.max(0, club.followers + follow.delta);
   const website = safeUrl(club.website_url);
   const socials = SOCIALS.map(([k, label, icon]) => [k, label, icon, safeUrl(club.socials[k] || (k === "website" ? club.website_url : null))]).filter(
     ([, , , url]) => url
@@ -242,7 +331,7 @@ export default function ClubPage() {
                   </span>
                 ) : null}
                 <span>
-                  <Icon name="users" size={14} /> <strong>{formatCount(club.followers)}</strong> {club.followers === 1 ? "follower" : "followers"}
+                  <Icon name="users" size={14} /> <strong>{formatCount(followers)}</strong> {followers === 1 ? "follower" : "followers"}
                 </span>
                 {club.events_held !== null ? (
                   <span>
@@ -252,13 +341,22 @@ export default function ClubPage() {
               </p>
             </div>
             <div className="dc-club-actions">
-              <button type="button" className="dc-btn" onClick={() => setPrompt(true)}>
-                Follow in the app
-              </button>
+              {signedIn ? (
+                <FollowButton follow={follow} />
+              ) : (
+                <button type="button" className="dc-btn" onClick={() => setPrompt(true)}>
+                  Follow in the app
+                </button>
+              )}
               {website ? (
                 <a className="dc-btn dc-btn--ghost" href={website} target="_blank" rel="noopener noreferrer">
                   Visit website <Icon name="external" size={16} />
                 </a>
+              ) : null}
+              {follow.error ? (
+                <p className="ac-follow-err" role="status">
+                  {follow.error}
+                </p>
               ) : null}
             </div>
           </div>
@@ -283,10 +381,26 @@ export default function ClubPage() {
               ))}
             </div>
           ) : (
-            <EmptyState as="h3" title="Nothing scheduled yet" message={`Follow ${club.name} in the app to hear the moment they announce their next event.`}>
-              <button type="button" className="dc-btn dc-btn--ghost" onClick={() => setPrompt(true)}>
-                Follow in the app
-              </button>
+            <EmptyState
+              as="h3"
+              title="Nothing scheduled yet"
+              message={
+                signedIn
+                  ? follow.on
+                    ? `You follow ${club.name}: you'll hear the moment they announce their next event.`
+                    : `Follow ${club.name} to hear the moment they announce their next event.`
+                  : `Follow ${club.name} in the app to hear the moment they announce their next event.`
+              }
+            >
+              {signedIn ? (
+                follow.on ? null : (
+                  <FollowButton follow={follow} ghost />
+                )
+              ) : (
+                <button type="button" className="dc-btn dc-btn--ghost" onClick={() => setPrompt(true)}>
+                  Follow in the app
+                </button>
+              )}
             </EmptyState>
           )}
         </Section>
@@ -371,6 +485,13 @@ export default function ClubPage() {
         onClose={() => setPrompt(false)}
         title={`Follow ${club.name}`}
         message={`Following happens in the MyOtherApp app — open ${club.name} there and tap Follow to hear about every new event and post.`}
+        alt={
+          auth.enabled ? (
+            <button type="button" className="dc-btn dc-btn--ghost" onClick={signInToFollow}>
+              Sign in to follow here
+            </button>
+          ) : null
+        }
       />
     </SitePage>
   );

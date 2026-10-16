@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { CLUBS_URL, CONTACT_EMAIL, PLAY_STORE_URL } from "@/config";
+import { HeaderAccount } from "../auth/account";
 import { AppPrompt } from "./bits";
 import Icon from "./icons";
 import wordmark from "@/assets/wordmark-sm.png";
@@ -8,8 +9,8 @@ import "@/styles/discover.css";
 
 /**
  * The bar on top of every public page: the wordmark home, the three ways
- * in (events, clubs, posts), a search that lands on find-events, and the
- * way to the app.
+ * in (events, clubs, posts), a search that lands on find-events, signing in
+ * (when the build has it) and the way to the app.
  */
 export function SiteHeader() {
   const navigate = useNavigate();
@@ -62,6 +63,9 @@ export function SiteHeader() {
         >
           <Icon name={searchOpen ? "close" : "search"} size={20} />
         </button>
+        <div className="dc-header-account">
+          <HeaderAccount />
+        </div>
         <button type="button" className="dc-btn dc-btn--sm dc-header-app" onClick={() => setAppOpen(true)}>
           Get the app
         </button>

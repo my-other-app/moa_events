@@ -1,0 +1,390 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, NavLink } from "react-router-dom";
+import { accountApi } from "@/api/account";
+import { useAuth } from "@/auth/context";
+import { eventPath, whenLine } from "@/utils/eventpage";
+import { imageUrl } from "@/utils/format";
+import { useNoIndex, usePageMeta } from "@/utils/meta";
+import { SitePage } from "../discover/chrome";
+import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
+import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
+import { EventCover } from "../discover/cover";
+import Icon from "../discover/icons";
+// After discover.css, so these rules win over its resets and components.
+import "@/styles/discover.css";
+import "@/styles/account.css";
+
+/**
+ * The signed-in person's own pages: /me/tickets and /me/following. Kept out
+ * of search results. Signed out, each asks to sign in; in a build without
+ * sign-in, each points to the app, where these have always lived.
+ */
+
+const TICKETS_PAGE = 20;
+const CLUBS_PAGE = 24;
+
+/** A list from the account API that grows with "Show more". `load(offset)` resolves {items, more}. */
+function useAccountList(load, pageSize, key) {
+  const [state, setState] = useState({ status: "loading", items: [], more: false });
+  const [extra, setExtra] = useState({ busy: false, error: false });
+  const [attempt, setAttempt] = useState(0);
+  const loader = useRef(load);
+  const next = useRef(0);
+  const seq = useRef(0);
+  useEffect(() => {
+    loader.current = load;
+  });
+
+  useEffect(() => {
+    const id = ++seq.current;
+    setState({ status: "loading", items: [], more: false });
+    setExtra({ busy: false, error: false });
+    loader.current(0).then(
+      (p) => {
+        if (id !== seq.current) return;
+        next.current = pageSize;
+        setState({ status: "ready", items: p.items, more: p.more });
+      },
+      () => id === seq.current && setState((s) => ({ ...s, status: "error" })),
+    );
+  }, [key, attempt, pageSize]);
+
+  const loadMore = useCallback(() => {
+    const id = seq.current;
+    setExtra({ busy: true, error: false });
+    loader.current(next.current).then(
+      (p) => {
+        if (id !== seq.current) return;
+        next.current += pageSize;
+        setState((s) => ({ ...s, items: [...s.items, ...p.items], more: p.more }));
+        setExtra({ busy: false, error: false });
+      },
+      () => id === seq.current && setExtra({ busy: false, error: true }),
+    );
+  }, [pageSize]);
+
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
+  return { ...state, extra, loadMore, retry };
+}
+
+function ShowMore({ list, label }) {
+  if (!list.more && !list.extra.error) return null;
+  return (
+    <div className="me-more">
+      <button type="button" className="dc-btn dc-btn--ghost" onClick={list.loadMore} disabled={list.extra.busy}>
+        {list.extra.busy ? "Loading…" : list.extra.error ? "Couldn't load — try again" : label}
+      </button>
+    </div>
+  );
+}
+
+function MeTabs() {
+  return (
+    <nav className="me-tabs" aria-label="Your things">
+      <NavLink to="/me/tickets">
+        <Icon name="ticket" size={16} />
+        My tickets
+      </NavLink>
+      <NavLink to="/me/following">
+        <Icon name="users" size={16} />
+        Following
+      </NavLink>
+    </nav>
+  );
+}
+
+/** Signed out: what this page is, and the way in. */
+function SignInPrompt({ icon, title, text, reason }) {
+  const auth = useAuth();
+  return (
+    <div className="me-prompt">
+      <span className="me-prompt-icon" aria-hidden="true">
+        <Icon name={icon} size={26} />
+      </span>
+      <h1>{title}</h1>
+      <p>{text}</p>
+      <div className="me-prompt-actions">
+        <button type="button" className="dc-btn" onClick={() => auth.openSignIn({ reason })}>
+          Sign in
+        </button>
+        <Link className="dc-btn dc-btn--ghost" to="/events">
+          Find events
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/** A build without sign-in: these live in the app. */
+function InTheApp({ icon, title, text }) {
+  return (
+    <div className="me-prompt">
+      <span className="me-prompt-icon" aria-hidden="true">
+        <Icon name={icon} size={26} />
+      </span>
+      <h1>{title}</h1>
+      <p>{text}</p>
+      <div className="me-prompt-actions">
+        <StoreButtons />
+      </div>
+    </div>
+  );
+}
+
+/* ---------- /me/tickets ---------- */
+
+function Thumb({ event }) {
+  return (
+    <span className="me-thumb">
+      <Img src={imageUrl(event.poster, "medium")} alt="" fallback={<EventCover event={event} />} />
+    </span>
+  );
+}
+
+/** One ticket: the event (a link to its page) on the left, the stub with the code and the ticket's own page on the right. */
+function TicketRow({ item, past }) {
+  const e = item.event;
+  const when = whenLine(e.starts_at);
+  const where = e.is_online ? "Online" : e.location_name || "Venue to be announced";
+  const ticketPath = `/tickets/${encodeURIComponent(item.ticket_id)}`;
+  return (
+    <li className={`me-ticket${past ? " is-past" : ""}`}>
+      <div className="me-ticket-main">
+        <Thumb event={e} />
+        <div className="me-ticket-info">
+          {when ? (
+            <p className="me-ticket-when">
+              <time dateTime={e.starts_at}>{when}</time>
+            </p>
+          ) : null}
+          <h3 className="me-ticket-name">
+            <Link to={eventPath(e)}>{e.name}</Link>
+          </h3>
+          <p className="me-ticket-meta">
+            {e.club?.name ? <span>by {e.club.name}</span> : null}
+            <span>
+              <Icon name={e.is_online ? "monitor" : "pin"} size={14} />
+              {where}
+            </span>
+            {past && item.attended ? (
+              <span className="me-pill me-pill--yes">
+                <Icon name="check" size={12} />
+                Attended
+              </span>
+            ) : null}
+          </p>
+        </div>
+      </div>
+      <div className="me-ticket-stub">
+        <div className="me-ticket-code">
+          <p className="me-ticket-kicker">Ticket</p>
+          <p className="me-ticket-number">{item.ticket_id}</p>
+        </div>
+        <div className="me-ticket-actions">
+          <Link className="dc-btn dc-btn--sm" to={ticketPath} aria-label={`View ticket for ${e.name}`}>
+            View ticket
+          </Link>
+          {item.certificate ? (
+            <Link className="me-cert" to={`/certificates/${encodeURIComponent(item.ticket_id)}`} aria-label={`Certificate for ${e.name}`}>
+              <Icon name="award" size={15} />
+              Certificate
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function TicketsSkeleton() {
+  return (
+    <div className="me-tickets" role="status" aria-label="Loading your tickets">
+      {[0, 1, 2].map((i) => (
+        <span key={i} className="dc-skel me-skel" />
+      ))}
+    </div>
+  );
+}
+
+function Tickets({ email }) {
+  const upcoming = useAccountList((offset) => accountApi.myEvents({ ended: false, offset, limit: TICKETS_PAGE }), TICKETS_PAGE, email);
+  const past = useAccountList((offset) => accountApi.myEvents({ ended: true, offset, limit: TICKETS_PAGE }), TICKETS_PAGE, email);
+
+  let body;
+  if (upcoming.status === "error" || past.status === "error") {
+    body = (
+      <ErrorState
+        message="We couldn't load your tickets just now. Check your connection and try again."
+        onRetry={() => {
+          if (upcoming.status === "error") upcoming.retry();
+          if (past.status === "error") past.retry();
+        }}
+      />
+    );
+  } else if (upcoming.status === "loading" || past.status === "loading") {
+    body = <TicketsSkeleton />;
+  } else if (!upcoming.items.length && !past.items.length) {
+    body = (
+      <EmptyState title="No tickets yet" message="When you register for an event — here or in the app — your ticket shows up here.">
+        <Link className="dc-btn" to="/events">
+          Find events
+        </Link>
+        <Link className="dc-btn dc-btn--ghost" to="/clubs">
+          Browse clubs
+        </Link>
+      </EmptyState>
+    );
+  } else {
+    body = (
+      <>
+        <section className="me-section" aria-labelledby="me-upcoming">
+          <h2 className="me-section-title" id="me-upcoming">
+            Upcoming {upcoming.items.length ? <small>{upcoming.more ? `${upcoming.items.length}+` : upcoming.items.length}</small> : null}
+          </h2>
+          {upcoming.items.length ? (
+            <>
+              <ul className="me-tickets">
+                {upcoming.items.map((t) => (
+                  <TicketRow key={t.ticket_id} item={t} />
+                ))}
+              </ul>
+              <ShowMore list={upcoming} label="Show more" />
+            </>
+          ) : (
+            <p className="dc-section-sub">
+              Nothing coming up.{" "}
+              <Link className="dc-link" to="/events">
+                Find your next event
+              </Link>
+            </p>
+          )}
+        </section>
+        {past.items.length ? (
+          <section className="me-section" aria-labelledby="me-past">
+            <h2 className="me-section-title" id="me-past">
+              Past <small>{past.more ? `${past.items.length}+` : past.items.length}</small>
+            </h2>
+            <ul className="me-tickets">
+              {past.items.map((t) => (
+                <TicketRow key={t.ticket_id} item={t} past />
+              ))}
+            </ul>
+            <ShowMore list={past} label="Show older" />
+          </section>
+        ) : null}
+      </>
+    );
+  }
+  return body;
+}
+
+export function MyTicketsPage() {
+  const auth = useAuth();
+  useNoIndex();
+  usePageMeta("My tickets · MyOtherApp", "Your tickets on MyOtherApp, on the web and in the app.");
+  let content;
+  if (!auth.enabled) {
+    content = <InTheApp icon="ticket" title="Your tickets are in the app" text="Every ticket you get is in the MyOtherApp app, and in your email." />;
+  } else if (auth.status !== "signed-in") {
+    content = (
+      <SignInPrompt
+        icon="ticket"
+        reason="tickets"
+        title="Your tickets, in one place"
+        text="Sign in with the Google account you use in the MyOtherApp app to see every ticket — the ones from here and from the app."
+      />
+    );
+  } else {
+    content = (
+      <>
+        <header className="me-head">
+          <h1>My tickets</h1>
+          {auth.user?.email ? (
+            <p>
+              Signed in as <strong>{auth.user.email}</strong>
+            </p>
+          ) : null}
+        </header>
+        <MeTabs />
+        <Tickets email={auth.user?.email || ""} />
+      </>
+    );
+  }
+  return (
+    <SitePage>
+      <div className="dc-wrap dc-wrap--narrow me">{content}</div>
+    </SitePage>
+  );
+}
+
+/* ---------- /me/following ---------- */
+
+function FollowedClubs({ email }) {
+  const clubs = useAccountList((offset) => accountApi.following({ offset, limit: CLUBS_PAGE }), CLUBS_PAGE, email);
+  if (clubs.status === "error") {
+    return <ErrorState message="We couldn't load the clubs you follow just now. Check your connection and try again." onRetry={clubs.retry} />;
+  }
+  if (clubs.status === "loading") {
+    return (
+      <div className="dc-grid dc-grid--4 me-section" role="status" aria-label="Loading the clubs you follow">
+        {[0, 1, 2, 3].map((i) => (
+          <ClubCardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
+  if (!clubs.items.length) {
+    return (
+      <EmptyState title="You're not following any clubs yet" message="Follow a club to hear the moment it announces an event or posts something new.">
+        <Link className="dc-btn" to="/clubs">
+          Browse clubs
+        </Link>
+      </EmptyState>
+    );
+  }
+  return (
+    <>
+      <div className="dc-grid dc-grid--4 me-section">
+        {clubs.items.map((c) => (
+          <ClubCard key={c.id ?? c.slug} club={c} headingLevel={2} />
+        ))}
+      </div>
+      <ShowMore list={clubs} label="Show more" />
+    </>
+  );
+}
+
+export function FollowingPage() {
+  const auth = useAuth();
+  useNoIndex();
+  usePageMeta("Following · MyOtherApp", "The clubs you follow on MyOtherApp.");
+  let content;
+  if (!auth.enabled) {
+    content = <InTheApp icon="users" title="Follow clubs in the app" text="Follow clubs in the MyOtherApp app to hear the moment they announce an event." />;
+  } else if (auth.status !== "signed-in") {
+    content = (
+      <SignInPrompt
+        icon="users"
+        reason="follow"
+        title="The clubs you follow"
+        text="Sign in with the Google account you use in the MyOtherApp app to see the clubs you follow, and follow more from here."
+      />
+    );
+  } else {
+    content = (
+      <>
+        <header className="me-head">
+          <h1>Following</h1>
+          <p>Clubs you follow, here and in the MyOtherApp app.</p>
+        </header>
+        <MeTabs />
+        <FollowedClubs email={auth.user?.email || ""} />
+      </>
+    );
+  }
+  return (
+    <SitePage>
+      <div className="dc-wrap me">{content}</div>
+    </SitePage>
+  );
+}

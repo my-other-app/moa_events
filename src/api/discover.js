@@ -3,7 +3,9 @@ import apiClient from "./client";
 /**
  * The public discovery API: events and clubs near you, a club's page, the
  * clubs' posts. Everything here is readable without an account, so no
- * request carries the token a registration may have left behind.
+ * request carries the token a registration may have left behind. One post
+ * is read as the signed-in person, when there is one, so it can say whether
+ * they liked it and how they voted.
  *
  * Responses are read defensively: a field the API leaves out becomes an
  * empty value instead of a crash, and a row without an id is dropped.
@@ -159,7 +161,7 @@ export function parseWhere(w) {
 }
 
 /** The club as an event card carries it. */
-function parseClubRef(c) {
+export function parseClubRef(c) {
   const o = obj(c);
   if (!o) return null;
   const name = str(o.name);
@@ -229,22 +231,29 @@ export function parseClub(c) {
   };
 }
 
+/** A poll's options and counts (from a post, or the answer to a vote); null when it has no options. */
+export function parsePoll(p) {
+  const poll = obj(p);
+  if (!poll) return null;
+  const options = list(poll.options, (x) => {
+    const po = obj(x);
+    if (!po || idOf(po.id) === null) return null;
+    return { id: po.id, label: str(po.label) || "", votes: Math.max(0, n(po.votes)), share: Math.min(100, Math.max(0, n(po.share))) };
+  });
+  return options.length ? { options, votes: Math.max(0, n(poll.votes)), voted_option_id: idOf(poll.voted_option_id) } : null;
+}
+
 export function parseThread(t) {
   const o = obj(t);
   if (!o || idOf(o.id) === null) return null;
-  const poll = obj(o.poll);
-  const options = poll ? list(poll.options, (p) => {
-    const po = obj(p);
-    if (!po || idOf(po.id) === null) return null;
-    return { id: po.id, label: str(po.label) || "", votes: Math.max(0, n(po.votes)), share: Math.min(100, Math.max(0, n(po.share))) };
-  }) : [];
+  const poll = parsePoll(o.poll);
   return {
     id: o.id,
     club: parseClubRef(o.club) || { id: null, name: "A club", slug: null, logo: null },
     body: typeof o.body === "string" ? o.body : "",
     image: o.image || null,
-    kind: o.kind === "poll" && options.length ? "poll" : "post",
-    poll: options.length ? { options, votes: Math.max(0, n(poll.votes)), voted_option_id: idOf(poll.voted_option_id) } : null,
+    kind: o.kind === "poll" && poll ? "poll" : "post",
+    poll,
     pinned: Boolean(o.pinned),
     likes: Math.max(0, n(o.likes)),
     comments: Math.max(0, n(o.comments)),
@@ -474,6 +483,9 @@ export function parseSitemap(d) {
 
 const get = (url, params) => apiClient.get(url, { params, skipAuth: true }).then((r) => r.data);
 
+/** A public read that says whether the signed-in person liked or voted: their token goes along, never a guest's. */
+const getAsReader = (url) => apiClient.get(url, { userOnly: true }).then((r) => r.data);
+
 /** An error the pages can tell apart: `notFound` when the API said 404. */
 const tag = (error) => {
   const e = error instanceof Error ? error : new Error("Request failed");
@@ -544,7 +556,7 @@ export const discoverApi = {
   threads: ({ offset = 0, limit = PAGE_SIZE } = {}) => get("/api/v1/discover/threads", { offset, limit }).then(parseThreadsPage, tag),
 
   thread: (id) =>
-    get(`/api/v1/threads/${encodeURIComponent(id)}`).then((d) => {
+    getAsReader(`/api/v1/threads/${encodeURIComponent(id)}`).then((d) => {
       const t = parseThread(d);
       if (!t) {
         const e = new Error("No such post");
