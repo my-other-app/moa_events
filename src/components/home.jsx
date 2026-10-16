@@ -267,13 +267,16 @@ const Home = () => {
             </button>
           </div>
         )}
-        <div className="banner-container">
-          <img
-            src={eventData.poster.original}
-            alt="Oasis Hackathon Banner"
-            className="banner-image"
-          />
-        </div>
+        {/* An event saved without a poster has none; reading through it blanked the whole page. */}
+        {eventData.poster?.original && (
+          <div className="banner-container">
+            <img
+              src={eventData.poster.original}
+              alt={eventData.name}
+              className="banner-image"
+            />
+          </div>
+        )}
 
         <div className="event-details">
           <div className="countdown-container">
@@ -286,12 +289,14 @@ const Home = () => {
           <h2 className="event-title">{eventData.name}</h2>
 
           <div className="organizer">
-            <img
-              src={eventData.club.logo.thumbnail}
-              alt="Organizer Logo"
-              className="organizer-logo"
-            />
-            <span>{eventData.club.name}</span>
+            {eventData.club?.logo?.thumbnail && (
+              <img
+                src={eventData.club.logo.thumbnail}
+                alt=""
+                className="organizer-logo"
+              />
+            )}
+            <span>{eventData.club?.name}</span>
           </div>
 
           <div className="info-grid">
