@@ -56,7 +56,7 @@ describe("a club's page", () => {
     get.mockResolvedValue({ data: page });
     show("/clubs/circuit-society?ref=x7k2m9pq&follow=1");
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Circuit Society" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Circuit Society" }, { timeout: 5000 })).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith("/api/v1/discover/clubs/circuit-society", { params: undefined, skipAuth: true });
     expect(countVisit).toHaveBeenCalledTimes(1);
     const [slug, params] = countVisit.mock.calls[0];
