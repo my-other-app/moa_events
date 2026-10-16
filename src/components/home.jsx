@@ -9,8 +9,9 @@ import { competitionApi } from "@/api/competition";
 import { roomIsActive } from "@/utils/live";
 import "@/styles/live.css";
 import Snackbar from "./snackbar";
+import { SiteHeader } from "@/components/discover/chrome";
+import { usePageMeta } from "@/utils/meta";
 
-import logo from "../assets/wordmark 1.svg";
 import shareicon from "../assets/Icon.svg";
 import calendar from "../assets/Calendar.svg";
 import clock from "../assets/clock.svg";
@@ -92,6 +93,11 @@ const Home = () => {
       },
     });
   };
+
+  usePageMeta(
+    eventData?.name ? `${eventData.name} · MyOtherApp` : null,
+    typeof eventData?.about === "string" ? eventData.about.slice(0, 155) : null
+  );
 
   const [agenda, setAgenda] = useState(null);
   // The room: a banner, a poll or a quiz up right now earns a strip at the top.
@@ -225,11 +231,12 @@ const Home = () => {
   }
 
   return (
+    <>
+    <SiteHeader />
     <div className="hackathon-page">
       <div className="header">
-        <div className="logo">
-          <img src={logo} alt="Calendar icon" className="logo-icon" />
-        </div>
+        {/* The wordmark now lives in the site header above. */}
+        <div className="logo" />
         <button
           className="register-btn"
           onClick={handleRegister}
@@ -375,6 +382,7 @@ const Home = () => {
         <Snackbar message={snackbarMessage} onClose={closeSnackbar} />
       )}
     </div>
+    </>
   );
 };
 
