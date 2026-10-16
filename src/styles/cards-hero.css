@@ -1,0 +1,1208 @@
+/*
+ * The home hero, the event and club cards, the covers we draw for events
+ * and clubs without artwork, and the club page's team and partners.
+ * Same language as discover.css (its tokens are used throughout): DM Sans
+ * and Bebas Neue, ink greys, slate buttons, the app's pale yellow for what
+ * is "on", sky for links.
+ */
+
+/* ---------- generated covers ---------- */
+
+.dc-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.dc-cover-art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.5s ease;
+}
+.dc-cover-text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 8% 8%;
+}
+.dc-cover-kind {
+  max-width: 100%;
+  padding: 5px 8px 3px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  font-family: var(--dc-display);
+  font-size: 15px;
+  font-size: clamp(12px, 6.4cqw, 20px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-cover-date {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.14em;
+  font-family: var(--dc-display);
+  line-height: 0.8;
+}
+.dc-cover-day {
+  font-size: 96px;
+  font-size: 42cqw;
+  line-height: 0.76;
+  letter-spacing: -0.01em;
+}
+.dc-cover-mon {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08em;
+  padding-bottom: 0.02em;
+  font-size: 26px;
+  font-size: 12cqw;
+  line-height: 0.86;
+  letter-spacing: 0.04em;
+}
+.dc-cover-mon span + span {
+  opacity: 0.66;
+}
+@container (max-width: 150px) {
+  .dc-cover-kind {
+    display: none;
+  }
+  .dc-cover-text {
+    padding: 0 10% 10%;
+  }
+}
+
+/* The little calendar leaf on a poster. */
+.dc-datebadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 46px;
+  padding: 6px 7px 5px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--dc-ink);
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.2);
+  line-height: 1;
+  pointer-events: none;
+}
+.dc-datebadge-mon {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dc-live);
+}
+.dc-datebadge-day {
+  margin-top: 3px;
+  font-family: var(--dc-display);
+  font-size: 28px;
+  line-height: 0.9;
+}
+
+/* ---------- event card ---------- */
+
+.dc-evcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  padding: 10px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.dc-evcard:hover {
+  transform: translateY(-3px);
+  border-color: #d1d5db;
+  box-shadow: 0 20px 36px -20px rgba(17, 24, 39, 0.38);
+}
+.dc-evcard-club {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 2px 2px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.dc-evcard-club > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dc-evcard-media {
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 10px;
+  background: var(--dc-sunken);
+}
+.dc-evcard-media.dc-skel {
+  border-radius: 10px;
+}
+.dc-evcard-media > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+.dc-evcard:hover .dc-evcard-media > img,
+.dc-evcard:hover .dc-cover-art {
+  transform: scale(1.04);
+}
+.dc-evcard-pills {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+}
+/* Leave room for the date leaf when a poster carries one. */
+.dc-evcard-media:has(.dc-datebadge) .dc-evcard-pills {
+  max-width: calc(100% - 76px);
+}
+.dc-scope .dc-evcard-pills .dc-pill {
+  position: static;
+}
+.dc-pill--quiet {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--dc-ink);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.1);
+}
+.dc-evcard-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 4px 0;
+}
+.dc-evcard-info {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 12px;
+}
+.dc-evcard-title {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.dc-evcard-link::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  border-radius: 16px;
+}
+.dc-scope .dc-evcard-link:focus-visible {
+  outline: none;
+}
+.dc-evcard-link:focus-visible::after {
+  outline: 3px solid var(--dc-link);
+  outline-offset: 2px;
+}
+.dc-evcard:focus-within {
+  border-color: #d1d5db;
+}
+.dc-evcard-when {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.dc-evcard-where {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 3px;
+  font-size: 14px;
+  color: var(--dc-muted);
+}
+.dc-evcard-where svg {
+  flex: 0 0 auto;
+}
+.dc-evcard-where span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dc-evcard-where .dc-evcard-dist {
+  flex: 0 0 auto;
+}
+.dc-evcard-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--dc-line);
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--dc-muted);
+}
+.dc-evcard-foot.has-bar {
+  border-top-color: transparent;
+}
+.dc-evcard .dc-price {
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.dc-evcard .dc-going {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-weight: 600;
+}
+.dc-evcard-seats {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.dc-evcard-seats--few {
+  color: var(--dc-warn);
+}
+/* The divider over the footer doubles as the fill bar when the club set a capacity. */
+.dc-evcard-bar {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+}
+.dc-evcard-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dc-primary);
+}
+.dc-evcard-bar--few > span {
+  background: var(--dc-warn);
+}
+.dc-evcard-status {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.dc-evcard-status--live {
+  color: var(--dc-live);
+}
+.dc-evcard-status--warn {
+  color: var(--dc-warn);
+}
+.dc-evcard-status--muted {
+  color: var(--dc-muted);
+}
+
+/* Over: greyed out, still readable. */
+.dc-evcard.is-ended {
+  background: #fcfcfd;
+}
+.dc-evcard.is-ended .dc-evcard-media > img,
+.dc-evcard.is-ended .dc-cover {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.dc-evcard.is-ended .dc-evcard-title,
+.dc-evcard.is-ended .dc-evcard-when,
+.dc-evcard.is-ended .dc-price {
+  color: var(--dc-text);
+}
+
+/* The sideways card, for dense lists. */
+.dc-evcard--row {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 14px;
+  height: auto;
+}
+.dc-evcard--row .dc-evcard-media {
+  flex: 0 0 92px;
+  width: 92px;
+  align-self: flex-start;
+  border-radius: 8px;
+}
+@media (min-width: 600px) {
+  .dc-evcard--row .dc-evcard-media {
+    flex-basis: 104px;
+    width: 104px;
+  }
+}
+.dc-evcard--row .dc-evcard-body {
+  padding: 2px 2px 0 0;
+}
+.dc-evcard--row .dc-evcard-info {
+  padding-bottom: 6px;
+}
+.dc-evcard--row .dc-evcard-when {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dc-link);
+}
+.dc-evcard--row .dc-evcard-title {
+  font-size: 21px;
+}
+.dc-evcard--row .dc-evcard-foot {
+  min-height: 0;
+  padding-top: 6px;
+  border-top: 0;
+}
+.dc-evcard--row.is-ended .dc-evcard-when {
+  color: var(--dc-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-evcard,
+  .dc-evcard-media > img,
+  .dc-cover-art,
+  .dc-clubcard,
+  .dc-fan-slot {
+    transition: none !important;
+  }
+  .dc-evcard:hover,
+  .dc-clubcard:hover {
+    transform: none;
+  }
+  .dc-evcard:hover .dc-evcard-media > img,
+  .dc-evcard:hover .dc-cover-art {
+    transform: none;
+  }
+  .dc-hero2-livedot {
+    animation: none !important;
+  }
+}
+
+/* ---------- rows of cards ---------- */
+
+/* On a phone a row scrolls sideways a card at a time, with the next one peeking in. */
+.dc-scope .dc-rail--cards {
+  grid-auto-columns: 74%;
+  gap: 14px;
+  padding-bottom: 16px;
+}
+@media (min-width: 600px) {
+  .dc-scope .dc-rail--cards {
+    grid-auto-columns: 42%;
+  }
+}
+@media (min-width: 768px) {
+  .dc-scope .dc-rail--cards {
+    grid-auto-columns: 31%;
+  }
+}
+/* On a desk it is a grid of four; a clipped row (the home page's) keeps to one tidy row, and "See all" has the rest. */
+@media (min-width: 960px) {
+  .dc-scope .dc-rail--cards {
+    gap: 28px 20px;
+    padding-bottom: 4px;
+  }
+  .dc-scope .dc-rail--clip > :nth-child(n + 5) {
+    display: none;
+  }
+}
+
+/* A dense list of sideways cards (a club's past events). */
+.dc-rowlist {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 768px) {
+  .dc-rowlist {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+@media (min-width: 1140px) {
+  .dc-rowlist {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---------- club card ---------- */
+
+.dc-scope .dc-clubcard {
+  height: 100%;
+  border-radius: 16px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+.dc-scope .dc-clubcard:hover {
+  transform: translateY(-3px);
+  border-color: #d1d5db;
+  box-shadow: 0 20px 36px -20px rgba(17, 24, 39, 0.38);
+}
+.dc-clubcard .dc-ccard-cover > .dc-avatar {
+  z-index: 1;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 6px 14px -4px rgba(17, 24, 39, 0.3);
+}
+.dc-clubcard:hover .dc-cover-art {
+  transform: scale(1.04);
+}
+.dc-clubcard .dc-ccard-body {
+  gap: 8px;
+}
+.dc-scope .dc-clubcard-place {
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+}
+.dc-clubcard-place svg {
+  flex: 0 0 auto;
+}
+.dc-clubcard-place span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dc-chip--more {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--dc-line);
+  color: var(--dc-muted);
+}
+.dc-clubcard-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px dashed var(--dc-line);
+  font-size: 13px;
+  color: var(--dc-muted);
+}
+.dc-clubcard-stats strong {
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.dc-clubcard-upcoming.is-on {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--dc-accent);
+  color: var(--dc-ink);
+}
+
+/* ---------- home hero ---------- */
+
+.dc-hero2 {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 28px 0 8px;
+}
+@media (min-width: 960px) {
+  .dc-hero2 {
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+    align-items: center;
+    gap: 32px;
+    min-height: 560px;
+    padding: 48px 0 24px;
+  }
+}
+.dc-hero2-copy {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+.dc-hero2-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin-bottom: 18px;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid var(--dc-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
+  transition: border-color 0.15s;
+}
+.dc-hero2-live:hover {
+  border-color: var(--dc-ink);
+}
+.dc-hero2-live svg {
+  flex: 0 0 auto;
+}
+.dc-hero2-livedot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--dc-live);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.14);
+  animation: dc-pulse 1.6s ease-in-out infinite;
+}
+.dc-hero2-livelabel {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dc-live);
+}
+.dc-hero2-livename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dc-hero2-title {
+  text-wrap: balance;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(56px, 16vw, 80px);
+  line-height: 0.88;
+  letter-spacing: 0.005em;
+  color: var(--dc-ink);
+}
+.dc-hero2-title > span {
+  display: block;
+}
+.dc-hero2-title > .dc-hl {
+  display: inline-block;
+  margin-top: 0.04em;
+  padding: 0 0.08em;
+  background: linear-gradient(transparent 50%, var(--dc-accent) 50%, var(--dc-accent) 93%, transparent 93%);
+}
+@media (min-width: 600px) {
+  .dc-hero2-title {
+    font-size: clamp(80px, 11vw, 104px);
+  }
+}
+@media (min-width: 960px) {
+  .dc-hero2-title {
+    font-size: clamp(84px, 7vw, 108px);
+  }
+}
+.dc-hero2-lede {
+  max-width: 540px;
+  text-wrap: pretty;
+  margin-top: 16px;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--dc-text);
+}
+@media (min-width: 960px) {
+  .dc-hero2-lede {
+    font-size: 19px;
+  }
+}
+
+/* What + where, one bar on a desk, a stacked card on a phone. */
+.dc-hero2-search {
+  position: relative;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 660px;
+  margin-top: 28px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, 0.05),
+    0 22px 44px -28px rgba(17, 24, 39, 0.4);
+  transition: border-color 0.15s;
+}
+.dc-hero2-search:focus-within {
+  border-color: #9ca3af;
+}
+.dc-hero2-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 16px;
+  color: var(--dc-muted);
+}
+.dc-hero2-what {
+  min-height: 58px;
+  border-bottom: 1px solid var(--dc-line);
+}
+.dc-scope .dc-hero2-what input {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  font-size: 16px;
+  color: var(--dc-ink);
+  outline: none;
+}
+.dc-hero2-what input::placeholder {
+  color: var(--dc-muted);
+}
+.dc-hero2-where {
+  min-height: 56px;
+  padding: 0 10px;
+}
+.dc-scope .dc-where--bare {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.dc-scope .dc-hero2-go {
+  margin: 0 8px 8px;
+  min-height: 52px;
+  border-radius: 10px;
+  font-size: 22px;
+}
+.dc-hero2-go svg {
+  margin-top: -3px;
+}
+@media (min-width: 720px) {
+  .dc-hero2-search {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    padding: 6px;
+    border-radius: 999px;
+  }
+  .dc-hero2-what {
+    min-height: 52px;
+    padding: 0 12px 0 16px;
+    border-bottom: 0;
+  }
+  .dc-scope .dc-hero2-what input {
+    height: 52px;
+  }
+  .dc-hero2-where {
+    min-height: 40px;
+    padding: 0 10px 0 16px;
+    border-left: 1px solid var(--dc-line);
+  }
+  .dc-scope .dc-hero2-go {
+    margin: 0;
+    padding: 10px 24px 8px 20px;
+    border-radius: 999px;
+  }
+}
+
+.dc-hero2-cats {
+  margin-top: 18px;
+}
+.dc-hero2-cats ul {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 calc(-1 * var(--dc-gutter));
+  padding: 2px var(--dc-gutter) 6px;
+  scrollbar-width: none;
+}
+.dc-hero2-cats ul::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 720px) {
+  .dc-hero2-cats ul {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+}
+.dc-hero2-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--dc-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.dc-hero2-cat:hover {
+  border-color: var(--dc-ink);
+  background: var(--dc-accent);
+}
+.dc-hero2-cat small {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--dc-text);
+}
+.dc-hero2-cat:hover small {
+  background: rgba(17, 24, 39, 0.08);
+}
+.dc-hero2-cat--more {
+  color: var(--dc-link);
+}
+
+.dc-hero2-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 22px;
+  font-size: 14px;
+  color: var(--dc-text);
+}
+.dc-hero2-faces {
+  display: inline-flex;
+  margin-right: -4px;
+}
+.dc-hero2-faces .dc-avatar {
+  box-shadow: 0 0 0 2px #fff;
+}
+.dc-hero2-faces .dc-avatar + .dc-avatar {
+  margin-left: -9px;
+}
+.dc-hero2-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.dc-hero2-stat strong {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--dc-ink);
+}
+
+/* The fan of real events, over a sun in the app's yellow. */
+.dc-hero2-visual {
+  --fan-w: 150px;
+  --fan-x: 88px;
+  position: relative;
+  min-height: 340px;
+  margin: 8px calc(-1 * var(--dc-gutter)) 0;
+  overflow-x: clip;
+}
+@media (min-width: 600px) {
+  .dc-hero2-visual {
+    --fan-w: 190px;
+    --fan-x: 120px;
+    min-height: 420px;
+  }
+}
+@media (min-width: 960px) {
+  .dc-hero2-visual {
+    --fan-w: 216px;
+    --fan-x: 150px;
+    min-height: 520px;
+    margin: 0;
+    overflow: visible;
+  }
+}
+.dc-hero2-sun {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(300px, 78vw);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: var(--dc-accent);
+  transform: translate(-50%, -50%);
+}
+@media (min-width: 960px) {
+  .dc-hero2-sun {
+    width: 420px;
+  }
+}
+.dc-hero2-dots {
+  position: absolute;
+  top: 2%;
+  right: 4%;
+  width: 120px;
+  height: 104px;
+  background-image: radial-gradient(var(--dc-ink) 1.3px, transparent 1.6px);
+  background-size: 14px 14px;
+  opacity: 0.16;
+}
+.dc-hero2-spark {
+  position: absolute;
+  left: 8%;
+  bottom: 8%;
+  width: 30px;
+  height: 30px;
+  fill: var(--dc-ink);
+}
+@media (min-width: 960px) {
+  .dc-hero2-dots {
+    top: 4%;
+    right: -2%;
+    width: 160px;
+    height: 140px;
+  }
+  .dc-hero2-spark {
+    left: 2%;
+    bottom: 12%;
+    width: 38px;
+    height: 38px;
+  }
+}
+
+.dc-fan {
+  position: absolute;
+  inset: 0;
+}
+.dc-fan-slot {
+  --tx: 0px;
+  --ty: 0px;
+  --rot: 0deg;
+  --lift: 0px;
+  --tilt: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--fan-w);
+  transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty) - var(--lift))) rotate(calc(var(--rot) * var(--tilt)));
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dc-fan-slot--1 {
+  z-index: 3;
+  --rot: -2deg;
+}
+.dc-fan-slot--2 {
+  z-index: 2;
+  --tx: calc(-1 * var(--fan-x));
+  --ty: 26px;
+  --rot: -11deg;
+}
+.dc-fan-slot--3 {
+  z-index: 1;
+  --tx: var(--fan-x);
+  --ty: 4px;
+  --rot: 10deg;
+}
+.dc-fan--2 .dc-fan-slot--1 {
+  --tx: calc(var(--fan-x) * 0.45);
+  --rot: 5deg;
+}
+.dc-fan--2 .dc-fan-slot--2 {
+  --tx: calc(var(--fan-x) * -0.45);
+  --ty: 12px;
+  --rot: -7deg;
+}
+.dc-fan--1 .dc-fan-slot--1 {
+  --rot: -3deg;
+}
+.dc-fan-slot:hover,
+.dc-fan-slot:focus-within {
+  z-index: 4;
+  --lift: 10px;
+  --tilt: 0;
+}
+.dc-fan-tile {
+  display: block;
+  padding: 7px 7px 9px;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--dc-ink);
+  box-shadow:
+    0 1px 2px rgba(17, 24, 39, 0.08),
+    0 26px 48px -22px rgba(17, 24, 39, 0.5);
+}
+.dc-fan--idle .dc-fan-tile {
+  padding-bottom: 7px;
+}
+.dc-scope a.dc-fan-tile:focus-visible {
+  outline-offset: 4px;
+  border-radius: 16px;
+}
+.dc-fan-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--dc-sunken);
+}
+.dc-fan-media > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dc-fan-media .dc-datebadge {
+  top: 8px;
+  right: 8px;
+  min-width: 40px;
+  padding: 5px 6px 4px;
+}
+.dc-fan-media .dc-datebadge-day {
+  font-size: 24px;
+}
+.dc-fan-media .dc-pill {
+  top: 8px;
+  left: 8px;
+}
+.dc-fan-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 9px 3px 0;
+}
+.dc-fan-name {
+  overflow: hidden;
+  font-family: var(--dc-display);
+  font-size: 17px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dc-fan-club {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.dc-fan-club > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (min-width: 960px) {
+  .dc-fan-tile {
+    padding: 8px 8px 12px;
+    border-radius: 18px;
+  }
+  .dc-fan-name {
+    font-size: 22px;
+  }
+  .dc-fan-club {
+    font-size: 12px;
+  }
+}
+
+/* ---------- club page: cover, team, partners ---------- */
+
+.dc-club-cover > .dc-cover {
+  border-radius: inherit;
+}
+
+.dc-crew {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 600px) {
+  .dc-crew {
+    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+.dc-member {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 22px 12px 16px;
+  overflow: hidden;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+}
+.dc-member::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 62px;
+  background: var(--dc-sunken);
+}
+.dc-member-face {
+  position: relative;
+  display: block;
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+  box-shadow:
+    0 0 0 4px #fff,
+    0 8px 18px -8px rgba(17, 24, 39, 0.4);
+}
+.dc-member-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dc-member-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding-top: 4px;
+  font-family: var(--dc-display);
+  font-size: 36px;
+  letter-spacing: 0.04em;
+}
+.dc-member-name {
+  margin-top: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.dc-member-role {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+  overflow-wrap: anywhere;
+}
+.dc-member-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.dc-member-links a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--dc-line);
+  border-radius: 999px;
+  color: var(--dc-text);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.dc-member-links a:hover {
+  border-color: var(--dc-ink);
+  background: var(--dc-ink);
+  color: #fff;
+}
+
+.dc-pwall {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .dc-pwall {
+    gap: 16px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1140px) {
+  .dc-pwall {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.dc-ptile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 10px 14px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+}
+.dc-ptile-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 12px;
+  padding: 12px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+.dc-ptile-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+.dc-ptile-initials {
+  font-family: var(--dc-display);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--dc-ink);
+}
+.dc-ptile-name {
+  max-width: 100%;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.dc-ptile-role {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--dc-muted);
+}

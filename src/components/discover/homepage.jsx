@@ -1,22 +1,22 @@
-import { useEffect, useId, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { discoverApi, isEmptyHome } from "@/api/discover";
 import { usePageMeta } from "@/utils/meta";
 import { useWhere } from "@/utils/where";
-import { formatCount } from "@/utils/format";
 import { SitePage } from "./chrome";
 import { EmptyState, ErrorState, Section, StoreButtons } from "./bits";
 import { EventCard, EventRailSkeleton } from "./eventcard";
 import { ClubCard } from "./clubcard";
 import { ThreadCard } from "./threadcard";
-import { LocationPill } from "./locationpill";
-import Icon from "./icons";
+import { HomeHero } from "./hero";
+import "@/styles/cards-hero.css";
 
 const RAIL = 8;
 
+/** A row of events: it scrolls sideways on a phone and is a one-row grid on a desk ("See all" has the rest). */
 function EventRail({ events }) {
   return (
-    <div className="dc-rail">
+    <div className="dc-rail dc-rail--cards dc-rail--clip">
       {events.slice(0, RAIL).map((e) => (
         <EventCard key={e.id} event={e} />
       ))}
@@ -41,17 +41,14 @@ function AppBand() {
 }
 
 /**
- * The front door: what is on near you, this week, by category, the clubs
- * around, online, popular, and the clubs' latest posts. A section with
- * nothing in it is left out.
+ * The front door: the hero (search, categories, a fan of what's coming up),
+ * then what is on near you, this week, the clubs around, online, popular,
+ * and the clubs' latest posts. A section with nothing in it is left out.
  */
 export default function DiscoverHome() {
-  const navigate = useNavigate();
   const [stored, setStored] = useWhere();
   const [state, setState] = useState({ status: "loading", data: null });
   const [attempt, setAttempt] = useState(0);
-  const [q, setQ] = useState("");
-  const searchId = useId();
   const lat = stored?.lat ?? null;
   const lng = stored?.lng ?? null;
 
@@ -77,36 +74,10 @@ export default function DiscoverHome() {
       : "Find events, clubs and people near you: hackathons, workshops, meetups and more on MyOtherApp."
   );
 
-  const search = (e) => {
-    e.preventDefault();
-    const term = q.trim();
-    navigate(term ? `/events?q=${encodeURIComponent(term)}` : "/events");
-  };
-
   return (
     <SitePage>
       <div className="dc-wrap">
-        <section className="dc-hero" aria-labelledby="dc-hero-title">
-          <h1 id="dc-hero-title">
-            Find your <span className="dc-hl">people.</span>
-          </h1>
-          <p className="dc-hero-lede">Events and clubs near you — hackathons, workshops, meetups and more, from the clubs on MyOtherApp.</p>
-          <form className="dc-hero-search" role="search" onSubmit={search}>
-            <div className="dc-field">
-              <Icon name="search" size={18} />
-              <label className="dc-sr" htmlFor={searchId}>
-                Search events
-              </label>
-              <input id={searchId} type="search" placeholder="Search events or topics" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
-            </div>
-            <button type="submit" className="dc-btn">
-              Search
-            </button>
-          </form>
-          <div className="dc-hero-where">
-            <LocationPill where={where} stored={stored} onChange={setStored} />
-          </div>
-        </section>
+        <HomeHero data={state.data} loading={state.status === "loading"} where={where} stored={stored} onWhereChange={setStored} />
 
         {state.status === "loading" ? (
           <>
@@ -161,24 +132,9 @@ export default function DiscoverHome() {
           </Section>
         ) : null}
 
-        {data && data.categories.length ? (
-          <Section id="categories" title="Browse by category">
-            <ul className="dc-chiprow dc-chiprow--wrap">
-              {data.categories.map((c) => (
-                <li key={c.id}>
-                  <Link className="dc-chipbtn" to={`/events?category=${encodeURIComponent(c.id)}`}>
-                    {c.name}
-                    <small>{formatCount(c.upcoming)}</small>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        ) : null}
-
         {data && data.clubs.length ? (
           <Section id="clubs" title="Clubs near you" seeAll="/clubs">
-            <div className="dc-rail">
+            <div className="dc-rail dc-rail--cards dc-rail--clip">
               {data.clubs.slice(0, RAIL).map((c) => (
                 <ClubCard key={c.slug || c.id} club={c} />
               ))}
@@ -209,22 +165,6 @@ export default function DiscoverHome() {
         ) : null}
 
         {state.status !== "loading" ? <AppBand /> : null}
-
-        {data && (data.stats.upcoming_events > 0 || data.stats.clubs > 0) ? (
-          <p className="dc-stats">
-            <span className="dc-stat">
-              <strong>{formatCount(data.stats.upcoming_events)}</strong> upcoming {data.stats.upcoming_events === 1 ? "event" : "events"}
-            </span>
-            <span className="dc-stat">
-              <strong>{formatCount(data.stats.clubs)}</strong> {data.stats.clubs === 1 ? "club" : "clubs"}
-            </span>
-            {data.stats.cities > 1 ? (
-              <span className="dc-stat">
-                <strong>{formatCount(data.stats.cities)}</strong> cities
-              </span>
-            ) : null}
-          </p>
-        ) : null}
       </div>
     </SitePage>
   );

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 vi.mock("@/api/discover", async (importOriginal) => {
@@ -47,8 +47,12 @@ describe("the home page", () => {
     show();
     expect(await screen.findByRole("heading", { name: "Events near Pune" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Clubs near you" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Browse by category" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Tech/ })).toHaveAttribute("href", "/events?category=4");
+    // The categories sit in the hero now, one tap under the search.
+    const cats = screen.getByRole("navigation", { name: "Browse by category" });
+    expect(within(cats).getByRole("link", { name: /Tech/ })).toHaveAttribute("href", "/events?category=4");
+    // The hero fans out the real events coming up.
+    const fan = screen.getByRole("list", { name: "Coming up" });
+    expect(within(fan).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/1", "/2"]);
     expect(screen.getByRole("link", { name: "See all: Events near Pune" })).toHaveAttribute("href", "/events?sort=distance");
     expect(screen.queryByRole("heading", { name: "This week" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Online events" })).toBeNull();
@@ -56,7 +60,7 @@ describe("the home page", () => {
     expect(screen.queryByRole("heading", { name: "From the clubs" })).toBeNull();
     expect(screen.getByText("Near Pune")).toBeInTheDocument();
     expect(screen.getByText("upcoming events", { exact: false })).toBeInTheDocument();
-    expect(document.title).toBe("Events and clubs near Pune · MyOtherApp");
+    await waitFor(() => expect(document.title).toBe("Events and clubs near Pune · MyOtherApp"));
     // No location stored yet: the server guesses from the connection.
     expect(discoverApi.home).toHaveBeenCalledWith(null);
   });
