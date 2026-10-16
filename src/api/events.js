@@ -22,6 +22,12 @@ export const eventsApi = {
         }
     },
 
+    /**
+     * A guest token left by an earlier registration goes along when there is
+     * one. If the server no longer takes it (the guest was folded into an app
+     * account), client.js drops it and sends this once more without it; a
+     * new guest's token in the answer replaces whatever was stored.
+     */
     registerForEvent: async (eventId, data) => {
         try {
             const response = await apiClient.post(
@@ -41,8 +47,16 @@ export const eventsApi = {
             return responseData;
         } catch (error) {
             console.error("Failed to submit form:", error);
-            // To mimic original behavior, throw the error message
-            throw new Error(error.response?.data?.message || "Unknown error");
+            // The server's own words when it sent some, and what the form needs
+            // to show them well: the status (409 = already registered), the
+            // body (field errors), and whether it answered at all.
+            const data = error.response?.data ?? null;
+            const said = typeof data?.message === "string" ? data.message : typeof data?.detail === "string" ? data.detail : null;
+            const e = new Error(said || (error.response ? "Registration failed" : "Network error"));
+            e.status = error.response?.status ?? 0;
+            e.data = data;
+            e.network = !error.response;
+            throw e;
         }
     },
 

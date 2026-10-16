@@ -11,8 +11,10 @@ export const processPayment = async ({
 }) => {
   const razorpayLoaded = await loadScript("https://checkout.razorpay.com/v1/checkout.js");
 
+  // The form says what went wrong in its own words: "load" (the checkout
+  // never opened), "verify" (paid, but not confirmed yet) or "dismissed".
   if (!razorpayLoaded) {
-    alert("Failed to load Razorpay. Please try again.");
+    onFailure("load");
     return;
   }
 
@@ -29,7 +31,7 @@ export const processPayment = async ({
         onSuccess();
       } catch (error) {
         console.error("Payment verification failed:", error);
-        onFailure();
+        onFailure("verify");
       }
     },
     prefill: {
@@ -42,7 +44,7 @@ export const processPayment = async ({
     },
     modal: {
       ondismiss: () => {
-        onFailure();
+        onFailure("dismissed");
       },
     },
   };

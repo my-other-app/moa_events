@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+// The older pages' global rules, where form.css used to put them in the cascade.
+import './styles/legacy-base.css'
 import App from './App.jsx'
 import { rememberRef } from './utils/ref'
 
