@@ -98,6 +98,23 @@ describe("My tickets, signed in", () => {
     signInAs();
   });
 
+  it("shows a paid event still waiting for payment as that, not as a ticket", async () => {
+    answer({
+      upcoming: [row({ is_paid: false })],
+      past: [row({ id: 851, name: "Old Unpaid", slug: "old-unpaid", event_datetime: "2026-08-02T10:00:00+05:30", ticket_id: "MOA5UNP01", is_paid: false })],
+    });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    const pending = within(upcoming).getByRole("listitem");
+    expect(within(pending).getByText("Awaiting payment")).toBeInTheDocument();
+    expect(within(pending).getByRole("link", { name: "Finish payment for Hack Night 04" })).toHaveAttribute("href", "/events/hack-night-04/register");
+    expect(within(pending).queryByRole("link", { name: /View ticket/ })).toBeNull();
+
+    const old = within(screen.getByRole("region", { name: /Past/ })).getByRole("listitem");
+    expect(within(old).getByText("Payment not completed")).toBeInTheDocument();
+    expect(within(old).queryByRole("link", { name: /View ticket|Finish payment/ })).toBeNull();
+  });
+
   it("lists upcoming and past tickets, each linking to its ticket and its event", async () => {
     answer();
     show("/me/tickets");

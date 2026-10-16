@@ -41,6 +41,8 @@ export function parseMyEvent(e) {
     ticket_id: o.ticket_id,
     attended: Boolean(o.is_attended),
     certificate: Boolean(str(o.certificate_url)),
+    // A paid event's registration whose payment never went through: not a ticket yet.
+    awaitingPayment: Boolean(o.has_fee) && o.is_paid === false,
     event: {
       id: o.id,
       slug: str(o.slug),

@@ -172,6 +172,9 @@ function TicketRow({ item, past }) {
                 Attended
               </span>
             ) : null}
+            {item.awaitingPayment ? (
+              <span className="me-pill">{past ? "Payment not completed" : "Awaiting payment"}</span>
+            ) : null}
           </p>
         </div>
       </div>
@@ -181,9 +184,17 @@ function TicketRow({ item, past }) {
           <p className="me-ticket-number">{item.ticket_id}</p>
         </div>
         <div className="me-ticket-actions">
-          <Link className="dc-btn dc-btn--sm" to={ticketPath} aria-label={`View ticket for ${e.name}`}>
-            View ticket
-          </Link>
+          {item.awaitingPayment ? (
+            past ? null : (
+              <Link className="dc-btn dc-btn--sm" to={`${eventPath(e)}/register`} aria-label={`Finish payment for ${e.name}`}>
+                Finish payment
+              </Link>
+            )
+          ) : (
+            <Link className="dc-btn dc-btn--sm" to={ticketPath} aria-label={`View ticket for ${e.name}`}>
+              View ticket
+            </Link>
+          )}
           {item.certificate ? (
             <Link className="me-cert" to={`/certificates/${encodeURIComponent(item.ticket_id)}`} aria-label={`Certificate for ${e.name}`}>
               <Icon name="award" size={15} />
