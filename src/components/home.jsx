@@ -19,6 +19,8 @@ import hourglass from "../assets/hourglass.svg";
 import PlaceMarker from "../assets/Place Marker.svg";
 import Trophy from "../assets/Trophy.svg";
 
+const IST_TIME = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
+
 const agendaTime = (iso, tz) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
 const agendaDay = (iso, tz) =>
@@ -183,17 +185,11 @@ const Home = () => {
     return () => clearInterval(interval);
   }, [eventData]);
 
-  const convertToIST = (gmtDateTime) => {
-    const date = new Date(gmtDateTime);
-    date.setHours(date.getHours() + 5);
-    date.setMinutes(date.getMinutes() + 30);
-
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-
-    return `${hours}:${minutes} ${ampm}`;
+  // The start time in India time. This used to add 5:30 to the browser's own
+  // clock, so anyone already in India saw it five and a half hours late.
+  const convertToIST = (iso) => {
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : IST_TIME.format(d);
   };
 
   if (error) {
