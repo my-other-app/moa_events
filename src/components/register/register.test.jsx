@@ -235,8 +235,9 @@ describe("registering for a free event", () => {
     expect(screen.getByText("Your ticket is also in your email.")).toBeInTheDocument();
     expect(screen.getByText(/Sign in to the MyOtherApp app with/).textContent).toContain("asha@example.org");
     expect(screen.getByRole("link", { name: /Google Play/ })).toHaveAttribute("href", expect.stringContaining("play.google.com"));
-    // The step left the address, and what was typed is forgotten.
-    expect(screen.getByTestId("where").textContent).toBe("/events/quiet-evening/register");
+    // The step left the address, and what was typed is forgotten. (The router
+    // commits a navigation in a transition, so it can land a beat after the paint.)
+    await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/events/quiet-evening/register"));
     expect(sessionStorage.getItem("moa.register.124")).toBeNull();
   });
 });
