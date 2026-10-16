@@ -150,7 +150,7 @@ export function registerState(event, now = Date.now()) {
   if (opens && opens.getTime() > now) {
     return { kind: "soon", label: `Registration opens ${shortDate(event.reg_opens_at)}`, note: `Opens ${formatWhen(event.reg_opens_at)} IST` };
   }
-  return { kind: "closed", label: "Registration closed", note: "Registration for this event has closed." };
+  return { kind: "closed", label: "Registration closed", note: "Registration has closed." };
 }
 
 /** A short plain-text description for tags and previews: the first lines of the about, on one line. */
