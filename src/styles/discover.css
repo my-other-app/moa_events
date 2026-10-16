@@ -709,17 +709,14 @@
 a.dc-ecard-club:hover span {
   text-decoration: underline;
 }
+/* Portrait at every width, like the app's cards: event posters are mostly
+   4:5 and a wide crop cut their titles off. */
 .dc-ecard-media {
   position: relative;
   aspect-ratio: 4 / 5;
   overflow: hidden;
   border-radius: var(--dc-radius-img);
   background: var(--dc-sunken);
-}
-@media (min-width: 600px) {
-  .dc-ecard-media {
-    aspect-ratio: 16 / 10;
-  }
 }
 .dc-ecard-media img {
   width: 100%;

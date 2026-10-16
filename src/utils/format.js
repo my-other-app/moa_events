@@ -26,6 +26,12 @@ export function formatWhen(iso) {
   return `${part(p, "weekday")}, ${part(p, "day")} ${part(p, "month")} · ${timeFmt.format(d)}`;
 }
 
+/** "6:00 PM" in IST, whatever the visitor's clock; empty when missing. */
+export function formatTime(iso) {
+  const d = valid(iso);
+  return d ? timeFmt.format(d) : "";
+}
+
 /** "18 Oct 2026" — for past events and the like. */
 export function formatDate(iso) {
   const d = valid(iso);

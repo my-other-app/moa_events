@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "@/styles/home.css";
+import { formatTime } from "@/utils/format";
 
 import RegisterButton from "@/components/registerbutton";
 import { eventsApi } from "@/api/events";
@@ -189,18 +190,9 @@ const Home = () => {
     return () => clearInterval(interval);
   }, [eventData]);
 
-  const convertToIST = (gmtDateTime) => {
-    const date = new Date(gmtDateTime);
-    date.setHours(date.getHours() + 5);
-    date.setMinutes(date.getMinutes() + 30);
-
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-
-    return `${hours}:${minutes} ${ampm}`;
-  };
+  // The start time in India time. This used to add 5:30 to the browser's own
+  // clock, so anyone already in India saw it five and a half hours late.
+  const convertToIST = (iso) => formatTime(iso);
 
   if (error) {
     return (
