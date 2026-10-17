@@ -10,6 +10,8 @@ const STATIC = [
   ["/events", "daily", "0.9"],
   ["/clubs", "daily", "0.8"],
   ["/threads", "daily", "0.6"],
+  ["/for-clubs", "weekly", "0.8"],
+  ["/pricing", "weekly", "0.7"],
   ["/about", "monthly", "0.5"],
   ["/privacy", "yearly", "0.3"],
   ["/terms", "yearly", "0.3"],

@@ -260,9 +260,15 @@
   gap: 10px 16px;
   margin-top: 28px;
 }
-.dc-about-clubs-cta span {
-  font-size: 14px;
-  color: #9ca3af;
+.dc-about-clubs-pricing {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dc-about-clubs-pricing:hover {
+  color: var(--dc-accent);
 }
 
 /* How it works */

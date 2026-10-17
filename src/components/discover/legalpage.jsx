@@ -8,7 +8,7 @@ import Icon from "./icons";
 import "@/styles/pages.css";
 
 /** One line of a legal text: plain words, bold, and links (the site's own go through the router). */
-function Inline({ text }) {
+export function Inline({ text }) {
   return inline(text).map((part, i) => {
     if (part.strong !== undefined) return <strong key={i}>{part.strong}</strong>;
     if (part.link !== undefined) {
