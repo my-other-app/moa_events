@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { fullEvent } from "@/test/eventFixture";
 
@@ -148,6 +148,20 @@ describe("the routes", () => {
     await waitFor(() => expect(eventsApi.fetchCertificateStyle).toHaveBeenCalledWith("tk-2"));
     expect(eventsApi.fetchEvent).not.toHaveBeenCalledWith("tickets");
     expect(discoverCalls()).toBe(0);
+  });
+
+  it("serves a person's own pages at /me/tickets and /me/following, never as an old event address", async () => {
+    at("/me/tickets");
+    expect(screen.getByRole("heading", { level: 1, name: "Your tickets are in the app" })).toBeInTheDocument();
+    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
+    cleanup();
+    at("/me/following");
+    expect(screen.getByRole("heading", { level: 1, name: "Follow clubs in the app" })).toBeInTheDocument();
+    cleanup();
+    at("/me");
+    expect(where()).toBe("/me/tickets");
+    expect(discoverApi.event).not.toHaveBeenCalled();
+    expect(eventsApi.fetchEvent).not.toHaveBeenCalled();
   });
 
   it("shows the not-found page for anything else deeper", () => {

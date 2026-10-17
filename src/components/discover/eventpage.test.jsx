@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
 
@@ -113,7 +113,8 @@ describe("an event's page", () => {
     serve([fullEvent()]);
     show("/events/hack-night-04");
     await title("Hack Night 04");
-    expect(document.title).toBe("Hack Night 04 · MyOtherApp");
+    // The head is filled in effects, which can land a beat after the page paints.
+    await waitFor(() => expect(document.title).toBe("Hack Night 04 · MyOtherApp"));
     expect(document.head.querySelector('meta[name="description"]').getAttribute("content")).toMatch(/^Twenty-four hours of building\./);
     expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/events/hack-night-04");
     const og = (p) => document.head.querySelector(`meta[property="og:${p}"]`)?.getAttribute("content");
@@ -148,7 +149,13 @@ describe("an event's page", () => {
     expect(h2("Online event")).toBeInTheDocument();
     expect(screen.getByText(/joining link is on your ticket/)).toBeInTheDocument();
     expect(screen.queryByTitle(/Map of/)).toBeNull();
-    const ld = JSON.parse(document.head.querySelector('script[type="application/ld+json"]').textContent);
+    // Added to the head in an effect, which can land a beat after the page paints.
+    const script = await waitFor(() => {
+      const el = document.head.querySelector('script[type="application/ld+json"]');
+      expect(el).not.toBeNull();
+      return el;
+    });
+    const ld = JSON.parse(script.textContent);
     expect(ld.location).toEqual({ "@type": "VirtualLocation", url: "https://myotherapp.in/events/hack-night-04" });
     expect(ld.eventAttendanceMode).toBe("https://schema.org/OnlineEventAttendanceMode");
   });

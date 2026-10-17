@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { eventsApi } from "@/api/events";
+import { useAuth } from "@/auth/context";
+import { cancelOneTap } from "@/auth/google";
 import { paymentsApi } from "@/api/payments";
 import { processPayment } from "@/utils/payment";
 import { currentRef } from "@/utils/ref";
@@ -22,6 +24,7 @@ import {
   validateAnswers,
   validateDetails,
 } from "@/utils/register";
+import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
 import { SitePage } from "../discover/chrome";
 import { CalendarButton, EpIcon } from "../discover/eventparts";
@@ -52,10 +55,33 @@ import "@/styles/register.css";
  * rather than making another. Its refusals are shown in its own words: 409
  * ALREADY_REGISTERED (with the app), 409 REGISTRATION_AWAITING_PAYMENT, and
  * 400 CLUB_EMAIL beside the email field.
+ *
+ * Signed in (Sign in with Google), the name and email come from the account
+ * and the email can't be changed: the registration goes in with the
+ * account's token and lands straight in the account, so the server sends no
+ * guest token back and none is kept. The calls and payloads are the same;
+ * only the Authorization header differs. Signed out, a quiet line offers
+ * signing in, and the guest path is exactly as it was.
  */
 
 const DETAIL_KEYS = ["name", "email", "phone"];
 const EMPTY = { name: "", email: "", phone: "" };
+
+/** What was typed, with the account's email (always) and its name and phone where nothing was typed. */
+const withAccount = (v, email, name, phone) => (email ? { ...v, name: v.name || name || "", email, phone: v.phone || phone || "" } : v);
+
+/** One Tap is offered once a tab, on a desk, on the details step: never over a phone's action bar. */
+const ONE_TAP_KEY = "moa.onetap";
+function oneTapWelcome() {
+  try {
+    if (sessionStorage.getItem(ONE_TAP_KEY)) return false;
+    if (typeof window.matchMedia !== "function" || !window.matchMedia("(min-width: 960px)").matches) return false;
+    sessionStorage.setItem(ONE_TAP_KEY, "1");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const ownsKey = (stepId, key) => (stepId === "details" ? DETAIL_KEYS.includes(key) : stepId === "questions" ? key.startsWith("q:") : false);
 
@@ -132,7 +158,7 @@ const sentence = (s) => {
 };
 
 /** What went wrong with the registration, said once and calmly, with the way forward. */
-function Problem({ problem, email, onRetry, onChangeEmail }) {
+function Problem({ problem, email, signedIn, onRetry, onChangeEmail, onSignIn }) {
   const box = useRef(null);
   // Said where the eye is: the checkout closes over the top of a long page.
   useEffect(() => {
@@ -155,7 +181,11 @@ function Problem({ problem, email, onRetry, onChangeEmail }) {
   } else if (problem.kind === "duplicate") {
     tone = "info";
     title = "You're already registered";
-    actions = (
+    actions = signedIn ? (
+      <Link className="dc-btn dc-btn--sm" to="/me/tickets">
+        Open My tickets
+      </Link>
+    ) : (
       <>
         <StoreButtons />
         <button type="button" className="rg-textbtn" onClick={onChangeEmail}>
@@ -163,6 +193,14 @@ function Problem({ problem, email, onRetry, onChangeEmail }) {
         </button>
       </>
     );
+  } else if (problem.kind === "auth") {
+    tone = "calm";
+    title = "Sign in again";
+    actions = onSignIn ? (
+      <button type="button" className="dc-btn dc-btn--sm" onClick={onSignIn}>
+        Sign in
+      </button>
+    ) : null;
   } else if (problem.kind === "awaiting") {
     tone = "info";
     title = "Your registration is waiting for payment";
@@ -273,12 +311,17 @@ function Flow({ event, club }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
+  const auth = useAuth();
+  const account = auth.status === "signed-in" && auth.user?.email ? auth.user : null;
+  const accountEmail = account?.email || null;
+  const accountName = account?.name || null;
+  const accountPhone = account?.phone || null;
 
   const [info, setInfo] = useState({ status: "loading", questions: [], fee: null });
   const [attempt, setAttempt] = useState(0);
   const [items, setItems] = useState(null);
   const [draft] = useState(() => loadDraft(eventId));
-  const [values, setValues] = useState(() => draft?.values || EMPTY);
+  const [values, setValues] = useState(() => withAccount(draft?.values || EMPTY, accountEmail, accountName, accountPhone));
   const [answers, setAnswers] = useState(() => draft?.answers || {});
   const [picks, setPicks] = useState(() => draft?.picks || {});
   const [touched, setTouched] = useState({});
@@ -289,6 +332,22 @@ function Flow({ event, club }) {
   const busy = useRef(false);
   const heading = useRef(null);
   const focusNext = useRef(null);
+  const submittedAs = useRef(null);
+
+  // Signing in part-way through fills in what the account knows; the email becomes the account's.
+  useEffect(() => {
+    if (!accountEmail) return;
+    setValues((v) => {
+      const next = withAccount(v, accountEmail, accountName, accountPhone);
+      return next.name === v.name && next.email === v.email && next.phone === v.phone ? v : next;
+    });
+    setServerErrors((e) => {
+      if (!("email" in e)) return e;
+      const rest = { ...e };
+      delete rest.email;
+      return rest;
+    });
+  }, [accountEmail, accountName, accountPhone]);
 
   // The organiser's questions (and the fee as the form knows it).
   useEffect(() => {
@@ -399,6 +458,15 @@ function Flow({ event, club }) {
     }
   }, [step.id, ready, done]);
 
+  // Google's One Tap, offered quietly on the details step to someone signed out.
+  const { enabled: signInOn, tryOneTap } = auth;
+  const onDetails = ready && !done && step.id === "details";
+  useEffect(() => {
+    if (!signInOn || accountEmail || !onDetails || !oneTapWelcome()) return undefined;
+    tryOneTap();
+    return () => cancelOneTap();
+  }, [signInOn, accountEmail, onDetails, tryOneTap]);
+
   // Once every field the server pointed at has been changed, its note goes too.
   useEffect(() => {
     if (problem?.kind === "fields" && Object.keys(serverErrors).length === 0) setProblem(null);
@@ -455,6 +523,7 @@ function Flow({ event, club }) {
       email: responseData.email || values.email,
       paid,
       amount: paid ? Number(responseData.pay_amount) || 0 : 0,
+      account: submittedAs.current,
     };
     busy.current = false;
     setPhase("idle");
@@ -497,6 +566,7 @@ function Flow({ event, club }) {
       return;
     }
     busy.current = true;
+    submittedAs.current = accountEmail;
     setProblem(null);
     setPhase("registering");
     const release = () => {
@@ -605,7 +675,7 @@ function Flow({ event, club }) {
   const isReview = step.id === "review";
   const title = isReview ? (pays ? "Review and pay" : "Review and confirm") : step.title;
   const ledes = {
-    details: "It takes a minute. Your ticket comes by email.",
+    details: accountEmail ? "It takes a minute. Your ticket comes by email and lands in your MyOtherApp app." : "It takes a minute. Your ticket comes by email.",
     questions: `${club?.name || "The organisers"} would like to know a little more. Questions marked * need an answer.`,
     addons: "Paid together with your registration and collected at the event. Skip it if you don't want anything.",
     review: "Check everything is right before you go ahead.",
@@ -633,6 +703,19 @@ function Flow({ event, club }) {
             <p className="rg-lede">{ledes[step.id]}</p>
           </header>
 
+          {step.id === "details" && auth.enabled && !accountEmail ? (
+            <p className="ac-haveapp">
+              <GoogleMark size={16} />
+              <span>
+                Have the app?{" "}
+                <button type="button" className="ac-linkbtn" onClick={() => auth.openSignIn({ reason: "register" })}>
+                  Sign in with Google
+                </button>{" "}
+                to keep this ticket in your account.
+              </span>
+            </p>
+          ) : null}
+
           {step.id === "details" ? (
             <div className="rg-fields">
               <TextField
@@ -649,13 +732,20 @@ function Flow({ event, club }) {
                 name="email"
                 label="Email"
                 required
-                hint="Your ticket is sent here."
+                hint={accountEmail ? null : "Your ticket is sent here."}
                 value={values.email}
                 onChange={setValue("email")}
                 onBlur={leave("email", values.email)}
                 error={errorFor("email")}
                 extra={
-                  suggestion ? (
+                  accountEmail ? (
+                    <p className="ac-signedas">
+                      Signed in as <strong>{accountEmail}</strong> · Not you?{" "}
+                      <button type="button" className="ac-linkbtn" onClick={auth.signOut}>
+                        Sign out
+                      </button>
+                    </p>
+                  ) : suggestion ? (
                     <p className="rg-suggest">
                       Did you mean{" "}
                       <button type="button" onClick={() => setValue("email")(suggestion)}>
@@ -674,6 +764,7 @@ function Flow({ event, club }) {
                   spellCheck: false,
                   enterKeyHint: "next",
                   placeholder: "you@example.com",
+                  ...(accountEmail ? { readOnly: true, "aria-readonly": true } : {}),
                 }}
               />
               <TextField
@@ -753,6 +844,7 @@ function Flow({ event, club }) {
                   <Icon name="mail" size={16} />
                   <span>
                     Your ticket goes to <strong>{values.email}</strong>
+                    {accountEmail ? " and into your MyOtherApp app" : ""}
                     {pays ? " once the payment goes through." : "."}
                   </span>
                 </p>
@@ -769,7 +861,16 @@ function Flow({ event, club }) {
             </div>
           ) : null}
 
-          {problemHere ? <Problem problem={problem} email={values.email} onRetry={submit} onChangeEmail={changeEmail} /> : null}
+          {problemHere ? (
+            <Problem
+              problem={problem}
+              email={values.email}
+              signedIn={Boolean(accountEmail)}
+              onRetry={submit}
+              onChangeEmail={changeEmail}
+              onSignIn={auth.enabled ? () => auth.openSignIn({ reason: "register" }) : null}
+            />
+          ) : null}
 
           <div className="rg-bar">
             <div className="rg-bar-in">

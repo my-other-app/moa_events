@@ -298,6 +298,14 @@
 .dc-header-app {
   flex: 0 0 auto;
 }
+.dc-header-account {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.dc-header-account:empty {
+  display: none;
+}
 .dc-header-searchtoggle {
   display: none;
 }
@@ -327,8 +335,11 @@
   .dc-header-searchtoggle:hover {
     background: var(--dc-sunken);
   }
-  .dc-header-app {
+  .dc-header-account {
     order: 3;
+  }
+  .dc-header-app {
+    order: 4;
   }
   .dc-header-app.dc-btn {
     min-height: 36px;
@@ -336,7 +347,7 @@
     font-size: 17px;
   }
   .dc-header-search {
-    order: 4;
+    order: 5;
     flex-basis: 100%;
     display: none;
     max-width: none;
@@ -346,7 +357,7 @@
     display: block;
   }
   .dc-nav {
-    order: 5;
+    order: 6;
     flex-basis: calc(100% + 2 * var(--dc-gutter));
     margin: 0 calc(-1 * var(--dc-gutter));
     padding: 0 var(--dc-gutter) 4px;

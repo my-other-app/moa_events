@@ -11,7 +11,9 @@ import { Thumb } from "./summary";
 /**
  * After the registration (and the payment, when there was one): the ticket
  * right here — the same QR the door scans, and the full ticket a tap away —
- * the calendar and sharing, and where the ticket lives from now on.
+ * the calendar and sharing, and where the ticket lives from now on: in the
+ * account, for someone who registered signed in; otherwise their email, and
+ * the app once they sign in to it.
  */
 export default function Success({ event, club, ticket }) {
   const heading = useRef(null);
@@ -43,18 +45,38 @@ export default function Success({ event, club, ticket }) {
           <ShareButton title={event.name} text={`I'm going to ${event.name}${club?.name ? ` by ${club.name}` : ""}. Join me?`} url={url} />
         </div>
 
-        <div className="rg-done-app">
-          <span className="rg-done-app-icon" aria-hidden="true">
-            <Icon name="mail" size={20} />
-          </span>
-          <div>
-            <p className="rg-done-app-title">Your ticket is also in your email.</p>
-            <p className="rg-done-app-text">
-              Sign in to the MyOtherApp app with <strong className="rg-done-email">{ticket.email}</strong> to keep all your tickets in one place.
-            </p>
-            <StoreButtons />
+        {ticket.account ? (
+          <div className="rg-done-app ac-inapp">
+            <span className="rg-done-app-icon" aria-hidden="true">
+              <Icon name="phone" size={20} />
+            </span>
+            <div>
+              <p className="rg-done-app-title">It&rsquo;s in your MyOtherApp app</p>
+              <p className="rg-done-app-text">
+                This ticket is saved to your account, <strong className="rg-done-email">{ticket.account}</strong>: open it in the app on your phone, or in My
+                tickets here. A copy is in your email too.
+              </p>
+              <div className="ac-inapp-links">
+                <Link className="dc-btn dc-btn--sm" to="/me/tickets">
+                  My tickets
+                </Link>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="rg-done-app">
+            <span className="rg-done-app-icon" aria-hidden="true">
+              <Icon name="mail" size={20} />
+            </span>
+            <div>
+              <p className="rg-done-app-title">Your ticket is also in your email.</p>
+              <p className="rg-done-app-text">
+                Sign in to the MyOtherApp app with <strong className="rg-done-email">{ticket.email}</strong> to keep all your tickets in one place.
+              </p>
+              <StoreButtons />
+            </div>
+          </div>
+        )}
 
         <p className="rg-done-more">
           <Link to={eventPath(event)}>Back to the event</Link>

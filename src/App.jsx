@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Navigate, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/auth/AuthProvider";
 import Register from "@/components/register/register";
 import Ticket from "@/components/ticket";
 import Certificate from "@/components/certificate";
@@ -14,12 +15,14 @@ import ClubPage from "@/components/discover/clubpage";
 import EventPage from "@/components/discover/eventpage";
 import { EventScoped, LegacyEventRedirect } from "@/components/discover/eventroutes";
 import { ThreadPage, ThreadsPage } from "@/components/discover/threadspage";
+import { FollowingPage, MyTicketsPage } from "@/components/me/mepages";
 
 /**
  * Every address the site answers. An event lives at /events/{slug}, with
  * its form, live room and competition under it. The discovery pages (/,
- * /events, /clubs, /threads) are fixed words, so they always win over the
- * old event addresses — /{id or slug}, /{ref}/live, /{ref}/compete and
+ * /events, /clubs, /threads) and a signed-in person's own (/me/tickets,
+ * /me/following) are fixed words, so they always win over the old event
+ * addresses — /{id or slug}, /{ref}/live, /{ref}/compete and
  * /register/{ref} — which are on posters, in emails and in the app's share
  * links, and redirect to the event's page for good.
  */
@@ -42,6 +45,9 @@ export function AppRoutes() {
       <Route path="/clubs/:slug" element={<ClubPage />} />
       <Route path="/threads" element={<ThreadsPage />} />
       <Route path="/threads/:id" element={<ThreadPage />} />
+      <Route path="/me" element={<Navigate to="/me/tickets" replace />} />
+      <Route path="/me/tickets" element={<MyTicketsPage />} />
+      <Route path="/me/following" element={<FollowingPage />} />
       <Route path="/play/:eventId" element={<Play />} />
       <Route path="/feedback/:eventId/:registrationId" element={<Feedback />} />
       <Route path="/tickets/:ticketid" element={<Ticket />} />
@@ -59,7 +65,9 @@ export function AppRoutes() {
 function App() {
   return (
     <Router>
-      <AppRoutes />
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
     </Router>
   );
 }

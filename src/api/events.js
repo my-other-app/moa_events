@@ -1,4 +1,5 @@
 import apiClient from "./client";
+import { isSignedIn, storeGuestTokens } from "@/auth/session";
 
 export const eventsApi = {
     /** What the event sells with its ticket; `{enabled:false, items:[]}` when nothing. */
@@ -23,10 +24,14 @@ export const eventsApi = {
     },
 
     /**
-     * A guest token left by an earlier registration goes along when there is
-     * one. If the server no longer takes it (the guest was folded into an app
-     * account), client.js drops it and sends this once more without it; a
-     * new guest's token in the answer replaces whatever was stored.
+     * Signed in, the account's token goes along and the registration is the
+     * account's own: the server sends no token back, and none is stored.
+     *
+     * Signed out, a guest token left by an earlier registration goes along
+     * when there is one. If the server no longer takes it (the guest was
+     * folded into an app account), client.js drops it and sends this once
+     * more without it; a new guest's token in the answer replaces whatever
+     * was stored.
      */
     registerForEvent: async (eventId, data) => {
         try {
@@ -36,14 +41,8 @@ export const eventsApi = {
             );
 
             const responseData = response.data;
-            if (responseData.auth_token) {
-                try {
-                    localStorage.setItem("access_token", responseData.auth_token.access_token);
-                    localStorage.setItem("refresh_token", responseData.auth_token.refresh_token);
-                } catch (e) {
-                    console.error("Error storing tokens:", e);
-                }
-            }
+            const asAccount = response.config?._as === "user" || isSignedIn();
+            if (responseData.auth_token && !asAccount) storeGuestTokens(responseData.auth_token);
             return responseData;
         } catch (error) {
             console.error("Failed to submit form:", error);
@@ -52,10 +51,11 @@ export const eventsApi = {
             // body (field errors), and whether it answered at all.
             const data = error.response?.data ?? null;
             const said = typeof data?.message === "string" ? data.message : typeof data?.detail === "string" ? data.detail : null;
-            const e = new Error(said || (error.response ? "Registration failed" : "Network error"));
-            e.status = error.response?.status ?? 0;
+            const e = new Error(said || (error.authExpired ? error.message : error.response ? "Registration failed" : "Network error"));
+            e.status = error.response?.status ?? (error.authExpired ? 401 : 0);
             e.data = data;
-            e.network = !error.response;
+            e.network = !error.response && !error.authExpired;
+            e.authExpired = Boolean(error.authExpired);
             throw e;
         }
     },

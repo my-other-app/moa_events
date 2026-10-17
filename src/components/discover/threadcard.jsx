@@ -3,7 +3,7 @@ import { imageUrl, plural, timeAgo } from "@/utils/format";
 import { Avatar, Img } from "./bits";
 import Icon from "./icons";
 
-/** A poll's results as share bars; with `onVote`, each option is a button (that leads to the app). */
+/** A poll's results as share bars; with `onVote(option)`, each option is a button. */
 function Poll({ poll, onVote }) {
   const lead = Math.max(0, ...poll.options.map((o) => o.share));
   return (
@@ -22,7 +22,14 @@ function Poll({ poll, onVote }) {
           </>
         );
         return onVote ? (
-          <button key={o.id} type="button" className={cls} onClick={onVote} aria-label={`Vote for ${o.label} (${o.share}% so far)`}>
+          <button
+            key={o.id}
+            type="button"
+            className={cls}
+            onClick={() => onVote(o)}
+            aria-pressed={mine}
+            aria-label={mine ? `${o.label}: your vote (${o.share}%)` : `Vote for ${o.label} (${o.share}% so far)`}
+          >
             {inner}
           </button>
         ) : (
@@ -38,8 +45,9 @@ function Poll({ poll, onVote }) {
 
 /**
  * A club's post. In a list it is a card that opens the post; on the post's
- * own page (`full`) it shows everything and its buttons call `onAction`
- * ("like" | "vote" | "comment"), which on the web means "do this in the app".
+ * own page (`full`) it shows everything and its buttons call
+ * `onAction(kind, optionId)` ("like" | "vote" | "comment"): the page likes
+ * and votes for a signed-in reader, and otherwise says "do this in the app".
  */
 export function ThreadCard({ thread, full = false, onAction, headingLevel = 3 }) {
   const t = thread;
@@ -75,7 +83,7 @@ export function ThreadCard({ thread, full = false, onAction, headingLevel = 3 })
           <Img src={image} alt={`Picture posted by ${club.name}`} />
         </div>
       ) : null}
-      {t.poll ? <Poll poll={t.poll} onVote={onAction ? () => onAction("vote") : null} /> : null}
+      {t.poll ? <Poll poll={t.poll} onVote={onAction ? (o) => onAction("vote", o.id) : null} /> : null}
       <div className="dc-tcard-foot">
         <span className="dc-tcard-stat">
           <Icon name="heart" size={16} /> {plural(t.likes, "like")}
@@ -86,8 +94,8 @@ export function ThreadCard({ thread, full = false, onAction, headingLevel = 3 })
       </div>
       {onAction ? (
         <div className="dc-tcard-actions">
-          <button type="button" className="dc-tcard-action" onClick={() => onAction("like")}>
-            <Icon name="heart" size={16} /> Like
+          <button type="button" className="dc-tcard-action" aria-pressed={t.liked} onClick={() => onAction("like")}>
+            <Icon name="heart" size={16} /> {t.liked ? "Liked" : "Like"}
           </button>
           <button type="button" className="dc-tcard-action" onClick={() => onAction("comment")}>
             <Icon name="comment" size={16} /> Comment

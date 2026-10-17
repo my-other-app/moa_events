@@ -165,9 +165,10 @@ export function Dialog({ open, onClose, labelledBy, className, backdropClassName
 
 /**
  * "Do this in the app": following, liking, voting and commenting need an
- * account, and accounts live in the app.
+ * account, and accounts live in the app. `alt`, when given, is the other way
+ * (signing in here), under an "or".
  */
-export function AppPrompt({ open, onClose, title = "Get MyOtherApp", message }) {
+export function AppPrompt({ open, onClose, title = "Get MyOtherApp", message, alt = null }) {
   const id = useId();
   return (
     <Dialog open={open} onClose={onClose} labelledBy={id} className="dc-modal" backdropClassName="dc-modal-backdrop">
@@ -178,6 +179,12 @@ export function AppPrompt({ open, onClose, title = "Get MyOtherApp", message }) 
       <h2 id={id}>{title}</h2>
       <p>{message || "Follow clubs, get your tickets in a tap and hear about events before they fill up. Free on your phone."}</p>
       <StoreButtons />
+      {alt ? (
+        <div className="dc-modal-alt">
+          <span className="dc-modal-or">or</span>
+          {alt}
+        </div>
+      ) : null}
       <button type="button" className="dc-modal-later" onClick={onClose}>
         Not now
       </button>

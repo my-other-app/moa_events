@@ -1,0 +1,767 @@
+/*
+ * Signing in, and what a signed-in person gets: the header's sign-in button
+ * and account menu, the sign-in sheet, the signed-in bits of the
+ * registration form, the Follow button, and the /me pages. The tokens are
+ * discover.css's (--dc-*); everything here is prefixed ac- (account) or me-.
+ * Every module that imports this imports discover.css first, so these rules
+ * come after its resets and components in the cascade.
+ */
+
+/* ---------- header: "Sign in" ---------- */
+
+.ac-signin {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  white-space: nowrap;
+  transition: background-color 0.15s;
+}
+.ac-signin:hover {
+  background: var(--dc-sunken);
+}
+
+/* ---------- header: the account menu ---------- */
+
+.ac-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dc-accent);
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.12);
+  color: var(--dc-ink);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.ac-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ac-menu {
+  position: relative;
+}
+.ac-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 999px;
+  color: var(--dc-ink);
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.15s;
+}
+.ac-menu-btn:hover,
+.ac-menu-btn[aria-expanded="true"] {
+  background: var(--dc-sunken);
+}
+.ac-menu-first {
+  display: none;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (min-width: 1024px) {
+  .ac-menu-first {
+    display: inline;
+  }
+}
+.ac-menu-chev {
+  color: var(--dc-muted);
+  transition: transform 0.15s;
+}
+.ac-menu-btn[aria-expanded="true"] .ac-menu-chev {
+  transform: rotate(180deg);
+}
+.ac-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(280px, calc(100vw - 2 * var(--dc-gutter)));
+  padding: 8px;
+  border: 1px solid var(--dc-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--dc-shadow);
+}
+.ac-menu-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--dc-line);
+}
+.ac-menu-who > div {
+  min-width: 0;
+}
+.ac-menu-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.ac-menu-email {
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--dc-muted);
+  overflow-wrap: anywhere;
+}
+.ac-menu-list a,
+.ac-menu-out {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  text-align: left;
+}
+.ac-menu-list a:hover,
+.ac-menu-out:hover {
+  background: var(--dc-sunken);
+}
+.ac-menu-list svg,
+.ac-menu-out svg {
+  color: var(--dc-muted);
+}
+.ac-menu-out {
+  margin-top: 6px;
+  border-top: 1px solid var(--dc-line);
+  border-radius: 0 0 8px 8px;
+  padding-top: 2px;
+  color: var(--dc-text);
+}
+
+@media (max-width: 767px) {
+  .ac-signin {
+    min-height: 36px;
+    padding: 0 10px;
+  }
+  .ac-menu-btn {
+    min-height: 36px;
+    padding: 2px;
+  }
+  .ac-menu-chev {
+    display: none;
+  }
+  /* On a phone the menu hangs from the header, full width between the gutters. */
+  .ac-menu {
+    position: static;
+  }
+  .ac-menu-panel {
+    top: 54px;
+    left: var(--dc-gutter);
+    right: var(--dc-gutter);
+    width: auto;
+  }
+}
+
+/* ---------- the sign-in sheet ---------- */
+
+.ac-sheet .ac-sheet-why {
+  margin: 10px auto 20px;
+  max-width: 30ch;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--dc-text);
+}
+.ac-gbtn {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+.ac-gbtn-slot {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 320px;
+  min-height: 44px;
+}
+.ac-gbtn.is-busy .ac-gbtn-slot {
+  visibility: hidden;
+}
+.ac-gbtn-skel {
+  position: absolute;
+  inset: 0;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--dc-sunken), #fff, var(--dc-sunken));
+  background-size: 200% 100%;
+  box-shadow: inset 0 0 0 1px var(--dc-line);
+  animation: ac-shimmer 1.2s linear infinite;
+}
+.ac-sheet .ac-gbtn-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.ac-spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--dc-line);
+  border-top-color: var(--dc-ink);
+  border-radius: 999px;
+  animation: ac-spin 0.8s linear infinite;
+}
+.ac-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fef2f2;
+  text-align: left;
+}
+.ac-sheet .ac-note p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #7f1d1d;
+}
+.ac-note--calm {
+  border-color: var(--dc-line);
+  background: var(--dc-sunken);
+}
+.ac-sheet .ac-note--calm p {
+  color: var(--dc-text);
+}
+.ac-sheet .ac-sheet-fine {
+  margin: 18px auto 0;
+  max-width: 34ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dc-muted);
+}
+
+@media (max-width: 599px) {
+  /* A sheet from the bottom on a phone, the way the app's own sheets come up. */
+  .ac-sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .ac-sheet.dc-modal {
+    max-width: none;
+    border-radius: 18px 18px 0 0;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    animation: ac-up 0.22s ease-out both;
+  }
+}
+
+/* ---------- quiet sign-in lines on the page ---------- */
+
+.ac-gmark {
+  flex: 0 0 auto;
+}
+.ac-haveapp {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: -6px 0 24px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--dc-text);
+}
+.ac-haveapp .ac-gmark {
+  margin-top: 2px;
+}
+.ac-linkbtn {
+  padding: 0;
+  font-weight: 700;
+  color: var(--dc-link);
+  text-align: left;
+}
+.ac-linkbtn:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Signed in on the form: the email is the account's. */
+.dc-scope .rg-input[readonly] {
+  background: var(--dc-sunken);
+  border-color: var(--dc-line);
+  color: var(--dc-ink);
+  cursor: default;
+}
+.dc-scope .rg-input[readonly]:hover {
+  border-color: var(--dc-line);
+}
+.ac-signedas {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-muted);
+}
+.ac-signedas strong {
+  font-weight: 600;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+
+/* The success screen, signed in. */
+.ac-inapp .rg-done-app-icon {
+  background: var(--dc-accent);
+  box-shadow: none;
+}
+.ac-inapp-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ---------- follow ---------- */
+
+.dc-btn.ac-follow.is-on {
+  background: #fff;
+  color: var(--dc-ink);
+  box-shadow: inset 0 0 0 1px var(--dc-line);
+}
+.dc-btn.ac-follow.is-on:hover {
+  background: var(--dc-sunken);
+}
+.dc-btn.ac-follow[aria-busy="true"] {
+  cursor: progress;
+}
+.ac-follow-err {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: #b91c1c;
+}
+.dc-modal-alt {
+  margin-top: 16px;
+}
+.dc-modal-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.dc-modal-or::before,
+.dc-modal-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--dc-line);
+}
+.dc-modal-alt .dc-btn {
+  width: 100%;
+  font-family: var(--dc-font);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+/* ---------- threads, signed in ---------- */
+
+.dc-tcard-action[aria-pressed="true"] {
+  color: #be123c;
+}
+.dc-tcard-action[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+.ac-thread-note {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #b91c1c;
+}
+
+/* ---------- /me pages ---------- */
+
+.me-head {
+  padding: 28px 0 8px;
+}
+.me-head h1 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(44px, 7vw, 64px);
+  line-height: 0.95;
+  color: var(--dc-ink);
+}
+.me-head p {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--dc-text);
+}
+.me-head p strong {
+  color: var(--dc-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.me-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 18px 0 6px;
+  border-bottom: 1px solid var(--dc-line);
+}
+.me-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-text);
+}
+.me-tabs a:hover {
+  color: var(--dc-ink);
+}
+.me-tabs a.active {
+  color: var(--dc-ink);
+  border-bottom-color: var(--dc-ink);
+}
+
+.me-section {
+  margin-top: 28px;
+}
+.me-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--dc-ink);
+}
+.me-section-title small {
+  font-family: var(--dc-font);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.me-tickets {
+  display: grid;
+  gap: 12px;
+}
+
+/* A ticket: the event on the left, the stub with the code on the right, a perforation between. */
+.me-ticket {
+  --me-notch: 9px;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--dc-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+}
+.me-ticket-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+}
+.me-thumb {
+  position: relative;
+  flex: 0 0 auto;
+  display: block;
+  width: 64px;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--dc-sunken);
+}
+.me-thumb > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.me-ticket-info {
+  min-width: 0;
+}
+.me-ticket-when {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--dc-ink);
+}
+.me-ticket-name {
+  margin-top: 2px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 0.98;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.me-ticket-name a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.me-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--dc-muted);
+}
+.me-ticket-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.me-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.me-pill--yes {
+  background: var(--dc-accent);
+}
+.me-ticket-stub {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-top: 2px dashed var(--dc-line);
+}
+.me-ticket-stub::before,
+.me-ticket-stub::after {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--me-notch) - 1px);
+  width: calc(2 * var(--me-notch));
+  height: calc(2 * var(--me-notch));
+  border: 1px solid var(--dc-line);
+  border-radius: 999px;
+  background: var(--dc-bg);
+}
+.me-ticket-stub::before {
+  left: calc(-1 * var(--me-notch) - 1px);
+  clip-path: inset(0 0 0 50%);
+}
+.me-ticket-stub::after {
+  right: calc(-1 * var(--me-notch) - 1px);
+  clip-path: inset(0 50% 0 0);
+}
+.me-ticket-code {
+  min-width: 0;
+}
+.me-ticket-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.me-ticket-number {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.me-ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 14px;
+}
+.me-cert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-link);
+}
+.me-cert:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.me-ticket.is-past .me-thumb {
+  filter: grayscale(0.6);
+  opacity: 0.85;
+}
+
+@media (min-width: 720px) {
+  .me-ticket {
+    grid-template-columns: minmax(0, 1fr) 196px;
+  }
+  .me-ticket-main {
+    padding: 16px 18px;
+  }
+  .me-thumb {
+    width: 76px;
+  }
+  .me-ticket-stub {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 14px 20px;
+    min-width: 0;
+    border-top: 0;
+    border-left: 2px dashed var(--dc-line);
+  }
+  .me-ticket-stub::before,
+  .me-ticket-stub::after {
+    left: calc(-1 * var(--me-notch) - 1px);
+    right: auto;
+  }
+  .me-ticket-stub::before {
+    top: calc(-1 * var(--me-notch) - 1px);
+    clip-path: inset(50% 0 0 0);
+  }
+  .me-ticket-stub::after {
+    top: auto;
+    bottom: calc(-1 * var(--me-notch) - 1px);
+    clip-path: inset(0 0 50% 0);
+  }
+  .me-ticket-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 2px;
+  }
+}
+
+.me-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+.me-skel {
+  height: 104px;
+  border-radius: 14px;
+}
+
+.me-prompt {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-width: 520px;
+  margin: 24px auto 0;
+  padding: 36px 24px 32px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  text-align: center;
+}
+.me-prompt-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 10px;
+  border-radius: 16px;
+  background: var(--dc-accent);
+  color: var(--dc-ink);
+}
+.me-prompt h1,
+.me-prompt h2 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1;
+  color: var(--dc-ink);
+}
+.me-prompt p {
+  max-width: 40ch;
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.me-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+.me-prompt .dc-btn.me-google {
+  gap: 10px;
+  background: #fff;
+  color: var(--dc-ink);
+  box-shadow: inset 0 0 0 1px var(--dc-line);
+  font-family: var(--dc-font);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.me-prompt .dc-btn.me-google:hover {
+  background: var(--dc-sunken);
+}
+
+@keyframes ac-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ac-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes ac-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-spin,
+  .ac-gbtn-skel,
+  .ac-sheet.dc-modal {
+    animation: none;
+  }
+}

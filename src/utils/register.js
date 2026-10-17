@@ -261,6 +261,8 @@ const ALREADY = /already\s+registered/i;
  *   fields     the server named fields (or CLUB_EMAIL, which is about the
  *              email): shown beside them
  *   network    no answer at all: try again
+ *   auth       signed in, but the sign-in ran out and couldn't be renewed:
+ *              nothing was sent as a guest; sign in again, or go on as one
  *   message    anything else the server explained, in its own words
  *   server     a 5xx with nothing to say
  */
@@ -274,6 +276,9 @@ export function describeRegisterError(error, questionKeys = []) {
         ? data.detail.trim()
         : null;
 
+  if (error?.authExpired) {
+    return { kind: "auth", message: "Your sign-in expired before we could register you. Sign in again to keep this ticket in your account, or register with your email." };
+  }
   if (error?.network || (!status && !data)) {
     return { kind: "network", message: "Check your connection and try again — you won't be registered twice." };
   }

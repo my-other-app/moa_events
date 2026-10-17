@@ -85,3 +85,8 @@ export function useJsonLd(data) {
     return () => script.remove();
   }, [json]);
 }
+
+/** Keeps the page out of search results while it is open (a person's own pages: tickets, follows). */
+export function useNoIndex() {
+  useEffect(() => setHeadTag("meta", "name", "robots", "content", "noindex, nofollow"), []);
+}
