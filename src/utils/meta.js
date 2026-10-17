@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { SITE_URL } from "@/config";
 import { jsonForScript } from "./eventld";
 
 const DEFAULT_DESCRIPTION_SELECTOR = 'meta[name="description"]';
@@ -89,4 +90,14 @@ export function useJsonLd(data) {
 /** Keeps the page out of search results while it is open (a person's own pages: tickets, follows). */
 export function useNoIndex() {
   useEffect(() => setHeadTag("meta", "name", "robots", "content", "noindex, nofollow"), []);
+}
+
+/**
+ * A fixed page's head in one go: its title and description, the canonical
+ * address and the share tags. Indexable unless `noindex` is set.
+ */
+export function usePageSeo({ title, description, path, image = `${SITE_URL}/og-default.png`, noindex = false }) {
+  usePageMeta(title, description);
+  useShareMeta({ title, description, image, url: `${SITE_URL}${path}` });
+  useEffect(() => (noindex ? setHeadTag("meta", "name", "robots", "content", "noindex, nofollow") : undefined), [noindex]);
 }

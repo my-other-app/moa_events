@@ -26,11 +26,14 @@ describe("which addresses get a preview", () => {
     ["/events", { kind: "page", key: "events" }],
     ["/clubs", { kind: "page", key: "clubs" }],
     ["/threads", { kind: "page", key: "threads" }],
+    ["/about", { kind: "page", key: "about" }],
+    ["/privacy?utm_source=x", { kind: "page", key: "privacy" }],
+    ["/terms", { kind: "page", key: "terms" }],
   ])("%s", (path, route) => {
     expect(routeFor(path)).toEqual(route);
   });
 
-  it.each(["/tickets/abc", "/play/123", "/123/other", "/a/b/c", "/events/x/y/z", "/events/x/unknown", "/clubs/x/y", "/bad.ref", "/%E0%A4%A", "/threads/12"])("%s is not one", (path) => {
+  it.each(["/tickets/abc", "/play/123", "/123/other", "/a/b/c", "/events/x/y/z", "/events/x/unknown", "/clubs/x/y", "/bad.ref", "/%E0%A4%A", "/threads/12", "/about/x", "/terms/live"])("%s is not one", (path) => {
     expect(routeFor(path)).toBeNull();
   });
 });
@@ -108,6 +111,30 @@ describe("the preview page", () => {
     expect(tag(other.html, "property", "og:url")).toBe("https://myotherapp.in/");
     const events = await shareDocument("/events", { fetch: vi.fn() });
     expect(tag(events.html, "property", "og:title")).toBe("Find events · MyOtherApp");
+  });
+
+  it("gives the site's own pages their title, canonical address and their words, without asking the API", async () => {
+    const fetch = vi.fn();
+    const privacy = await shareDocument("/privacy", { fetch });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(privacy.status).toBe(200);
+    expect(canonical(privacy.html)).toBe("https://myotherapp.in/privacy");
+    expect(privacy.html).toContain("<title>Privacy Policy · MyOtherApp</title>");
+    expect(privacy.html).toContain("<p>Last updated 20 May 2025</p>");
+    expect(privacy.html).toContain('<h2 id="what-we-collect">1. What We Collect</h2>');
+    expect(privacy.html).toContain("<li><strong>Basic Info:</strong> Your name, email, college ID, and profile photo.</li>");
+    expect(privacy.html).not.toContain("Finnet");
+
+    const terms = await shareDocument("/terms", { fetch });
+    expect(canonical(terms.html)).toBe("https://myotherapp.in/terms");
+    expect(terms.html).toContain('<a href="https://myotherapp.in/privacy">Privacy Policy</a>');
+    expect(terms.html).toContain("A fixed 2% processing fee applied to all transactions.");
+
+    const about = await shareDocument("/about", { fetch });
+    expect(canonical(about.html)).toBe("https://myotherapp.in/about");
+    expect(about.html).toContain("<title>About MyOtherApp</title>");
+    expect(about.html).toContain("<h2>For clubs</h2>");
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("cuts descriptions at a word", () => {

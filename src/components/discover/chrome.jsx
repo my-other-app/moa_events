@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { CLUBS_URL, CONTACT_EMAIL, PLAY_STORE_URL } from "@/config";
+import { APP_STORE_URL, CLUBS_URL, CONTACT_EMAIL, PLAY_STORE_URL } from "@/config";
 import { HeaderAccount } from "../auth/account";
-import { AppPrompt } from "./bits";
+import { AppPrompt, AppleGlyph, PlayGlyph } from "./bits";
 import Icon from "./icons";
 import wordmark from "@/assets/wordmark-sm.png";
 import "@/styles/discover.css";
@@ -106,9 +106,7 @@ export function SiteFooter() {
             <h2>MyOtherApp</h2>
             <ul>
               <li>
-                <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
-                  Get the app
-                </a>
+                <Link to="/about">About</Link>
               </li>
               <li>
                 <a href={CLUBS_URL} target="_blank" rel="noopener noreferrer">
@@ -117,6 +115,41 @@ export function SiteFooter() {
               </li>
               <li>
                 <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
+              </li>
+            </ul>
+          </nav>
+          <nav aria-label="Get the app">
+            <h2>Get the app</h2>
+            <ul className="dc-footer-apps">
+              <li>
+                <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">
+                  <PlayGlyph /> Android app
+                </a>
+              </li>
+              <li>
+                {APP_STORE_URL ? (
+                  <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
+                    <AppleGlyph /> iPhone app
+                  </a>
+                ) : (
+                  <span className="is-soon">
+                    <AppleGlyph />
+                    <span>
+                      iPhone app <small>Coming soon</small>
+                    </span>
+                  </span>
+                )}
+              </li>
+            </ul>
+          </nav>
+          <nav aria-label="Legal">
+            <h2>Legal</h2>
+            <ul>
+              <li>
+                <Link to="/privacy">Privacy</Link>
+              </li>
+              <li>
+                <Link to="/terms">Terms</Link>
               </li>
             </ul>
           </nav>

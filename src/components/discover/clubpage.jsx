@@ -12,6 +12,7 @@ import { SitePage } from "./chrome";
 import { AppPrompt, Avatar, EmptyState, ErrorState, Img, Section } from "./bits";
 import { ClubCover } from "./cover";
 import { EventCard } from "./eventcard";
+import { LoadMore } from "./finder";
 import { ThreadCard } from "./threadcard";
 import Icon from "./icons";
 import "@/styles/cards-hero.css";
@@ -125,6 +126,67 @@ function Partner({ partner }) {
   );
 }
 
+/** How many a club's page carries of its past events; more come a page at a time. */
+const PAST_ON_PAGE = 6;
+const MORE_PAGE = 12;
+
+/**
+ * A club's past or upcoming events beyond the few its page carries. "Show
+ * more" asks for the next twelve and adds them to the end; `known` is the
+ * full count when the page says it (null: unknown). Where the API has no
+ * such list, `gone` turns true and "Show more" goes away for good.
+ */
+function useMoreEvents(slug, when, initial, known) {
+  const [s, setS] = useState({ items: initial, total: known, busy: false, error: false, gone: false });
+  const count = useRef(initial.length);
+
+  const loadMore = () => {
+    setS((x) => ({ ...x, busy: true, error: false }));
+    discoverApi.clubEvents(slug, { when, offset: count.current, limit: MORE_PAGE }).then(
+      (page) => {
+        count.current += page.items.length;
+        setS((x) => {
+          const seen = new Set(x.items.map((e) => e.id));
+          const items = [...x.items, ...page.items.filter((e) => !seen.has(e.id))];
+          // An empty page is the end, whatever the count said.
+          return { ...x, items, busy: false, total: page.items.length ? Math.max(page.total, items.length) : items.length };
+        });
+      },
+      (e) => setS((x) => ({ ...x, busy: false, error: !e?.notFound, gone: Boolean(e?.notFound) }))
+    );
+  };
+
+  // Without a count, a full first page suggests there are more; the first answer brings the real count.
+  const more = !s.gone && (s.total === null ? s.items.length >= PAST_ON_PAGE : s.items.length < s.total);
+  const grown = s.items.length > initial.length;
+  return { ...s, more, grown, loadMore };
+}
+
+/**
+ * A list of the club's events that grows with "Show more", and says how
+ * far along it is ("Showing 12 of 37"). `children` draws the events.
+ */
+function MoreEvents({ slug, when, initial, known, noun, children }) {
+  const list = useMoreEvents(slug, when, initial, known);
+  return (
+    <>
+      {children(list.items)}
+      {list.more || (list.grown && !list.gone) ? (
+        <LoadMore
+          className="dc-more--tight"
+          shown={list.items.length}
+          total={list.more ? list.total : list.items.length}
+          busy={list.busy}
+          error={list.error}
+          onMore={list.loadMore}
+          noun={noun}
+          label="Show more"
+        />
+      ) : null}
+    </>
+  );
+}
+
 /**
  * Following a club as the signed-in person. The button flips the moment it
  * is pressed (and the count with it), and flips back if the server says no.
@@ -231,6 +293,7 @@ export default function ClubPage() {
   const data = state.data;
   const club = data?.club;
   const follow = useClubFollow(club?.id ?? null, signedIn);
+
   usePageMeta(
     club ? `${club.name} · MyOtherApp` : state.status === "missing" ? "Club not found · MyOtherApp" : null,
     club ? club.tagline || (club.about ? club.about.slice(0, 155) : `Events and posts from ${club.name} on MyOtherApp.`) : null
@@ -307,7 +370,7 @@ export default function ClubPage() {
     ["upcoming", "Upcoming", data.upcoming.length],
     hasAbout && ["about", "About"],
     threads.length && ["threads", "Threads", data.threads.length],
-    data.past.length && ["past", "Past events", data.past.length],
+    data.past.length && ["past", "Past events", Math.max(club.events_held || 0, data.past.length)],
     data.team.length && ["team", "Team", data.team.length],
     data.partners.length && ["partners", "Partners", data.partners.length],
   ].filter(Boolean);
@@ -375,11 +438,15 @@ export default function ClubPage() {
 
         <Section id="upcoming" title="Upcoming events" className="dc-club-section">
           {data.upcoming.length ? (
-            <div className="dc-rail dc-rail--cards">
-              {data.upcoming.map((e) => (
-                <EventCard key={e.id} event={e} showClub={false} />
-              ))}
-            </div>
+            <MoreEvents slug={slug} when="upcoming" initial={data.upcoming} known={Math.max(club.upcoming_events, data.upcoming.length)} noun="upcoming events">
+              {(items) => (
+                <div className="dc-rail dc-rail--cards">
+                  {items.map((e) => (
+                    <EventCard key={e.id} event={e} showClub={false} />
+                  ))}
+                </div>
+              )}
+            </MoreEvents>
           ) : (
             <EmptyState
               as="h3"
@@ -451,11 +518,15 @@ export default function ClubPage() {
 
         {data.past.length ? (
           <Section id="past" title="Past events" className="dc-club-section">
-            <div className="dc-rowlist">
-              {data.past.slice(0, 9).map((e) => (
-                <EventCard key={e.id} event={e} variant="row" />
-              ))}
-            </div>
+            <MoreEvents slug={slug} when="past" initial={data.past} known={club.events_held} noun="past events">
+              {(items) => (
+                <div className="dc-rowlist">
+                  {items.map((e) => (
+                    <EventCard key={e.id} event={e} variant="row" />
+                  ))}
+                </div>
+              )}
+            </MoreEvents>
           </Section>
         ) : null}
 

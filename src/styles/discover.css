@@ -395,7 +395,7 @@
 }
 @media (min-width: 768px) {
   .dc-footer-grid {
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 1.6fr repeat(4, minmax(0, 1fr));
   }
   .dc-footer-brand {
     grid-column: auto;
@@ -1562,8 +1562,9 @@ button.dc-poll-option:hover {
   justify-content: center;
   gap: 10px;
 }
-.dc-modal .dc-stores .dc-btn {
+.dc-modal .dc-stores .dc-store {
   flex: 1 1 160px;
+  justify-content: center;
 }
 .dc-modal-later {
   margin-top: 12px;
@@ -1952,4 +1953,134 @@ button.dc-poll-option:hover {
 }
 .dc-back:hover {
   color: var(--dc-ink);
+}
+
+/* ---------- store badges ---------- */
+
+/* Drawn here, not pasted in: the stores' marks in one colour, the words in the site's type. */
+.dc-store {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 166px;
+  height: 52px;
+  padding: 0 18px 0 14px;
+  border-radius: 10px;
+  background: var(--dc-ink);
+  color: #fff;
+  text-align: left;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    transform 0.15s;
+}
+a.dc-store:hover {
+  background: #000;
+}
+a.dc-store:active {
+  transform: translateY(1px);
+}
+.dc-store-glyph {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+}
+.dc-store-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dc-store-text small {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.dc-store-text strong {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.dc-store--sm {
+  min-width: 148px;
+  height: 44px;
+  padding: 0 14px 0 12px;
+  gap: 8px;
+}
+.dc-store--sm .dc-store-glyph {
+  width: 20px;
+  height: 20px;
+}
+.dc-store--sm .dc-store-text strong {
+  font-size: 16px;
+}
+/* On the slate band: a hairline so the black badge doesn't sink into it. */
+.dc-store--on-dark {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+/* Not out yet: the same badge, outlined, and not a link. */
+.dc-store.is-soon {
+  background: transparent;
+  color: var(--dc-muted);
+  border: 1.5px dashed #c9cdd4;
+  box-shadow: none;
+}
+.dc-store.is-soon .dc-store-text strong {
+  color: var(--dc-text);
+}
+.dc-store--on-dark.is-soon {
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.dc-store--on-dark.is-soon .dc-store-text strong {
+  color: #fff;
+}
+
+/* ---------- footer: the apps ---------- */
+
+.dc-footer-apps a,
+.dc-footer-apps .is-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dc-footer-apps .dc-store-glyph {
+  width: 16px;
+  height: 16px;
+  color: var(--dc-ink);
+}
+.dc-footer-apps .is-soon {
+  color: var(--dc-muted);
+}
+.dc-footer-apps .is-soon .dc-store-glyph {
+  color: var(--dc-muted);
+}
+.dc-footer-apps .is-soon {
+  align-items: flex-start;
+}
+.dc-footer-apps .is-soon .dc-store-glyph {
+  margin-top: 2px;
+}
+.dc-footer-apps small {
+  display: block;
+  font-size: 12px;
+  color: var(--dc-muted);
+}
+
+/* ---------- small type helpers ---------- */
+
+.dc-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dc-link);
+}
+.dc-more--tight {
+  margin-top: 20px;
 }

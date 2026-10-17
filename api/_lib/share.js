@@ -8,16 +8,23 @@
 import { CACHE, CACHE_SHORT, DEFAULT_IMAGE, SITE_NAME, SITE_URL, escapeHtml, fetchJson } from "./site.js";
 import { formatPrice, formatWhen, imageUrl } from "../../src/utils/format.js";
 import { eventJsonLd, jsonForScript } from "../../src/utils/eventld.js";
+import { LEGAL, inline, updatedLabel } from "../../src/content/legal.js";
+import { ABOUT } from "../../src/content/about.js";
 
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 /** First words of the site's own addresses, never an event's old /{ref}. */
-const RESERVED = new Set(["events", "clubs", "threads", "play", "feedback", "tickets", "certificates", "register", "api", "assets"]);
+const RESERVED = new Set(["events", "clubs", "threads", "about", "privacy", "terms", "play", "feedback", "tickets", "certificates", "register", "api", "assets"]);
+/** The site's own one-word pages, which no old event address can take. */
+const OWN_PAGES = new Set(["about", "privacy", "terms"]);
 
 const PAGES = {
   home: { path: "/", title: `${SITE_NAME} · Events and clubs near you`, description: "Find events and clubs near you on MyOtherApp — hackathons, workshops, meetups and more, from the clubs that run them." },
   events: { path: "/events", title: `Find events · ${SITE_NAME}`, description: "Hackathons, workshops, meetups and more near you, from the clubs on MyOtherApp." },
   clubs: { path: "/clubs", title: `Clubs · ${SITE_NAME}`, description: "Find clubs near you on MyOtherApp and see what they're running next." },
   threads: { path: "/threads", title: `Threads · ${SITE_NAME}`, description: "What the clubs on MyOtherApp are posting." },
+  about: { path: ABOUT.path, title: ABOUT.title, description: ABOUT.description },
+  privacy: { path: LEGAL.privacy.path, title: `${LEGAL.privacy.title} · ${SITE_NAME}`, description: LEGAL.privacy.description },
+  terms: { path: LEGAL.terms.path, title: `${LEGAL.terms.title} · ${SITE_NAME}`, description: LEGAL.terms.description },
 };
 
 /**
@@ -44,6 +51,7 @@ export function routeFor(raw) {
     return REF.test(b) && parts.length === 2 ? { kind: "club", slug: b } : null;
   }
   if (a === "threads") return parts.length === 1 ? { kind: "page", key: "threads" } : null;
+  if (OWN_PAGES.has(a)) return parts.length === 1 ? { kind: "page", key: a } : null;
   if (a === "register") return b && REF.test(b) && parts.length === 2 ? { kind: "event", ref: b } : null;
   if (RESERVED.has(a) || !REF.test(a)) return null;
   if (parts.length === 1 || (parts.length === 2 && (b === "live" || b === "compete"))) return { kind: "event", ref: a };
@@ -62,7 +70,7 @@ export function clip(text, max = 200) {
 const absolute = (url) => (typeof url === "string" && /^https?:\/\//i.test(url) ? url : null);
 
 /** The whole document. Every value is escaped; the JSON-LD is made safe for a <script>. */
-export function buildShareHtml({ title, pageTitle, description, image, imageAlt, url, type = "website", lines = [], body = "", linkText = "Open on MyOtherApp", jsonLd = null }) {
+export function buildShareHtml({ title, pageTitle, description, image, imageAlt, url, type = "website", lines = [], body = "", bodyHtml = "", linkText = "Open on MyOtherApp", jsonLd = null }) {
   const t = escapeHtml(title);
   const d = escapeHtml(description);
   const u = escapeHtml(url);
@@ -102,7 +110,7 @@ ${lines
   .filter(Boolean)
   .map((l) => `<p>${escapeHtml(l)}</p>`)
   .join("\n")}
-${paragraphs || `<p>${d}</p>`}
+${bodyHtml || paragraphs || `<p>${d}</p>`}
 <p><a href="${u}">${escapeHtml(linkText)}</a></p>
 </main>
 </body>
@@ -110,9 +118,51 @@ ${paragraphs || `<p>${d}</p>`}
 `;
 }
 
+/* The site's own pages carry their words, so a crawler reads what a person does. Every piece is escaped here. */
+const inlineHtml = (text) =>
+  inline(text)
+    .map((p) => {
+      if (p.strong !== undefined) return `<strong>${escapeHtml(p.strong)}</strong>`;
+      if (p.link !== undefined) return `<a href="${escapeHtml(p.href.startsWith("/") ? `${SITE_URL}${p.href}` : p.href)}">${escapeHtml(p.link)}</a>`;
+      return escapeHtml(p.text);
+    })
+    .join("");
+const blockHtml = ([kind, body]) => {
+  if (kind === "h3") return `<h3>${escapeHtml(body)}</h3>`;
+  if (kind === "ul" || kind === "ol") return `<${kind}>${body.map((item) => `<li>${inlineHtml(item)}</li>`).join("")}</${kind}>`;
+  return `<p>${inlineHtml(body)}</p>`;
+};
+
+function ownPageHtml(key) {
+  const doc = LEGAL[key];
+  if (doc) {
+    return [
+      `<p>Last updated ${escapeHtml(updatedLabel(doc.updated))}</p>`,
+      ...doc.intro.map(blockHtml),
+      ...doc.sections.map((s) => [`<h2 id="${escapeHtml(s.id)}">${escapeHtml(s.heading)}</h2>`, ...s.blocks.map(blockHtml)].join("\n")),
+    ].join("\n");
+  }
+  if (key === "about") {
+    const list = (title, items) => `<h2>${escapeHtml(title)}</h2>\n<ul>${items.map((f) => `<li><strong>${escapeHtml(f.title)}</strong>: ${escapeHtml(f.text)}</li>`).join("")}</ul>`;
+    return [`<p>${escapeHtml(ABOUT.lede)}</p>`, list("For students", ABOUT.students), list("For clubs", ABOUT.clubs), list("How it works", ABOUT.steps)].join("\n");
+  }
+  return "";
+}
+
 const generic = (key = "home", status = 200, cache = CACHE) => {
   const page = PAGES[key] || PAGES.home;
-  return { status, cache, html: buildShareHtml({ title: page.title, description: page.description, url: `${SITE_URL}${page.path}`, image: DEFAULT_IMAGE, linkText: "Open MyOtherApp" }) };
+  return {
+    status,
+    cache,
+    html: buildShareHtml({
+      title: page.title,
+      description: page.description,
+      url: `${SITE_URL}${page.path}`,
+      image: DEFAULT_IMAGE,
+      bodyHtml: status === 200 ? ownPageHtml(key) : "",
+      linkText: "Open MyOtherApp",
+    }),
+  };
 };
 
 function eventDocument(d) {
