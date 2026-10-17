@@ -16,6 +16,9 @@ describe("the sitemap", () => {
       "https://myotherapp.in/events",
       "https://myotherapp.in/clubs",
       "https://myotherapp.in/threads",
+      "https://myotherapp.in/about",
+      "https://myotherapp.in/privacy",
+      "https://myotherapp.in/terms",
       "https://myotherapp.in/events/hack-night-04",
       "https://myotherapp.in/clubs/circuit-society",
     ]);
@@ -25,7 +28,7 @@ describe("the sitemap", () => {
   });
 
   it("still lists the fixed pages when the API gave nothing", () => {
-    expect(locs(buildSitemap(null))).toHaveLength(4);
-    expect(locs(buildSitemap({ events: "nope" }))).toHaveLength(4);
+    expect(locs(buildSitemap(null))).toHaveLength(7);
+    expect(locs(buildSitemap({ events: "nope" }))).toHaveLength(7);
   });
 });

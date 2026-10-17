@@ -164,6 +164,66 @@ describe("a club's page", () => {
     expect(screen.queryByText(/tap Follow\./)).toBeNull();
   });
 
+  it("shows more past events twelve at a time, saying how far along it is, until there are no more", async () => {
+    const past = (from, to) => Array.from({ length: to - from }, (_, i) => ({ id: 100 + from + i, slug: `past-${from + i}`, name: `Past ${from + i}`, starts_at: "2026-08-01T12:30:00Z", status: "ended" }));
+    get.mockImplementation(async (url, config) => {
+      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, club: { ...page.club, events_held: 20 }, past: past(0, 6) } };
+      const { offset, limit } = config.params;
+      return { data: { items: past(offset, Math.min(20, offset + limit)), total: 20, offset, limit } };
+    });
+    show("/clubs/circuit-society");
+    const region = await screen.findByRole("region", { name: "Past events" }, { timeout: 5000 });
+    const rows = () => within(region).getAllByRole("article");
+    expect(rows()).toHaveLength(6);
+    // Still the compact rows.
+    expect(rows()[0]).toHaveClass("dc-evcard--row");
+    expect(within(region).getByText("Showing 6 of 20")).toBeInTheDocument();
+    // The tab counts every past event, not just the ones on the page.
+    expect(screen.getByRole("link", { name: /^Past events/ })).toHaveTextContent("20");
+
+    fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
+    expect(await within(region).findByText("Showing 18 of 20")).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith("/api/v1/discover/clubs/circuit-society/events", { params: { when: "past", offset: 6, limit: 12 }, skipAuth: true });
+    expect(rows()).toHaveLength(18);
+    expect(within(region).getByRole("link", { name: "Past 17" })).toHaveAttribute("href", "/events/past-17");
+
+    fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
+    expect(await within(region).findByText("That's all 20 past events.")).toBeInTheDocument();
+    expect(get).toHaveBeenLastCalledWith("/api/v1/discover/clubs/circuit-society/events", { params: { when: "past", offset: 18, limit: 12 }, skipAuth: true });
+    expect(rows()).toHaveLength(20);
+    expect(within(region).queryByRole("button", { name: "Show more" })).toBeNull();
+  });
+
+  it("drops Show more where the API has no list of a club's events", async () => {
+    const six = Array.from({ length: 6 }, (_, i) => ({ id: 200 + i, name: `Old ${i}`, starts_at: "2026-08-01T12:30:00Z", status: "ended" }));
+    get.mockImplementation(async (url) => {
+      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, club: { ...page.club, events_held: 9 }, past: six } };
+      throw Object.assign(new Error("404"), { response: { status: 404 } });
+    });
+    show("/clubs/circuit-society");
+    const region = await screen.findByRole("region", { name: "Past events" }, { timeout: 5000 });
+    fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
+    await waitFor(() => expect(within(region).queryByRole("button", { name: "Show more" })).toBeNull());
+    expect(within(region).queryByText(/Showing/)).toBeNull();
+    expect(within(region).queryByRole("alert")).toBeNull();
+    expect(within(region).getAllByRole("article")).toHaveLength(6);
+  });
+
+  it("offers more upcoming events too, when the club has more than its page carries", async () => {
+    const up = (from, to) => Array.from({ length: to - from }, (_, i) => ({ id: 300 + from + i, name: `Soon ${from + i}`, starts_at: "2026-11-01T12:30:00Z", status: "upcoming" }));
+    get.mockImplementation(async (url, config) => {
+      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, club: { ...page.club, upcoming_events: 62 }, upcoming: up(0, 60) } };
+      const { offset } = config.params;
+      return { data: { items: up(offset, 62), total: 62 } };
+    });
+    show("/clubs/circuit-society");
+    const region = await screen.findByRole("region", { name: "Upcoming events" }, { timeout: 5000 });
+    expect(within(region).getByText("Showing 60 of 62")).toBeInTheDocument();
+    fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
+    expect(await within(region).findByRole("link", { name: "Soon 61" })).toBeInTheDocument();
+    expect(get).toHaveBeenLastCalledWith("/api/v1/discover/clubs/circuit-society/events", { params: { when: "upcoming", offset: 60, limit: 12 }, skipAuth: true });
+  });
+
   it("says when the club does not exist, without counting a visit", async () => {
     get.mockRejectedValue(Object.assign(new Error("404"), { response: { status: 404 } }));
     show("/clubs/nobody");

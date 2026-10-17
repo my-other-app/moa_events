@@ -2,12 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import apiClient from "./client";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
 import {
+  calendarQuery,
   clubsQuery,
   discoverApi,
+  eventSortOptions,
   eventsQuery,
   filtersToSearch,
   forgetEvents,
   isEmptyHome,
+  parseCalendar,
+  parseClubEventsPage,
   parseClubPage,
   parseEvent,
   parseEventPage,
@@ -22,7 +26,23 @@ import {
 describe("the find-events filters", () => {
   it("are read from the address, dropping anything unknown", () => {
     const f = readEventFilters(new URLSearchParams("q=%20robots%20&when=this_week&type=online&price=gratis&sort=popular&category=7&radius_km=33&utm_source=x"));
-    expect(f).toEqual({ q: "robots", when: "this_week", type: "online", price: "", category: "7", sort: "popular", radius_km: null });
+    expect(f).toEqual({ q: "robots", when: "this_week", from: "", to: "", type: "online", price: "", category: "7", sort: "popular", radius_km: null });
+  });
+
+  it("take picked days over the presets, in order, and never a span the API refuses", () => {
+    const read = (qs) => readEventFilters(new URLSearchParams(qs));
+    expect(read("when=today&from=2026-10-24&to=2026-10-17")).toMatchObject({ when: "", from: "2026-10-17", to: "2026-10-24" });
+    // One end alone is that one day.
+    expect(read("from=2026-10-17")).toMatchObject({ from: "2026-10-17", to: "2026-10-17" });
+    // An end that is not a real day is dropped; more than a year apart, both are, and the preset stands.
+    expect(read("when=today&from=2026-02-30&to=2026-03-01")).toMatchObject({ when: "", from: "2026-03-01", to: "2026-03-01" });
+    expect(read("when=today&from=2026-01-01&to=2027-06-01")).toMatchObject({ when: "today", from: "", to: "" });
+    expect(eventsQuery({ when: "today", from: "2026-10-17", to: "2026-10-24" })).toEqual({ from: "2026-10-17", to: "2026-10-24", offset: 0, limit: 12 });
+  });
+
+  it("drop an order by relevance when there are no search words", () => {
+    expect(readEventFilters(new URLSearchParams("sort=relevance")).sort).toBe("");
+    expect(readEventFilters(new URLSearchParams("q=ai&sort=relevance")).sort).toBe("relevance");
   });
 
   it("make the API query with the stored point and the page, and nothing empty", () => {
@@ -38,6 +58,44 @@ describe("the find-events filters", () => {
   it("go back into the address in a stable order, only what is set", () => {
     const s = filtersToSearch({ q: "ai", when: "", type: "online", price: "", category: "", sort: "", radius_km: null });
     expect(s.toString()).toBe("q=ai&type=online");
+  });
+});
+
+describe("the orders offered", () => {
+  const values = (opts) => opts.map(([v]) => v);
+  const disabled = (opts) => opts.filter(([, , off]) => off).map(([v]) => v);
+
+  it("offer relevance only for a search", () => {
+    expect(values(eventSortOptions({ q: "", knowsWhere: true }))).toEqual(["date", "distance", "popular"]);
+    expect(values(eventSortOptions({ q: "robots", knowsWhere: true }))).toEqual(["relevance", "date", "distance", "popular"]);
+  });
+
+  it("switch distance off, saying why, until the visitor's place is known", () => {
+    const off = eventSortOptions({ knowsWhere: false });
+    expect(disabled(off)).toEqual(["distance"]);
+    expect(off.find(([v]) => v === "distance")[1]).toMatch(/set your location/);
+    expect(disabled(eventSortOptions({ knowsWhere: true }))).toEqual([]);
+  });
+});
+
+describe("the calendar and a club's events", () => {
+  it("ask the calendar for a month with the list's filters, minus when and order", () => {
+    const f = { q: "ai", when: "today", from: "2026-10-01", to: "2026-10-02", type: "online", price: "free", category: "4", sort: "popular", radius_km: 25 };
+    expect(calendarQuery(f, { lat: 9.9, lng: 76.2 }, "2026-10")).toEqual({ month: "2026-10", q: "ai", type: "online", price: "free", category: "4", lat: 9.9, lng: 76.2, radius_km: 25 });
+  });
+
+  it("read the counts, keeping only real days with events", () => {
+    expect(parseCalendar({ month: "2026-10", days: { "2026-10-17": 3, "2026-10-18": 0, "2026-02-30": 2, nope: 1, "2026-10-20": "2" } })).toEqual({
+      month: "2026-10",
+      days: { "2026-10-17": 3, "2026-10-20": 2 },
+    });
+    expect(parseCalendar(null)).toEqual({ month: null, days: {} });
+  });
+
+  it("read a page of a club's events", () => {
+    const page = parseClubEventsPage({ items: [{ id: 1, name: "A" }, { nope: 1 }], total: 37, offset: 6, limit: 12 });
+    expect(page.items.map((e) => e.id)).toEqual([1]);
+    expect(page).toMatchObject({ total: 37, offset: 6, limit: 12 });
   });
 });
 
@@ -172,6 +230,24 @@ describe("the calls", () => {
     expect(config.headers.Authorization).toBeUndefined();
     expect(page.items[0].name).toBe("Hack Night");
     expect(page.where.city).toBe("Pune");
+  });
+
+  it("ask for a club's past events a page at a time, and the month's events in pages of 48", async () => {
+    adapter.mockImplementation(async (config) => {
+      if (config.url.endsWith("/events") && config.url.includes("/clubs/")) return { data: { items: [{ id: 7, name: "Old one" }], total: 19 }, status: 200, headers: {}, config };
+      const offset = config.params.offset;
+      const items = Array.from({ length: offset < 96 ? 48 : 4 }, (_, i) => ({ id: offset + i + 1, name: `E${offset + i + 1}` }));
+      return { data: { items, total: 100 }, status: 200, headers: {}, config };
+    });
+    const page = await discoverApi.clubEvents("circuit society", { when: "past", offset: 6, limit: 99 });
+    expect(adapter.mock.calls[0][0].url).toBe("/api/v1/discover/clubs/circuit%20society/events");
+    expect(adapter.mock.calls[0][0].params).toEqual({ when: "past", offset: 6, limit: 48 });
+    expect(page.total).toBe(19);
+
+    adapter.mockClear();
+    const month = await discoverApi.monthEvents({ when: "today", sort: "popular", type: "online" }, null, "2026-10");
+    expect(adapter.mock.calls.map((c) => c[0].params)).toEqual([0, 48, 96].map((offset) => ({ from: "2026-10-01", to: "2026-10-31", type: "online", offset, limit: 48 })));
+    expect(month.items).toHaveLength(100);
   });
 
   it("looks an event up once for its slug and its id, and remembers it for a minute", async () => {

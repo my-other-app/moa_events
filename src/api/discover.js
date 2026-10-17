@@ -1,4 +1,5 @@
 import apiClient from "./client";
+import { dayRange, firstOfMonth, isDay, isMonth, lastOfMonth } from "@/utils/days";
 
 /**
  * The public discovery API: events and clubs near you, a club's page, the
@@ -36,7 +37,23 @@ export const EVENT_SORT_OPTIONS = [
   ["date", "Date"],
   ["distance", "Distance"],
   ["popular", "Popular"],
+  ["relevance", "Relevance"],
 ];
+
+/**
+ * The orders worth offering right now: "Relevance" only for a search (it
+ * means nothing without words), and "Distance" only once we know where the
+ * visitor is — before that it is there, switched off, with how to fix it.
+ * Each is [value, label, disabled?].
+ */
+export function eventSortOptions({ q = "", knowsWhere = false } = {}) {
+  return [
+    ...(q ? [["relevance", "Relevance"]] : []),
+    ["date", "Date"],
+    knowsWhere ? ["distance", "Distance"] : ["distance", "Distance · set your location first", true],
+    ["popular", "Popular"],
+  ];
+}
 export const CLUB_SORT_OPTIONS = [
   ["popular", "Popular"],
   ["nearby", "Nearby"],
@@ -61,17 +78,26 @@ const radius = (v) => {
 
 /* ---------- the filters, as the page URL carries them ---------- */
 
-/** The find-events filters from the page's query string; anything unknown is dropped. */
+/**
+ * The find-events filters from the page's query string; anything unknown is
+ * dropped. Picked days (from/to) replace the "when" presets, and an order by
+ * relevance without search words is no order at all.
+ */
 export function readEventFilters(params) {
   const get = (k) => params.get(k) || "";
   const category = get("category");
+  const q = text(get("q"));
+  const days = dayRange(get("from"), get("to"));
+  const sort = pick(get("sort"), EVENT_SORTS);
   return {
-    q: text(get("q")),
-    when: pick(get("when"), WHEN),
+    q,
+    when: days ? "" : pick(get("when"), WHEN),
+    from: days ? days.from : "",
+    to: days ? days.to : "",
     type: pick(get("type"), TYPES),
     price: pick(get("price"), PRICES),
     category: ID.test(category) ? category : "",
-    sort: pick(get("sort"), EVENT_SORTS),
+    sort: sort === "relevance" && !q ? "" : sort,
     radius_km: radius(get("radius_km")),
   };
 }
@@ -103,11 +129,14 @@ const coords = (where) =>
 
 const compact = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== "" && v !== null && v !== undefined));
 
-/** The query for GET /discover/events: the filters, the stored point if any, the page. */
+/** The query for GET /discover/events: the filters, the stored point if any, the page. Days, when picked, stand in for "when". */
 export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PAGE_SIZE } = {}) {
+  const days = dayRange(filters.from, filters.to);
   return compact({
     q: text(filters.q),
-    when: pick(filters.when, WHEN),
+    when: days ? "" : pick(filters.when, WHEN),
+    from: days?.from,
+    to: days?.to,
     category: filters.category && ID.test(String(filters.category)) ? String(filters.category) : "",
     type: pick(filters.type, TYPES),
     price: pick(filters.price, PRICES),
@@ -116,6 +145,19 @@ export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PA
     sort: pick(filters.sort, EVENT_SORTS),
     offset,
     limit,
+  });
+}
+
+/** The query for GET /discover/calendar: a month and the same filters as the list, minus when and order. */
+export function calendarQuery(filters = {}, where = null, month) {
+  return compact({
+    month: isMonth(month) ? month : "",
+    q: text(filters.q),
+    category: filters.category && ID.test(String(filters.category)) ? String(filters.category) : "",
+    type: pick(filters.type, TYPES),
+    price: pick(filters.price, PRICES),
+    ...coords(where),
+    radius_km: radius(filters.radius_km),
   });
 }
 
@@ -353,6 +395,23 @@ export function parseClubPage(d) {
   };
 }
 
+/** One club's events, a page at a time (GET /discover/clubs/{slug}/events). */
+export function parseClubEventsPage(d) {
+  const o = obj(d) || {};
+  return page(o, list(o.items, parseEvent));
+}
+
+/** How many events each day of a month has: {month, days: {"YYYY-MM-DD": n}}, days with none left out. */
+export function parseCalendar(d) {
+  const o = obj(d) || {};
+  const days = {};
+  for (const [day, count] of Object.entries(obj(o.days) || {})) {
+    const c = Math.floor(n(count));
+    if (isDay(day) && c > 0) days[day] = c;
+  }
+  return { month: isMonth(o.month) ? o.month : null, days };
+}
+
 export function parseThreadsPage(d) {
   const o = obj(d) || {};
   return page(o, list(o.items, parseThread));
@@ -540,6 +599,28 @@ export const discoverApi = {
 
   events: (filters, where, paging) => get("/api/v1/discover/events", eventsQuery(filters, where, paging)).then(parseEventsPage, tag),
 
+  /**
+   * Every event on in a month, for the calendar: pages of `pageSize` until
+   * all are in or `maxPages` were asked for. Rejects only when the first
+   * page does; a later page that fails is left out.
+   */
+  monthEvents: async (filters, where, month, { pageSize = 48, maxPages = 4 } = {}) => {
+    const f = { ...filters, when: "", from: firstOfMonth(month), to: lastOfMonth(month), sort: "" };
+    const first = await discoverApi.events(f, where, { offset: 0, limit: pageSize });
+    const pages = Math.min(maxPages, Math.ceil(first.total / pageSize));
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) => discoverApi.events(f, where, { offset: (i + 1) * pageSize, limit: pageSize }).catch(() => null))
+    );
+    const seen = new Set();
+    const items = [first, ...rest]
+      .flatMap((p) => p?.items || [])
+      .filter((e) => (seen.has(e.id) ? false : seen.add(e.id)));
+    return { ...first, items };
+  },
+
+  /** How many events each day of `month` has, with the list's filters. */
+  calendar: (filters, where, month) => get("/api/v1/discover/calendar", calendarQuery(filters, where, month)).then(parseCalendar, tag),
+
   clubs: (filters, where, paging) => get("/api/v1/discover/clubs", clubsQuery(filters, where, paging)).then(parseClubsPage, tag),
 
   club: (slug) =>
@@ -552,6 +633,13 @@ export const discoverApi = {
       }
       return parsed;
     }, tag),
+
+  /** A club's past or upcoming events beyond the few its page carries; rejects with `notFound` where the API has no such list. */
+  clubEvents: (slug, { when = "past", offset = 0, limit = PAGE_SIZE } = {}) =>
+    get(`/api/v1/discover/clubs/${encodeURIComponent(slug)}/events`, { when: when === "upcoming" ? "upcoming" : "past", offset, limit: Math.min(48, limit) }).then(
+      parseClubEventsPage,
+      tag
+    ),
 
   threads: ({ offset = 0, limit = PAGE_SIZE } = {}) => get("/api/v1/discover/threads", { offset, limit }).then(parseThreadsPage, tag),
 
