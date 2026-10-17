@@ -7,17 +7,19 @@ import { jwtClaims } from "./jwt";
  * Two kinds of token live here, and they never share a key:
  *
  *   the account   `moa.session`: the app account's access and refresh tokens
- *                 from Sign in with Google, the profile, and what Google said
- *                 about the person (name, email, photo) for when the profile
- *                 can't be fetched.
+ *                 (from Sign in with Google, or an email and password: the
+ *                 same session either way), the profile, and what the
+ *                 sign-in said about the person (name, email, photo) for
+ *                 when the profile can't be fetched.
  *   a guest       `access_token` / `refresh_token`: what a registration from
  *                 the public form hands back, so the person can open the
  *                 ticket it made. Only ever used while nobody is signed in.
  *
- * Signing in drops the guest token: the server folds that guest's tickets
- * into the account, and from then on the account's token goes with every
- * request. Signing out drops the account; the next registration makes a
- * fresh guest, as it always has.
+ * Signing in drops the guest token once the account's address is verified
+ * (Google's always is; a password account's once the mailed code comes
+ * back): the server folds that guest's tickets into the account, and from
+ * then on the account's token goes with every request. Signing out drops
+ * the account; the next registration makes a fresh guest, as it always has.
  *
  * Nothing here calls the API, so the API client can read it without a cycle.
  */

@@ -2,10 +2,11 @@ import apiClient from "./client";
 import { parseClub, parseClubRef, parsePoll } from "./discover";
 
 /**
- * The signed-in person's side of the API: signing in with Google, their
- * profile, their tickets, the clubs they follow, and liking and voting on
- * posts. Every call but the sign-in itself goes with the account's token
- * (client.js adds it, and refreshes it once when it is refused).
+ * The signed-in person's side of the API: signing in (with Google, or an
+ * email and password), making an account, verifying its email, resetting a
+ * password, their profile, their tickets, the clubs they follow, and liking
+ * and voting on posts. Every call but the sign-ins themselves goes with the
+ * account's token (client.js adds it, and refreshes it once when it is refused).
  *
  * Responses are read defensively, as discover.js reads its own.
  */
@@ -76,12 +77,47 @@ const settled = (promise) =>
     (e) => (e?.response?.status === 409 ? false : Promise.reject(e)),
   );
 
+/** The token endpoint is OAuth2's password grant: a form, not JSON. */
+const FORM = { skipAuth: true, headers: { "Content-Type": "application/x-www-form-urlencoded" } };
+
 export const accountApi = {
   /** Google's ID token for the account's tokens: {access_token, refresh_token, token_type}. */
   googleSignIn: (idToken) => apiClient.post("/api/v1/auth/google", { id_token: idToken, platform: "web" }, { skipAuth: true }).then((r) => r.data),
 
+  /**
+   * An email and password for the account's tokens, the way the app signs in.
+   * An account with a second factor is refused with 401 TOTP_REQUIRED until
+   * `totpCode` (or a recovery code) comes along.
+   */
+  passwordSignIn: ({ email, password, totpCode = null }) => {
+    const form = new URLSearchParams({ username: email, password });
+    if (totpCode) form.set("totp_code", totpCode);
+    return apiClient.post("/api/v1/auth/token", form, FORM).then((r) => r.data);
+  },
+
+  /** A new password account: {username, access_token, refresh_token, token_type}. The server mails a six-digit code to the address. */
+  signUp: ({ name, email, password }) =>
+    apiClient.post("/api/v1/user/register", { full_name: name, email, password }, { skipAuth: true }).then((r) => r.data),
+
+  /** Another code to the signed-in account's address: {sent, email, expires_in, retry_after}. */
+  sendEmailCode: () => apiClient.post("/api/v1/auth/email/send-code").then((r) => r.data),
+
+  /** The code typed back: {email_verified, email_verified_at, merged, registrations_transferred}. */
+  verifyEmail: (code) => apiClient.post("/api/v1/auth/email/verify", { code }).then((r) => r.data),
+
+  /** A reset code to the address, if it has an account: {sent: true} either way. */
+  forgotPassword: (email) => apiClient.post("/api/v1/auth/password/forgot", { email }, { skipAuth: true }).then((r) => r.data),
+
+  /** The code and a new password for the account's tokens, as a sign-in hands back. */
+  resetPassword: ({ email, code, password }) =>
+    apiClient.post("/api/v1/auth/password/reset", { email, code, new_password: password }, { skipAuth: true }).then((r) => r.data),
+
   /** The account (and, on the server, any website guest tickets folded into it). */
   profile: () => apiClient.get("/api/v1/user/profile/me").then((r) => r.data),
+
+  /** The same, for tokens that aren't the session yet: asked before a sign-in is kept, so it arrives whole. */
+  profileWith: (accessToken) =>
+    apiClient.get("/api/v1/user/profile/me", { skipAuth: true, headers: { Authorization: `Bearer ${accessToken}` } }).then((r) => r.data),
 
   /** Ends this browser's session on the server. Sent with the token it ends, since the session is already gone here. */
   endSession: (accessToken, sid) =>

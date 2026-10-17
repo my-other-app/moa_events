@@ -200,7 +200,9 @@ describe("registering signed out, with sign-in on", () => {
     show(free);
     await heading(/Your details/);
     const line = screen.getByText(/Have the app\?/).closest("p");
-    expect(line).toHaveTextContent("Have the app? Sign in with Google to keep this ticket in your account.");
+    expect(line).toHaveTextContent("Have the app? Sign in with Google or your email to keep this ticket in your account.");
+    expect(within(line).getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
+    expect(within(line).getByRole("button", { name: "Sign in with your email" })).toBeInTheDocument();
     expect(field(/^Email/)).not.toHaveAttribute("readonly");
     expect(screen.queryByText(/Signed in as/)).toBeNull();
 
@@ -243,6 +245,54 @@ describe("registering signed out, with sign-in on", () => {
     expect(field(/^Phone number/)).toHaveValue("98765 43210");
     expect(screen.queryByText(/Have the app\?/)).toBeNull();
     expect(post).toHaveBeenCalledWith("/api/v1/auth/google", { id_token: expect.any(String), platform: "web" }, { skipAuth: true });
+  });
+
+  it("signs in with an email and password part-way, then registers as that account", async () => {
+    const access = accessToken();
+    const account = { ...PROFILE, id: 9, full_name: "Ravi Kumar", email: "ravi@example.org", phone: null, provider: "email", email_verified: false };
+    stubGoogle();
+    get.mockImplementation(async (url) => (url === "/api/v1/user/profile/me" ? { data: account } : { data: {} }));
+    post.mockImplementation(async (url, body, config) => {
+      if (url === "/api/v1/auth/token") {
+        expect(config).toMatchObject({ skipAuth: true, headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+        expect(body.get("username")).toBe("ravi@example.org");
+        expect(body.get("password")).toBe("correct horse");
+        return { data: { access_token: access, refresh_token: "refresh-9", token_type: "Bearer" } };
+      }
+      throw new Error(`unexpected POST ${url}`);
+    });
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA88", pay_amount: 0, full_name: "Ravi Kumar", email: "ravi@example.org" });
+    show(free);
+    await heading(/Your details/);
+    fireEvent.change(field(/^Email/), { target: { value: "ravi@example.org" } });
+    fireEvent.change(field(/^Phone number/), { target: { value: "98765 00000" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in with your email" }));
+    const sheet = await screen.findByRole("dialog", { name: "Sign in to register" });
+    // The email form is open, with what was typed on the page already in it.
+    expect(within(sheet).getByLabelText("Email")).toHaveValue("ravi@example.org");
+    await waitFor(() => expect(within(sheet).getByLabelText("Password")).toHaveFocus());
+    fireEvent.change(within(sheet).getByLabelText("Password"), { target: { value: "correct horse" } });
+    fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(field(/^Email/)).toHaveAttribute("readonly"));
+    expect(field(/^Email/)).toHaveValue("ravi@example.org");
+    expect(field(/^Full name/)).toHaveValue("Ravi Kumar");
+    expect(screen.getByText(/Signed in as/).closest("p")).toHaveTextContent("Signed in as ravi@example.org");
+    expect(JSON.parse(localStorage.getItem("moa.session")).access_token).toBe(access);
+
+    go();
+    await heading(/Review and confirm/);
+    go();
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+    expect(eventsApi.registerForEvent).toHaveBeenCalledWith("124", {
+      full_name: "Ravi Kumar",
+      email: "ravi@example.org",
+      phone: "98765 00000",
+      additional_details: {},
+    });
+    expect(screen.getByText("It’s in your MyOtherApp app")).toBeInTheDocument();
   });
 
   it("offers Google's One Tap once, on a desk, on the details step", async () => {

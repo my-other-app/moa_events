@@ -56,12 +56,13 @@ import "@/styles/register.css";
  * ALREADY_REGISTERED (with the app), 409 REGISTRATION_AWAITING_PAYMENT, and
  * 400 CLUB_EMAIL beside the email field.
  *
- * Signed in (Sign in with Google), the name and email come from the account
- * and the email can't be changed: the registration goes in with the
- * account's token and lands straight in the account, so the server sends no
- * guest token back and none is kept. The calls and payloads are the same;
- * only the Authorization header differs. Signed out, a quiet line offers
- * signing in, and the guest path is exactly as it was.
+ * Signed in (with Google, or an email and password), the name and email
+ * come from the account and the email can't be changed: the registration
+ * goes in with the account's token and lands straight in the account, so
+ * the server sends no guest token back and none is kept. The calls and
+ * payloads are the same; only the Authorization header differs. Signed out,
+ * a quiet line offers signing in (Google, or the email form with what was
+ * typed here already in it), and the guest path is exactly as it was.
  */
 
 const DETAIL_KEYS = ["name", "email", "phone"];
@@ -710,6 +711,15 @@ function Flow({ event, club }) {
                 Have the app?{" "}
                 <button type="button" className="ac-linkbtn" onClick={() => auth.openSignIn({ reason: "register" })}>
                   Sign in with Google
+                </button>{" "}
+                or{" "}
+                <button
+                  type="button"
+                  className="ac-linkbtn"
+                  aria-label="Sign in with your email"
+                  onClick={() => auth.openSignIn({ reason: "register", view: "email", email: values.email })}
+                >
+                  your email
                 </button>{" "}
                 to keep this ticket in your account.
               </span>

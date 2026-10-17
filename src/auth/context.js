@@ -6,15 +6,28 @@ import { imageUrl } from "@/utils/format";
  *
  *   enabled    sign-in is switched on for this build (VITE_GOOGLE_CLIENT_ID set)
  *   status     "signed-in" | "signed-out"
- *   user       {id, name, firstName, email, phone, picture} while signed in
- *   attempt    {status: "idle" | "busy" | "error", error: {kind, message}}
- *   openSignIn({reason, onDone})   the sheet; `onDone(user)` runs once signed in
+ *   user       {id, name, firstName, email, phone, picture, provider, emailVerified} while signed in;
+ *              emailVerified is null until the profile has said
+ *   attempt    Google's: {status: "idle" | "busy" | "error", error: {kind, message}}
+ *   openSignIn({reason, onDone, view, email})   the sheet; `onDone(user)` runs once signed in;
+ *                                        view "email" opens with the email form showing,
+ *                                        `email` already in it
+ *   openVerify({onDone})                 the sheet at "check your email", for a signed-in
+ *                                        account whose address isn't verified yet
  *   signOut()
- *   tryOneTap()                    Google's One Tap, where a page offers it
+ *   tryOneTap()                          Google's One Tap, where a page offers it
+ *
+ * and, for the sheet's email forms (each resolves, or throws the API's error):
+ *
+ *   passwordSignIn({email, password, totpCode})  signs in and closes the sheet
+ *   signUp({name, email, password})              signs in; the sheet goes on to the code
+ *   forgotPassword(email) / resetPassword({email, code, password})   the latter signs in
+ *   sendEmailCode() / verifyEmail(code)
  */
 export const AuthContext = createContext(null);
 
 const noop = () => {};
+const nothing = async () => null;
 
 /** Outside the provider (and in builds without sign-in): nobody is signed in and nothing offers it. */
 const OFF = Object.freeze({
@@ -23,10 +36,17 @@ const OFF = Object.freeze({
   user: null,
   attempt: { status: "idle", error: null },
   openSignIn: noop,
+  openVerify: noop,
   closeSignIn: noop,
   signOut: noop,
   tryOneTap: noop,
-  signInWithCredential: async () => null,
+  signInWithCredential: nothing,
+  passwordSignIn: nothing,
+  signUp: nothing,
+  forgotPassword: nothing,
+  resetPassword: nothing,
+  sendEmailCode: nothing,
+  verifyEmail: nothing,
 });
 
 export function useAuth() {
@@ -35,7 +55,7 @@ export function useAuth() {
 
 const s = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-/** The person, from the profile when it has come, else from what Google said at sign-in. */
+/** The person, from the profile when it has come, else from what Google (or the sign-in form) said. */
 export function userFromSession(session) {
   if (!session) return null;
   const p = session.profile && typeof session.profile === "object" ? session.profile : {};
@@ -50,6 +70,9 @@ export function userFromSession(session) {
     email,
     phone: s(p.phone) || s(extra.whatsapp),
     picture: imageUrl(extra.profile_pic, "thumbnail") || imageUrl(extra.avatar?.image, "thumbnail") || s(c.picture),
+    provider: s(p.provider),
+    // Google and Apple accounts always are; a password account once its owner typed back the mailed code.
+    emailVerified: typeof p.email_verified === "boolean" ? p.email_verified : null,
   };
 }
 
