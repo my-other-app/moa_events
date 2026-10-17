@@ -1,7 +1,12 @@
 import { loadScript } from "./loadScript";
 import { paymentsApi } from "../api/payments";
 
-const YOUR_RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY
+/**
+ * The publishable key checkout opens with: the one that came with the order
+ * (a club's own Razorpay account, or the platform's), or the site's own
+ * VITE_RAZORPAY_KEY when the order has none (an older server).
+ */
+export const checkoutKey = (order, fallback = import.meta.env.VITE_RAZORPAY_KEY) => order?.key_id || fallback;
 
 export const processPayment = async ({
   paymentData,
@@ -19,7 +24,7 @@ export const processPayment = async ({
   }
 
   const options = {
-    key: YOUR_RAZORPAY_KEY,
+    key: checkoutKey(paymentData),
     amount: paymentData.amount,
     currency: "INR",
     order_id: paymentData.razorpay_order_id,

@@ -188,6 +188,37 @@ describe("registering for a paid event", () => {
     ]);
   });
 
+  it("opens Razorpay with the key that came with the order, for a club's own account", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA123", pay_amount: 250, event_registration_id: "reg-1" });
+    paymentsApi.createPaymentOrder.mockResolvedValue({
+      amount: 25000,
+      currency: "INR",
+      razorpay_order_id: "order_club",
+      key_id: "rzp_test_club_not_real",
+      gateway: "club",
+    });
+    await toReview(paid);
+    go();
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    expect(razorpay.key).toBe("rzp_test_club_not_real");
+    expect(razorpay.order_id).toBe("order_club");
+  });
+
+  it("shows the server's words when it says this event can't be paid here (UPDATE_APP_TO_PAY)", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA123", pay_amount: 250, event_registration_id: "reg-1" });
+    paymentsApi.createPaymentOrder.mockRejectedValue(
+      Object.assign(new Error("Update the MyOtherApp app to pay for this event, or pay on the website."), {
+        code: "UPDATE_APP_TO_PAY",
+        webUrl: "https://myotherapp.in/events/quiet-evening",
+      })
+    );
+    await toReview(paid);
+    go();
+    expect(await screen.findByText(/Update the MyOtherApp app to pay for this event, or pay on the website\./)).toBeInTheDocument();
+    expect(window.Razorpay).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Pay ₹250" })).not.toBeDisabled();
+  });
+
   it("adds the shelf picks to the total and the payload", async () => {
     eventsApi.registerForEvent.mockReturnValue(new Promise(() => {}));
     show(paid, { items: [TEE] });
