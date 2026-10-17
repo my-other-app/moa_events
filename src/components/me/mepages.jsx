@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/context";
 import { eventPath, whenLine } from "@/utils/eventpage";
 import { imageUrl } from "@/utils/format";
 import { useNoIndex, usePageMeta } from "@/utils/meta";
+import { VerifyBanner } from "../auth/verifyemail";
 import { SitePage } from "../discover/chrome";
 import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
 import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
@@ -302,7 +303,7 @@ export function MyTicketsPage() {
         icon="ticket"
         reason="tickets"
         title="Your tickets, in one place"
-        text="Sign in with the Google account you use in the MyOtherApp app to see every ticket — the ones from here and from the app."
+        text="Sign in with the Google account or email you use in the MyOtherApp app to see every ticket — the ones from here and from the app."
       />
     );
   } else {
@@ -316,8 +317,10 @@ export function MyTicketsPage() {
             </p>
           ) : null}
         </header>
+        <VerifyBanner />
         <MeTabs />
-        <Tickets email={auth.user?.email || ""} />
+        {/* Verifying brings in what was booked here as a guest: the list loads again when it does. */}
+        <Tickets email={`${auth.user?.email || ""}${auth.user?.emailVerified === false ? ":unverified" : ""}`} />
       </>
     );
   }
@@ -378,7 +381,7 @@ export function FollowingPage() {
         icon="users"
         reason="follow"
         title="The clubs you follow"
-        text="Sign in with the Google account you use in the MyOtherApp app to see the clubs you follow, and follow more from here."
+        text="Sign in with the Google account or email you use in the MyOtherApp app to see the clubs you follow, and follow more from here."
       />
     );
   } else {
