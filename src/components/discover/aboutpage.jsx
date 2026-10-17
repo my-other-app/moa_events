@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { discoverApi } from "@/api/discover";
-import { CLUBS_URL, CONTACT_EMAIL } from "@/config";
+import { CONTACT_EMAIL } from "@/config";
 import { ABOUT } from "@/content/about";
 import { formatCount } from "@/utils/format";
 import { usePageSeo } from "@/utils/meta";
@@ -11,8 +11,6 @@ import Icon from "./icons";
 import logoIcon from "@/assets/logo-icon.png";
 import "@/styles/cards-hero.css";
 import "@/styles/pages.css";
-
-const CLUBS_HOST = CLUBS_URL.replace(/^https?:\/\//, "");
 
 /** The numbers on the front page, live: upcoming events, clubs, cities. Each shows only when there is one. */
 function LiveNumbers({ stats }) {
@@ -101,9 +99,9 @@ export default function AboutPage() {
               <Link className="dc-btn" to="/events">
                 Find events
               </Link>
-              <a className="dc-btn dc-btn--ghost" href={CLUBS_URL} target="_blank" rel="noopener noreferrer">
-                For clubs <Icon name="external" size={16} />
-              </a>
+              <Link className="dc-btn dc-btn--ghost" to="/for-clubs">
+                For clubs <Icon name="arrowRight" size={16} />
+              </Link>
             </div>
           </div>
           <LiveNumbers stats={stats || (stats === false ? {} : null)} />
@@ -135,10 +133,12 @@ export default function AboutPage() {
             ))}
           </ul>
           <div className="dc-about-clubs-cta">
-            <a className="dc-btn dc-btn--accent" href={CLUBS_URL} target="_blank" rel="noopener noreferrer">
-              Open the clubs dashboard <Icon name="external" size={16} />
-            </a>
-            <span>{CLUBS_HOST}</span>
+            <Link className="dc-btn dc-btn--accent" to="/for-clubs">
+              See everything clubs get <Icon name="arrowRight" size={16} />
+            </Link>
+            <Link className="dc-about-clubs-pricing" to="/pricing">
+              Plans and pricing
+            </Link>
           </div>
         </section>
 

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildShareHtml, clip, routeFor, shareDocument } from "./share.js";
 import { escapeHtml } from "./site.js";
 import { fullEvent } from "../../src/test/eventFixture.js";
+import { plansResponse } from "../../src/test/plansFixture.js";
 
 /** The value of one tag in a document, as a bot would read it. */
 const tag = (html, attr, key) => {
@@ -29,11 +30,13 @@ describe("which addresses get a preview", () => {
     ["/about", { kind: "page", key: "about" }],
     ["/privacy?utm_source=x", { kind: "page", key: "privacy" }],
     ["/terms", { kind: "page", key: "terms" }],
+    ["/for-clubs", { kind: "page", key: "for-clubs" }],
+    ["/pricing?utm_source=wa#compare", { kind: "page", key: "pricing" }],
   ])("%s", (path, route) => {
     expect(routeFor(path)).toEqual(route);
   });
 
-  it.each(["/tickets/abc", "/play/123", "/123/other", "/a/b/c", "/events/x/y/z", "/events/x/unknown", "/clubs/x/y", "/bad.ref", "/%E0%A4%A", "/threads/12", "/about/x", "/terms/live"])("%s is not one", (path) => {
+  it.each(["/tickets/abc", "/play/123", "/123/other", "/a/b/c", "/events/x/y/z", "/events/x/unknown", "/clubs/x/y", "/bad.ref", "/%E0%A4%A", "/threads/12", "/about/x", "/terms/live", "/for-clubs/x", "/pricing/live"])("%s is not one", (path) => {
     expect(routeFor(path)).toBeNull();
   });
 });
@@ -135,6 +138,47 @@ describe("the preview page", () => {
     expect(about.html).toContain("<title>About MyOtherApp</title>");
     expect(about.html).toContain("<h2>For clubs</h2>");
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("gives /for-clubs and /pricing their words, every plan with its prices, and the plans as structured data", async () => {
+    const fetch = vi.fn(async () => ({ status: 200, data: plansResponse() }));
+    const pricing = await shareDocument("/pricing", { fetch });
+    expect(fetch).toHaveBeenCalledWith("/api/v1/plans");
+    expect(pricing.status).toBe(200);
+    expect(pricing.cache).toBe("public, s-maxage=600, stale-while-revalidate=86400");
+    expect(canonical(pricing.html)).toBe("https://myotherapp.in/pricing");
+    expect(pricing.html).toContain("<title>Pricing · MyOtherApp for clubs</title>");
+    expect(tag(pricing.html, "property", "og:title")).toBe("Pricing · MyOtherApp for clubs");
+    expect(pricing.html).toContain("<p>Pay yearly and get 2 months free.</p>");
+    expect(pricing.html).toContain(
+      "<li><strong>Growth</strong>: ₹699 a month or ₹6,990 a year. For an active club with a following. 15 events a month, 1,000 people per event, 8,000 registrations a month, 10 team seats, 60 announcements a month.</li>"
+    );
+    expect(pricing.html).toContain("<li><strong>Enterprise</strong>: Talk to us.");
+    expect(pricing.html).toContain('<a href="https://myotherapp.in/privacy">Privacy Policy</a>');
+    expect(pricing.html).not.toMatch(/coupon|ticket type|GB storage/i);
+    const ld = JSON.parse(pricing.html.match(/<script type="application\/ld\+json">([^<]*)<\/script>/)[1]);
+    expect(ld).toMatchObject({ "@type": "SoftwareApplication", url: "https://myotherapp.in/pricing" });
+    expect(ld.offers).toHaveLength(9);
+    expect(ld.offers.find((o) => o.name === "Pro, monthly")).toMatchObject({ price: 1499, priceCurrency: "INR" });
+
+    const clubs = await shareDocument("/for-clubs", { fetch });
+    expect(canonical(clubs.html)).toBe("https://myotherapp.in/for-clubs");
+    expect(clubs.html).toContain("<h2>Before the event: Fill the room</h2>");
+    expect(clubs.html).toContain("<li><strong>We verify your club</strong>:");
+    expect(clubs.html).toContain("<h2>Pricing</h2>");
+    expect(JSON.parse(clubs.html.match(/<script type="application\/ld\+json">([^<]*)<\/script>/)[1]).url).toBe("https://myotherapp.in/for-clubs");
+  });
+
+  it("keeps the plan pages' words when the plans can't be had, and tries again soon", async () => {
+    for (const fetch of [async () => Promise.reject(new Error("timeout")), async () => ({ status: 404, data: null }), async () => ({ status: 200, data: { plans: [] } })]) {
+      const doc = await shareDocument("/for-clubs", { fetch });
+      expect(doc.status).toBe(200);
+      expect(doc.cache).toBe("public, s-maxage=60, stale-while-revalidate=600");
+      expect(tag(doc.html, "property", "og:title")).toBe("MyOtherApp for clubs · Run your club&#39;s events from one place");
+      expect(doc.html).toContain("<h2>How it works</h2>");
+      expect(doc.html).not.toContain("<h2>Pricing</h2>");
+      expect(doc.html).not.toContain("application/ld+json");
+    }
   });
 
   it("cuts descriptions at a word", () => {

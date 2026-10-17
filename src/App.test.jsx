@@ -21,6 +21,7 @@ vi.mock("@/api/competition", () => ({
   errorLine: (e, f) => f,
   competitionApi: { leaderboard: vi.fn(() => new Promise(() => {})), mine: vi.fn(() => new Promise(() => {})) },
 }));
+vi.mock("@/api/plans", () => ({ plansApi: { list: vi.fn(() => new Promise(() => {})) } }));
 vi.mock("@/api/discover", async (importOriginal) => {
   const real = await importOriginal();
   const pending = () => vi.fn(() => new Promise(() => {}));
@@ -44,6 +45,7 @@ vi.mock("@/api/discover", async (importOriginal) => {
 const { eventsApi } = await import("@/api/events");
 const { liveApi } = await import("@/api/live");
 const { discoverApi, parseEventPage } = await import("@/api/discover");
+const { plansApi } = await import("@/api/plans");
 const { AppRoutes } = await import("./App.jsx");
 
 function Where() {
@@ -139,6 +141,18 @@ describe("the routes", () => {
     await waitFor(() => expect(discoverApi.thread).toHaveBeenCalledWith("abc"));
     expect(eventsApi.fetchEvent).not.toHaveBeenCalled();
     expect(discoverApi.event).not.toHaveBeenCalled();
+  });
+
+  it("serves the clubs' pages at /for-clubs and /pricing, never as an old event address", async () => {
+    at("/for-clubs");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Run your club’s events from one place.");
+    cleanup();
+    at("/pricing");
+    expect(screen.getByRole("heading", { level: 1, name: "Plans for every club." })).toBeInTheDocument();
+    await waitFor(() => expect(plansApi.list).toHaveBeenCalledTimes(2));
+    expect(discoverApi.event).not.toHaveBeenCalled();
+    expect(eventsApi.fetchEvent).not.toHaveBeenCalled();
+    expect(where()).toBe("/pricing");
   });
 
   it("keeps tickets, certificates and registration where they were", async () => {

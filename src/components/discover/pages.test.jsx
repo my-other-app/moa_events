@@ -48,7 +48,11 @@ describe("the site's own pages", () => {
     for (const t of ["Events, registrations and payments", "Check-in at the door", "Certificates", "Club websites", "Tracking links", "Analytics"]) {
       expect(within(clubs).getByRole("heading", { level: 3, name: t })).toBeInTheDocument();
     }
-    expect(within(clubs).getByRole("link", { name: /Open the clubs dashboard/ })).toHaveAttribute("href", "https://clubs-next.myotherapp.in");
+    // Clubs are sent to the page for clubs on this site, not straight to the dashboard.
+    expect(within(clubs).getByRole("link", { name: /See everything clubs get/ })).toHaveAttribute("href", "/for-clubs");
+    expect(within(clubs).getByRole("link", { name: "Plans and pricing" })).toHaveAttribute("href", "/pricing");
+    for (const a of screen.getAllByRole("link", { name: /^For clubs/ })) expect(a).toHaveAttribute("href", "/for-clubs");
+    expect(screen.getByRole("main").querySelector('a[href*="clubs-next"]')).toBeNull();
     expect(within(screen.getByRole("region", { name: /three steps/ })).getAllByRole("listitem")).toHaveLength(3);
     expect(screen.getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();

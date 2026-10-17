@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { APP_STORE_URL, CLUBS_URL, CONTACT_EMAIL, PLAY_STORE_URL } from "@/config";
+import { APP_STORE_URL, CONTACT_EMAIL, PLAY_STORE_URL } from "@/config";
 import { HeaderAccount } from "../auth/account";
 import { AppPrompt, AppleGlyph, PlayGlyph } from "./bits";
 import Icon from "./icons";
@@ -9,11 +9,13 @@ import "@/styles/discover.css";
 
 /**
  * The bar on top of every public page: the wordmark home, the three ways
- * in (events, clubs, posts), a search that lands on find-events, signing in
- * (when the build has it) and the way to the app.
+ * in (events, clubs, posts) and the page for clubs that run events, a
+ * search that lands on find-events, signing in (when the build has it) and
+ * the way to the app.
  */
 export function SiteHeader() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [q, setQ] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [appOpen, setAppOpen] = useState(false);
@@ -42,6 +44,10 @@ export function SiteHeader() {
           <NavLink to="/events">Events</NavLink>
           <NavLink to="/clubs">Clubs</NavLink>
           <NavLink to="/threads">Threads</NavLink>
+          {/* The clubs' page and its pricing are one place to a visitor. */}
+          <NavLink to="/for-clubs" className={({ isActive }) => (isActive || pathname === "/pricing" ? "active dc-nav-clubs" : "dc-nav-clubs")}>
+            For clubs
+          </NavLink>
         </nav>
         <form id={formId} className={`dc-header-search${searchOpen ? " is-open" : ""}`} role="search" onSubmit={submit}>
           <div className="dc-searchbox">
@@ -109,9 +115,10 @@ export function SiteFooter() {
                 <Link to="/about">About</Link>
               </li>
               <li>
-                <a href={CLUBS_URL} target="_blank" rel="noopener noreferrer">
-                  For clubs
-                </a>
+                <Link to="/for-clubs">For clubs</Link>
+              </li>
+              <li>
+                <Link to="/pricing">Pricing</Link>
               </li>
               <li>
                 <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>

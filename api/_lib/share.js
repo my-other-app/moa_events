@@ -10,12 +10,32 @@ import { formatPrice, formatWhen, imageUrl } from "../../src/utils/format.js";
 import { eventJsonLd, jsonForScript } from "../../src/utils/eventld.js";
 import { LEGAL, inline, updatedLabel } from "../../src/content/legal.js";
 import { ABOUT } from "../../src/content/about.js";
+import { FOR_CLUBS, PRICING_PAGE, clubFaq } from "../../src/content/forclubs.js";
+import { parsePlans, planSummary, plansJsonLd, yearlyOffer } from "../../src/utils/pricing.js";
 
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 /** First words of the site's own addresses, never an event's old /{ref}. */
-const RESERVED = new Set(["events", "clubs", "threads", "about", "privacy", "terms", "play", "feedback", "tickets", "certificates", "register", "api", "assets"]);
+const RESERVED = new Set([
+  "events",
+  "clubs",
+  "threads",
+  "about",
+  "privacy",
+  "terms",
+  "for-clubs",
+  "pricing",
+  "play",
+  "feedback",
+  "tickets",
+  "certificates",
+  "register",
+  "api",
+  "assets",
+]);
 /** The site's own one-word pages, which no old event address can take. */
-const OWN_PAGES = new Set(["about", "privacy", "terms"]);
+const OWN_PAGES = new Set(["about", "privacy", "terms", "for-clubs", "pricing"]);
+/** The pages that show the clubs' plans, read from the API when a crawler asks. */
+const PLAN_PAGES = new Set(["for-clubs", "pricing"]);
 
 const PAGES = {
   home: { path: "/", title: `${SITE_NAME} · Events and clubs near you`, description: "Find events and clubs near you on MyOtherApp — hackathons, workshops, meetups and more, from the clubs that run them." },
@@ -23,6 +43,8 @@ const PAGES = {
   clubs: { path: "/clubs", title: `Clubs · ${SITE_NAME}`, description: "Find clubs near you on MyOtherApp and see what they're running next." },
   threads: { path: "/threads", title: `Threads · ${SITE_NAME}`, description: "What the clubs on MyOtherApp are posting." },
   about: { path: ABOUT.path, title: ABOUT.title, description: ABOUT.description },
+  "for-clubs": { path: FOR_CLUBS.path, title: FOR_CLUBS.title, description: FOR_CLUBS.description },
+  pricing: { path: PRICING_PAGE.path, title: PRICING_PAGE.title, description: PRICING_PAGE.description },
   privacy: { path: LEGAL.privacy.path, title: `${LEGAL.privacy.title} · ${SITE_NAME}`, description: LEGAL.privacy.description },
   terms: { path: LEGAL.terms.path, title: `${LEGAL.terms.title} · ${SITE_NAME}`, description: LEGAL.terms.description },
 };
@@ -149,6 +171,57 @@ function ownPageHtml(key) {
   return "";
 }
 
+/**
+ * For clubs and Pricing, in words a crawler reads: what clubs get (on
+ * /for-clubs), every plan with its prices when the API gave them, and the
+ * questions. Every piece is escaped here.
+ */
+function clubsPageHtml(key, data) {
+  const parts = [];
+  const items = (rows) => rows.map((r) => `<li><strong>${escapeHtml(r.title)}</strong>: ${escapeHtml(r.text)}</li>`).join("");
+  if (key === "for-clubs") {
+    parts.push(`<p>${escapeHtml(FOR_CLUBS.lede)}</p>`);
+    for (const phase of FOR_CLUBS.phases) parts.push(`<h2>${escapeHtml(`${phase.when}: ${phase.title}`)}</h2>\n<ul>${items(phase.features)}</ul>`);
+    parts.push(`<h2>How it works</h2>\n<ol>${items(FOR_CLUBS.steps)}</ol>`);
+  }
+  if (data) {
+    const offer = yearlyOffer(data.yearlyMonthsFree);
+    parts.push("<h2>Pricing</h2>");
+    if (offer) parts.push(`<p>Pay yearly and get ${escapeHtml(offer)}.</p>`);
+    parts.push(`<ul>${data.plans.map((p) => `<li><strong>${escapeHtml(p.name)}</strong>: ${escapeHtml(planSummary(p, data.currency))}</li>`).join("")}</ul>`);
+  }
+  parts.push("<h2>Questions</h2>");
+  for (const q of clubFaq({ yearlyMonthsFree: data?.yearlyMonthsFree ?? null })) {
+    parts.push(`<h3>${escapeHtml(q.q)}</h3>`, ...q.a.map((t) => `<p>${inlineHtml(t)}</p>`));
+  }
+  return parts.join("\n");
+}
+
+/** /for-clubs and /pricing: the page's own words, with the plans and their structured data when the API answers. */
+async function plansDocument(key, fetchDoc) {
+  let data = null;
+  try {
+    data = parsePlans((await fetchDoc("/api/v1/plans")).data);
+  } catch {
+    data = null;
+  }
+  const page = PAGES[key];
+  const url = `${SITE_URL}${page.path}`;
+  return {
+    status: 200,
+    cache: data ? CACHE : CACHE_SHORT,
+    html: buildShareHtml({
+      title: page.title,
+      description: page.description,
+      url,
+      image: DEFAULT_IMAGE,
+      bodyHtml: clubsPageHtml(key, data),
+      linkText: key === "pricing" ? "See the plans on MyOtherApp" : "MyOtherApp for clubs",
+      jsonLd: data ? plansJsonLd(data, { url, siteUrl: SITE_URL, description: page.description }) : null,
+    }),
+  };
+}
+
 const generic = (key = "home", status = 200, cache = CACHE) => {
   const page = PAGES[key] || PAGES.home;
   return {
@@ -223,7 +296,7 @@ function clubDocument(d, slug) {
 export async function shareDocument(path, { fetch: fetchDoc = fetchJson } = {}) {
   const route = routeFor(path);
   if (!route) return generic("home");
-  if (route.kind === "page") return generic(route.key);
+  if (route.kind === "page") return PLAN_PAGES.has(route.key) ? plansDocument(route.key, fetchDoc) : generic(route.key);
   try {
     const apiPath = route.kind === "event" ? `/api/v1/discover/events/${encodeURIComponent(route.ref)}` : `/api/v1/discover/clubs/${encodeURIComponent(route.slug)}`;
     const { status, data } = await fetchDoc(apiPath);

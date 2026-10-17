@@ -1,0 +1,780 @@
+{
+  "currency": "INR",
+  "yearly_months_free": 2,
+  "plans": [
+    {
+      "key": "free",
+      "name": "Free",
+      "tagline": "For a club just starting out.",
+      "price_monthly_paise": 0,
+      "price_yearly_paise": 0,
+      "trial_days": 0,
+      "contact_sales": false,
+      "featured": false,
+      "limits": {
+        "events_per_month": 2,
+        "registrations_per_month": 300,
+        "registrations_per_event": 100,
+        "ticket_types_per_event": 1,
+        "coupons_per_event": 0,
+        "merch_items_per_event": 0,
+        "committee_seats": 2,
+        "storage_gb": 1,
+        "announcements_per_month": 4,
+        "website_templates": 1
+      },
+      "features": [
+        {
+          "key": "checkin",
+          "label": "Check-in at the door",
+          "included": true
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "included": true
+        },
+        {
+          "key": "regform",
+          "label": "Custom registration questions",
+          "included": true
+        },
+        {
+          "key": "reviews",
+          "label": "Ratings and reviews",
+          "included": true
+        },
+        {
+          "key": "threads",
+          "label": "Threads to your followers",
+          "included": true
+        },
+        {
+          "key": "tickets",
+          "label": "Paid tickets with Razorpay",
+          "included": false
+        },
+        {
+          "key": "website",
+          "label": "Club website",
+          "included": false
+        },
+        {
+          "key": "quiz",
+          "label": "Live room: quiz",
+          "included": false
+        },
+        {
+          "key": "polls",
+          "label": "Live room: polls",
+          "included": false
+        },
+        {
+          "key": "qa",
+          "label": "Live room: Q&A",
+          "included": false
+        },
+        {
+          "key": "networking",
+          "label": "Attendee networking",
+          "included": false
+        },
+        {
+          "key": "links",
+          "label": "Tracking links",
+          "included": false
+        },
+        {
+          "key": "report",
+          "label": "Post-event reports",
+          "included": false
+        },
+        {
+          "key": "merch",
+          "label": "Merchandise store",
+          "included": false
+        },
+        {
+          "key": "swag",
+          "label": "Swag handouts at the door",
+          "included": false
+        },
+        {
+          "key": "badges",
+          "label": "ID cards and badge printing",
+          "included": false
+        },
+        {
+          "key": "roles",
+          "label": "Team roles and access",
+          "included": false
+        },
+        {
+          "key": "teams",
+          "label": "Competitions: teams and submissions",
+          "included": false
+        },
+        {
+          "key": "judging",
+          "label": "Competitions: judging",
+          "included": false
+        },
+        {
+          "key": "rounds",
+          "label": "Competitions: rounds and leaderboard",
+          "included": false
+        },
+        {
+          "key": "finance",
+          "label": "Finance and expenses",
+          "included": false
+        }
+      ]
+    },
+    {
+      "key": "starter",
+      "name": "Starter",
+      "tagline": "For a club running regular events.",
+      "price_monthly_paise": 29900,
+      "price_yearly_paise": 299000,
+      "trial_days": 0,
+      "contact_sales": false,
+      "featured": false,
+      "limits": {
+        "events_per_month": 5,
+        "registrations_per_month": 1500,
+        "registrations_per_event": 300,
+        "ticket_types_per_event": 3,
+        "coupons_per_event": 2,
+        "merch_items_per_event": 5,
+        "committee_seats": 5,
+        "storage_gb": 5,
+        "announcements_per_month": 15,
+        "website_templates": 3
+      },
+      "features": [
+        {
+          "key": "checkin",
+          "label": "Check-in at the door",
+          "included": true
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "included": true
+        },
+        {
+          "key": "regform",
+          "label": "Custom registration questions",
+          "included": true
+        },
+        {
+          "key": "reviews",
+          "label": "Ratings and reviews",
+          "included": true
+        },
+        {
+          "key": "threads",
+          "label": "Threads to your followers",
+          "included": true
+        },
+        {
+          "key": "tickets",
+          "label": "Paid tickets with Razorpay",
+          "included": true
+        },
+        {
+          "key": "website",
+          "label": "Club website",
+          "included": true
+        },
+        {
+          "key": "quiz",
+          "label": "Live room: quiz",
+          "included": false
+        },
+        {
+          "key": "polls",
+          "label": "Live room: polls",
+          "included": false
+        },
+        {
+          "key": "qa",
+          "label": "Live room: Q&A",
+          "included": false
+        },
+        {
+          "key": "networking",
+          "label": "Attendee networking",
+          "included": false
+        },
+        {
+          "key": "links",
+          "label": "Tracking links",
+          "included": false
+        },
+        {
+          "key": "report",
+          "label": "Post-event reports",
+          "included": false
+        },
+        {
+          "key": "merch",
+          "label": "Merchandise store",
+          "included": false
+        },
+        {
+          "key": "swag",
+          "label": "Swag handouts at the door",
+          "included": false
+        },
+        {
+          "key": "badges",
+          "label": "ID cards and badge printing",
+          "included": false
+        },
+        {
+          "key": "roles",
+          "label": "Team roles and access",
+          "included": false
+        },
+        {
+          "key": "teams",
+          "label": "Competitions: teams and submissions",
+          "included": false
+        },
+        {
+          "key": "judging",
+          "label": "Competitions: judging",
+          "included": false
+        },
+        {
+          "key": "rounds",
+          "label": "Competitions: rounds and leaderboard",
+          "included": false
+        },
+        {
+          "key": "finance",
+          "label": "Finance and expenses",
+          "included": false
+        }
+      ]
+    },
+    {
+      "key": "growth",
+      "name": "Growth",
+      "tagline": "For an active club with a following.",
+      "price_monthly_paise": 69900,
+      "price_yearly_paise": 699000,
+      "trial_days": 14,
+      "contact_sales": false,
+      "featured": true,
+      "limits": {
+        "events_per_month": 15,
+        "registrations_per_month": 8000,
+        "registrations_per_event": 1000,
+        "ticket_types_per_event": 5,
+        "coupons_per_event": 10,
+        "merch_items_per_event": 20,
+        "committee_seats": 10,
+        "storage_gb": 20,
+        "announcements_per_month": 60,
+        "website_templates": null
+      },
+      "features": [
+        {
+          "key": "checkin",
+          "label": "Check-in at the door",
+          "included": true
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "included": true
+        },
+        {
+          "key": "regform",
+          "label": "Custom registration questions",
+          "included": true
+        },
+        {
+          "key": "reviews",
+          "label": "Ratings and reviews",
+          "included": true
+        },
+        {
+          "key": "threads",
+          "label": "Threads to your followers",
+          "included": true
+        },
+        {
+          "key": "tickets",
+          "label": "Paid tickets with Razorpay",
+          "included": true
+        },
+        {
+          "key": "website",
+          "label": "Club website",
+          "included": true
+        },
+        {
+          "key": "quiz",
+          "label": "Live room: quiz",
+          "included": true
+        },
+        {
+          "key": "polls",
+          "label": "Live room: polls",
+          "included": true
+        },
+        {
+          "key": "qa",
+          "label": "Live room: Q&A",
+          "included": true
+        },
+        {
+          "key": "networking",
+          "label": "Attendee networking",
+          "included": true
+        },
+        {
+          "key": "links",
+          "label": "Tracking links",
+          "included": true
+        },
+        {
+          "key": "report",
+          "label": "Post-event reports",
+          "included": true
+        },
+        {
+          "key": "merch",
+          "label": "Merchandise store",
+          "included": false
+        },
+        {
+          "key": "swag",
+          "label": "Swag handouts at the door",
+          "included": false
+        },
+        {
+          "key": "badges",
+          "label": "ID cards and badge printing",
+          "included": false
+        },
+        {
+          "key": "roles",
+          "label": "Team roles and access",
+          "included": false
+        },
+        {
+          "key": "teams",
+          "label": "Competitions: teams and submissions",
+          "included": false
+        },
+        {
+          "key": "judging",
+          "label": "Competitions: judging",
+          "included": false
+        },
+        {
+          "key": "rounds",
+          "label": "Competitions: rounds and leaderboard",
+          "included": false
+        },
+        {
+          "key": "finance",
+          "label": "Finance and expenses",
+          "included": false
+        }
+      ]
+    },
+    {
+      "key": "pro",
+      "name": "Pro",
+      "tagline": "For big clubs and paid events at scale.",
+      "price_monthly_paise": 149900,
+      "price_yearly_paise": 1499000,
+      "trial_days": 14,
+      "contact_sales": false,
+      "featured": false,
+      "limits": {
+        "events_per_month": null,
+        "registrations_per_month": 30000,
+        "registrations_per_event": 5000,
+        "ticket_types_per_event": 10,
+        "coupons_per_event": null,
+        "merch_items_per_event": 100,
+        "committee_seats": 25,
+        "storage_gb": 100,
+        "announcements_per_month": null,
+        "website_templates": null
+      },
+      "features": [
+        {
+          "key": "checkin",
+          "label": "Check-in at the door",
+          "included": true
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "included": true
+        },
+        {
+          "key": "regform",
+          "label": "Custom registration questions",
+          "included": true
+        },
+        {
+          "key": "reviews",
+          "label": "Ratings and reviews",
+          "included": true
+        },
+        {
+          "key": "threads",
+          "label": "Threads to your followers",
+          "included": true
+        },
+        {
+          "key": "tickets",
+          "label": "Paid tickets with Razorpay",
+          "included": true
+        },
+        {
+          "key": "website",
+          "label": "Club website",
+          "included": true
+        },
+        {
+          "key": "quiz",
+          "label": "Live room: quiz",
+          "included": true
+        },
+        {
+          "key": "polls",
+          "label": "Live room: polls",
+          "included": true
+        },
+        {
+          "key": "qa",
+          "label": "Live room: Q&A",
+          "included": true
+        },
+        {
+          "key": "networking",
+          "label": "Attendee networking",
+          "included": true
+        },
+        {
+          "key": "links",
+          "label": "Tracking links",
+          "included": true
+        },
+        {
+          "key": "report",
+          "label": "Post-event reports",
+          "included": true
+        },
+        {
+          "key": "merch",
+          "label": "Merchandise store",
+          "included": true
+        },
+        {
+          "key": "swag",
+          "label": "Swag handouts at the door",
+          "included": true
+        },
+        {
+          "key": "badges",
+          "label": "ID cards and badge printing",
+          "included": true
+        },
+        {
+          "key": "roles",
+          "label": "Team roles and access",
+          "included": true
+        },
+        {
+          "key": "teams",
+          "label": "Competitions: teams and submissions",
+          "included": true
+        },
+        {
+          "key": "judging",
+          "label": "Competitions: judging",
+          "included": true
+        },
+        {
+          "key": "rounds",
+          "label": "Competitions: rounds and leaderboard",
+          "included": true
+        },
+        {
+          "key": "finance",
+          "label": "Finance and expenses",
+          "included": false
+        }
+      ]
+    },
+    {
+      "key": "campus",
+      "name": "Campus",
+      "tagline": "For a college body running many clubs and a fest.",
+      "price_monthly_paise": 399900,
+      "price_yearly_paise": 3999000,
+      "trial_days": 0,
+      "contact_sales": false,
+      "featured": false,
+      "limits": {
+        "events_per_month": null,
+        "registrations_per_month": 150000,
+        "registrations_per_event": 20000,
+        "ticket_types_per_event": null,
+        "coupons_per_event": null,
+        "merch_items_per_event": null,
+        "committee_seats": 60,
+        "storage_gb": 500,
+        "announcements_per_month": null,
+        "website_templates": null
+      },
+      "features": [
+        {
+          "key": "checkin",
+          "label": "Check-in at the door",
+          "included": true
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "included": true
+        },
+        {
+          "key": "regform",
+          "label": "Custom registration questions",
+          "included": true
+        },
+        {
+          "key": "reviews",
+          "label": "Ratings and reviews",
+          "included": true
+        },
+        {
+          "key": "threads",
+          "label": "Threads to your followers",
+          "included": true
+        },
+        {
+          "key": "tickets",
+          "label": "Paid tickets with Razorpay",
+          "included": true
+        },
+        {
+          "key": "website",
+          "label": "Club website",
+          "included": true
+        },
+        {
+          "key": "quiz",
+          "label": "Live room: quiz",
+          "included": true
+        },
+        {
+          "key": "polls",
+          "label": "Live room: polls",
+          "included": true
+        },
+        {
+          "key": "qa",
+          "label": "Live room: Q&A",
+          "included": true
+        },
+        {
+          "key": "networking",
+          "label": "Attendee networking",
+          "included": true
+        },
+        {
+          "key": "links",
+          "label": "Tracking links",
+          "included": true
+        },
+        {
+          "key": "report",
+          "label": "Post-event reports",
+          "included": true
+        },
+        {
+          "key": "merch",
+          "label": "Merchandise store",
+          "included": true
+        },
+        {
+          "key": "swag",
+          "label": "Swag handouts at the door",
+          "included": true
+        },
+        {
+          "key": "badges",
+          "label": "ID cards and badge printing",
+          "included": true
+        },
+        {
+          "key": "roles",
+          "label": "Team roles and access",
+          "included": true
+        },
+        {
+          "key": "teams",
+          "label": "Competitions: teams and submissions",
+          "included": true
+        },
+        {
+          "key": "judging",
+          "label": "Competitions: judging",
+          "included": true
+        },
+        {
+          "key": "rounds",
+          "label": "Competitions: rounds and leaderboard",
+          "included": true
+        },
+        {
+          "key": "finance",
+          "label": "Finance and expenses",
+          "included": true
+        }
+      ]
+    },
+    {
+      "key": "enterprise",
+      "name": "Enterprise",
+      "tagline": "For large fests and institutions.",
+      "price_monthly_paise": 0,
+      "price_yearly_paise": 0,
+      "trial_days": 0,
+      "contact_sales": true,
+      "featured": false,
+      "limits": {
+        "events_per_month": null,
+        "registrations_per_month": null,
+        "registrations_per_event": null,
+        "ticket_types_per_event": null,
+        "coupons_per_event": null,
+        "merch_items_per_event": null,
+        "committee_seats": null,
+        "storage_gb": null,
+        "announcements_per_month": null,
+        "website_templates": null
+      },
+      "features": [
+        {
+          "key": "checkin",
+          "label": "Check-in at the door",
+          "included": true
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "included": true
+        },
+        {
+          "key": "regform",
+          "label": "Custom registration questions",
+          "included": true
+        },
+        {
+          "key": "reviews",
+          "label": "Ratings and reviews",
+          "included": true
+        },
+        {
+          "key": "threads",
+          "label": "Threads to your followers",
+          "included": true
+        },
+        {
+          "key": "tickets",
+          "label": "Paid tickets with Razorpay",
+          "included": true
+        },
+        {
+          "key": "website",
+          "label": "Club website",
+          "included": true
+        },
+        {
+          "key": "quiz",
+          "label": "Live room: quiz",
+          "included": true
+        },
+        {
+          "key": "polls",
+          "label": "Live room: polls",
+          "included": true
+        },
+        {
+          "key": "qa",
+          "label": "Live room: Q&A",
+          "included": true
+        },
+        {
+          "key": "networking",
+          "label": "Attendee networking",
+          "included": true
+        },
+        {
+          "key": "links",
+          "label": "Tracking links",
+          "included": true
+        },
+        {
+          "key": "report",
+          "label": "Post-event reports",
+          "included": true
+        },
+        {
+          "key": "merch",
+          "label": "Merchandise store",
+          "included": true
+        },
+        {
+          "key": "swag",
+          "label": "Swag handouts at the door",
+          "included": true
+        },
+        {
+          "key": "badges",
+          "label": "ID cards and badge printing",
+          "included": true
+        },
+        {
+          "key": "roles",
+          "label": "Team roles and access",
+          "included": true
+        },
+        {
+          "key": "teams",
+          "label": "Competitions: teams and submissions",
+          "included": true
+        },
+        {
+          "key": "judging",
+          "label": "Competitions: judging",
+          "included": true
+        },
+        {
+          "key": "rounds",
+          "label": "Competitions: rounds and leaderboard",
+          "included": true
+        },
+        {
+          "key": "finance",
+          "label": "Finance and expenses",
+          "included": true
+        }
+      ]
+    }
+  ]
+}
