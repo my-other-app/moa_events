@@ -30,7 +30,10 @@ export function tidySvg(node) {
     if (k === "children") continue;
     props[k] = typeof v === "number" ? round(v) : typeof v === "string" && (k === "d" || k === "transform") ? roundIn(v) : v;
   }
-  return node.props.children === undefined ? cloneElement(node, props) : cloneElement(node, props, tidySvg(node.props.children));
+  const kids = node.props.children;
+  if (kids === undefined) return cloneElement(node, props);
+  // A static list of children goes back as children, not as one array (which React would want keys for).
+  return Array.isArray(kids) ? cloneElement(node, props, ...kids.map(tidySvg)) : cloneElement(node, props, tidySvg(kids));
 }
 
 /** The shape on a generated cover. Everything sits in the top part, leaving the bottom for the date. */
