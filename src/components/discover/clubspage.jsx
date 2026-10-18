@@ -8,26 +8,32 @@ import { ClubFilters, FilterLink, Finder, FinderPlace, FinderSearchBox, MoreResu
 import Icon from "./icons";
 
 /**
- * Find clubs: by name, by interest, nearest or most followed. Filters live
- * in the address (q, interest, sort, radius_km, near). Rendered on the
+ * Find clubs: by name, by topic or interest, nearest or most followed.
+ * Filters live in the address (q, topic, interest, sort, radius_km, near). Rendered on the
  * server for the address (src/app/clubs/page.jsx) with the first page; the
  * islands change the address and add later pages.
  *
  *   state     clubsPageState(params): {filters, near}
  *   page      the first page (parseClubsPage, images stable): {items, total, where, interests}
  *   heading   the <h1> (clubsHead)
+ *   topics    topicChoice(): the Topic filter's options and the picked topic (its interests become the chips)
  */
-export function ClubsView({ state, page, heading }) {
+export function ClubsView({ state, page, heading, topics = null }) {
   const { filters } = state;
   const hrefFor = (patch) => {
     const search = filtersToSearch({ ...filters, ...patch }).toString();
     return search ? `/clubs?${search}` : "/clubs";
   };
   const active = activeClubFilters(filters);
+  const topic = topics?.current || null;
+  // A picked topic narrows the chips to its own interests (with the list's counts where it has them).
+  const pool = topic
+    ? topic.interests.map((i) => ({ id: i.id, name: i.name, clubs: page.interests.find((x) => String(x.id) === String(i.id))?.clubs ?? null }))
+    : page.interests;
   const interests =
-    filters.interest && !page.interests.some((i) => String(i.id) === filters.interest)
-      ? [...page.interests, { id: filters.interest, name: "Chosen interest", clubs: null }]
-      : page.interests;
+    filters.interest && !pool.some((i) => String(i.id) === filters.interest)
+      ? [...pool, { id: filters.interest, name: topics?.interestName || "Chosen interest", clubs: null }]
+      : pool;
 
   let results;
   if (!page.items.length) {
@@ -68,12 +74,12 @@ export function ClubsView({ state, page, heading }) {
           </div>
         </header>
 
-        <ClubFilters count={page.total} capped={page.capped} />
+        <ClubFilters count={page.total} capped={page.capped} topics={topics?.options.map((t) => [t.slug, t.name])} topic={topic?.slug || topics?.topicSlug || filters.topic} />
 
         {interests.length ? (
-          <div className="dc-chiprow" role="group" aria-label="Interests">
+          <div className="dc-chiprow" role="group" aria-label={topic ? `Interests in ${topic.name}` : "Interests"}>
             <FilterLink className={`dc-chipbtn${filters.interest ? "" : " is-on"}`} href={hrefFor({ interest: "" })} current={!filters.interest}>
-              All
+              {topic ? `All ${topic.name}` : "All"}
             </FilterLink>
             {interests.map((i) => {
               const on = filters.interest === String(i.id);

@@ -43,8 +43,32 @@ function CategoryChips({ categories, filters, hrefFor }) {
 }
 
 /**
+ * A picked topic's interests, as links (the topic page's chips, on the
+ * list): "All Design", then each interest, with how many are coming up.
+ */
+function InterestChips({ topic, interest, hrefFor }) {
+  if (!topic?.interests?.length) return null;
+  return (
+    <div className="dc-chiprow" role="group" aria-label={`Interests in ${topic.name}`}>
+      <FilterLink className={`dc-chipbtn${interest ? "" : " is-on"}`} href={hrefFor({ topic: topic.slug, interest: "" })} current={!interest}>
+        {`All ${topic.name}`}
+      </FilterLink>
+      {topic.interests.map((i) => {
+        const on = Boolean(interest) && String(interest.id) === String(i.id);
+        return (
+          <FilterLink key={i.id} className={`dc-chipbtn${on ? " is-on" : ""}`} href={hrefFor({ topic: topic.slug, interest: on ? "" : String(i.id) })} current={on}>
+            {i.name}
+            {i.upcoming_events !== null && i.upcoming_events !== undefined ? <small>{formatCount(i.upcoming_events)}</small> : null}
+          </FilterLink>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * Find events. Every filter lives in the address (q, when or from/to,
- * type, price, category, sort, radius_km, near), so a search can be shared
+ * type, price, category, topic, interest, sort, radius_km, near), so a search can be shared
  * or bookmarked and the back button undoes a filter; `view=calendar` shows
  * the month instead of the list (`month=YYYY-MM` picks which).
  *
@@ -55,8 +79,9 @@ function CategoryChips({ categories, filters, hrefFor }) {
  *   state     eventsPageState(params): {filters, near, calendar, month}
  *   page      the first page (parseEventsPage, images stable): {items, total, where, categories}
  *   heading   the <h1> (eventsHead)
+ *   topics    topicChoice(): the Topic filter's options, the picked topic and interest (none: no filter)
  */
-export function EventsView({ state, page, heading }) {
+export function EventsView({ state, page, heading, topics = null }) {
   const { filters, near, calendar, month } = state;
   const keep = calendar ? { view: "calendar", month } : null;
   const hrefFor = (patch) => {
@@ -114,9 +139,18 @@ export function EventsView({ state, page, heading }) {
           </div>
         </header>
 
-        <EventFilters count={calendar ? null : page.total} capped={page.capped} dates={dates} calendar={calendar} />
+        <EventFilters
+          count={calendar ? null : page.total}
+          capped={page.capped}
+          dates={dates}
+          calendar={calendar}
+          topics={topics?.options.map((t) => [t.slug, t.name])}
+          topic={topics?.current?.slug || topics?.topicSlug || filters.topic}
+        />
 
         <CategoryChips categories={categories} filters={filters} hrefFor={hrefFor} />
+
+        <InterestChips topic={topics?.current} interest={topics?.interest} hrefFor={hrefFor} />
 
         <div className="dc-resultline">
           <div className="dc-resultline-main">

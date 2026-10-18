@@ -43,7 +43,8 @@ afterEach(() => {
 });
 
 const sp = (qs) => Promise.resolve(Object.fromEntries(new URLSearchParams(qs)));
-const queryOf = (i = -1) => Object.fromEntries(new URL(fetch.calls.at(i).url).searchParams);
+/** The query of a read of the lists (the topics read alongside some pages left out). */
+const queryOf = (i = -1) => Object.fromEntries(new URL(fetch.calls.filter((c) => new URL(c.url).pathname.startsWith("/api/v1/discover/")).at(i).url).searchParams);
 const eventsRoute = () => import("../events/page.jsx");
 const clubsRoute = () => import("../clubs/page.jsx");
 

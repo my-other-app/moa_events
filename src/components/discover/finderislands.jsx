@@ -43,6 +43,15 @@ import Icon from "./icons";
 
 const RADIUS_SELECT = [["", "Any distance"], ...RADIUS_OPTIONS.map((r) => [String(r), `Within ${r} km`])];
 
+/**
+ * The Topic select, when the page knows topics (`topics`: [[slug, name]]):
+ * picking one starts over on its interests.
+ */
+function TopicSelect({ topics, value, update }) {
+  if (!topics?.length) return null;
+  return <FilterSelect label="Topic" value={value || ""} options={[["", "Any topic"], ...topics]} onChange={(v) => update({ topic: v, interest: "" })} />;
+}
+
 const FinderContext = createContext(null);
 const useFinder = () => useContext(FinderContext);
 
@@ -155,14 +164,16 @@ export function SheetButton({ children }) {
  * The events' filter bar (when, type, price, distance; "Clear filters"),
  * the same controls in a sheet on a phone, and the date picker. `count` is
  * the list's size, for the sheet's button (`capped`: 1,000+); `dates` the
- * picked days in words; `calendar` hides "when" (the month picks it).
+ * picked days in words; `calendar` hides "when" (the month picks it);
+ * `topics` the Topic select's options ([[slug, name]]; none: no select)
+ * and `topic` the picked one's slug.
  */
-export function EventFilters({ count = null, capped = false, dates = "", calendar = false }) {
+export function EventFilters({ count = null, capped = false, dates = "", calendar = false, topics = [], topic = "" }) {
   const { filters, update, sheet, setSheet, picker, setPicker } = useFinder();
   const knowsWhere = Boolean(filters.near);
   const where = nearPoint(filters.near) || ANYWHERE;
   const active = activeEventFilters(filters, calendar);
-  const clearAll = () => update({ when: "", from: "", to: "", type: "", price: "", category: "", radius_km: null });
+  const clearAll = () => update({ when: "", from: "", to: "", type: "", price: "", category: "", topic: "", interest: "", radius_km: null });
   const applyDates = (from, to) => {
     setPicker(null);
     update({ when: "", from, to });
@@ -199,6 +210,7 @@ export function EventFilters({ count = null, capped = false, dates = "", calenda
   const controls = (inSheet) => (
     <>
       {calendar ? null : whenControl(inSheet)}
+      <TopicSelect topics={topics} value={topic} update={update} />
       <FilterSelect label="Type" value={filters.type} options={TYPE_OPTIONS} onChange={(v) => update({ type: v })} />
       <FilterSelect label="Price" value={filters.price} options={PRICE_OPTIONS} onChange={(v) => update({ price: v })} />
       {knowsWhere ? (
@@ -237,16 +249,17 @@ export function EventFilters({ count = null, capped = false, dates = "", calenda
   );
 }
 
-/** The clubs' filter bar (order and distance) and its sheet. */
-export function ClubFilters({ count = null, capped = false }) {
+/** The clubs' filter bar (order, topic and distance) and its sheet; `topics` and `topic` as for EventFilters. */
+export function ClubFilters({ count = null, capped = false, topics = [], topic = "" }) {
   const { filters, update, sheet, setSheet } = useFinder();
   const knowsWhere = Boolean(filters.near);
   const active = activeClubFilters(filters);
-  const clearAll = () => update({ interest: "", radius_km: null });
+  const clearAll = () => update({ topic: "", interest: "", radius_km: null });
   const sorts = knowsWhere ? CLUB_SORT_OPTIONS : CLUB_SORT_OPTIONS.map(([v, l]) => (v === "nearby" ? [v, "Nearby · set your location first", true] : [v, l]));
   const controls = (
     <>
       <FilterSelect label="Sort by" value={filters.sort || "popular"} defaultValue="popular" options={sorts} onChange={(v) => update({ sort: v === "popular" ? "" : v })} />
+      <TopicSelect topics={topics} value={topic} update={update} />
       {knowsWhere ? (
         <FilterSelect
           label="Distance"

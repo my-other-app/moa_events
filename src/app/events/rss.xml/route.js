@@ -1,5 +1,5 @@
 import { SITE_URL } from "@/config";
-import { ANYWHERE, filtersToSearch, readEventFilters } from "@/api/parse";
+import { ANYWHERE, filtersToSearch, findTopic, readEventFilters } from "@/api/parse";
 import { FEED_CACHE, FEED_LIMIT, FEED_TYPE, feedCity, feedTitle, feedWhere, rssFeed } from "@/seo/rss";
 import { ApiError } from "@/server/api";
 import { getEvents, getNewestEvents } from "@/server/discover";
@@ -11,6 +11,7 @@ import { feedItems } from "@/server/feeds";
  * filters, so a feed can be subscribed to for one kind of event:
  *
  *   ?category=3  ?type=online|in_person  ?price=free|paid  ?q=words
+ *   ?topic=design  ?interest=12                       (by topic; /topics/{slug}/rss.xml too)
  *   ?when=this_week …  ?from=YYYY-MM-DD&to=…
  *   ?lat=..&lng=..[&radius_km=25] or ?near=lat,lng   (near a place)
  *   ?city=Kochi                                       (matched on the venue)
@@ -45,9 +46,10 @@ export async function GET(request) {
     // Both words and a city: the words go to the API, the city is matched on the venue here.
     if (city && filters.q) cards = cards.filter((e) => (e.location_name || "").toLowerCase().includes(city.toLowerCase()));
     const categoryName = filters.category ? first.categories.find((c) => String(c.id) === String(filters.category))?.name || null : null;
+    const topicName = filters.topic ? findTopic(first.topics, filters.topic)?.name || null : null;
     const items = await feedItems(cards, { limit: FEED_LIMIT });
     const search = filtersToSearch(filters).toString();
-    const title = feedTitle({ filters, city, categoryName, near: Boolean(where) });
+    const title = feedTitle({ filters, city, categoryName, topicName, near: Boolean(where) });
     const xml = rssFeed({
       title,
       description: `${title}: hackathons, workshops, meetups and more, from the clubs that run them.`,

@@ -173,9 +173,9 @@ export const feedCity = (params) => {
   return c && /^[\p{L}\p{N} .'-]+$/u.test(c) ? c : "";
 };
 
-/** A feed's title, from its filters: "Online events on MyOtherApp", "Free events in Kochi on MyOtherApp". */
-export function feedTitle({ filters = {}, city = "", categoryName = null, near = false } = {}) {
-  const kind = [filters.price === "free" ? "Free" : filters.price === "paid" ? "Paid" : null, filters.type === "online" ? "online" : filters.type === "in_person" ? "in-person" : null, categoryName]
+/** A feed's title, from its filters: "Online events on MyOtherApp", "Free Design events in Kochi on MyOtherApp". `topicName`: the topic's (or interest's) name. */
+export function feedTitle({ filters = {}, city = "", categoryName = null, topicName = null, near = false } = {}) {
+  const kind = [filters.price === "free" ? "Free" : filters.price === "paid" ? "Paid" : null, filters.type === "online" ? "online" : filters.type === "in_person" ? "in-person" : null, topicName, categoryName]
     .filter(Boolean)
     .join(" ");
   const what = kind ? `${kind[0].toUpperCase()}${kind.slice(1)} events` : "Upcoming events";
