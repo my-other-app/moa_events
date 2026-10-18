@@ -1,3 +1,10 @@
+"use client";
+
+/*
+ * The event page's own icons and the club's typed text. Client components
+ * for the same reason as icons.jsx: the page sends their names and text,
+ * not their drawing twice.
+ */
 import { linkify } from "@/utils/linkify";
 import Icon from "./icons";
 

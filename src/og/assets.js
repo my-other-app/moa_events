@@ -22,9 +22,10 @@ export function ogFonts() {
         { name: "Bebas Neue", data: bebas, weight: 400, style: "normal" },
         { name: "DM Sans", data: dm, weight: 400, style: "normal" },
         { name: "DM Sans", data: dmBold, weight: 700, style: "normal" },
-        // Latin Extended has the ₹; the renderer falls back to it for what Latin lacks.
-        { name: "DM Sans", data: dmExt, weight: 400, style: "normal" },
-        { name: "DM Sans", data: dmExtBold, weight: 700, style: "normal" },
+        // Latin Extended has the ₹. Under its own name: the renderer falls back
+        // to another font for a glyph its font lacks, never to a same-named one.
+        { name: "DM Sans Ext", data: dmExt, weight: 400, style: "normal" },
+        { name: "DM Sans Ext", data: dmExtBold, weight: 700, style: "normal" },
       ])
       .catch((e) => {
         fonts = null;

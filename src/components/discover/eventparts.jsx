@@ -3,6 +3,7 @@ import { formatCount, formatPrice, imageUrl, statusPill } from "@/utils/format";
 import { safeHref } from "@/utils/linkify";
 import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { Img } from "./img";
+import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
 import Icon from "./icons";
 import { EpIcon } from "./eventbits";
@@ -60,7 +61,7 @@ export function EpSection({ id, title, children, className = "", aside = null })
  * shows, so the event looks the same on the card and on its page.
  */
 export function Cover({ event }) {
-  return <EventCover event={event} />;
+  return <EventCover event={coverFields(event)} />;
 }
 
 /**

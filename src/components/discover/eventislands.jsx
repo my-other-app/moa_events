@@ -114,12 +114,17 @@ export function CalendarButton({ event, url, links = null }) {
         Add to calendar
       </button>
       <div id={menuId} className="ep-cal-menu" hidden={!open}>
-        <a href={cal.google} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
-          Google Calendar
-        </a>
-        <a href={cal.ics} download={cal.filename} onClick={() => setOpen(false)}>
-          Apple, Outlook and others (.ics)
-        </a>
+        {/* Made when opened: the .ics travels as a long data: link, worth sending only to someone who asks. */}
+        {open ? (
+          <>
+            <a href={cal.google} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
+              Google Calendar
+            </a>
+            <a href={cal.ics} download={cal.filename} onClick={() => setOpen(false)}>
+              Apple, Outlook and others (.ics)
+            </a>
+          </>
+        ) : null}
       </div>
     </div>
   );

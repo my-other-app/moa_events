@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useNavigate, usePathname } from "@/lib/router";
 import { assetSrc } from "@/utils/asset";
 import { HeaderAccount } from "../auth/account";
-import { AppPrompt } from "./dialog";
 import Icon from "./icons";
 import wordmark from "@/assets/wordmark-sm.png";
+
+// "Get the app" opens a dialog: its code comes the first time it is opened.
+const AppPrompt = lazy(() => import("./dialog").then((m) => ({ default: m.AppPrompt })));
 
 /**
  * The bar on top of every public page: the wordmark home, the three ways
@@ -77,7 +79,11 @@ export function SiteHeader() {
           Get the app
         </button>
       </div>
-      <AppPrompt open={appOpen} onClose={() => setAppOpen(false)} />
+      {appOpen ? (
+        <Suspense fallback={null}>
+          <AppPrompt open onClose={() => setAppOpen(false)} />
+        </Suspense>
+      ) : null}
     </header>
   );
 }

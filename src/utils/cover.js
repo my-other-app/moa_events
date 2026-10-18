@@ -6,6 +6,14 @@
  */
 import { TZ } from "./format";
 
+/** Just what a drawn cover is made from: the id, the category, the date and whether it is online. */
+export const coverFields = (event) => ({
+  id: event?.id ?? null,
+  category: event?.category ? { id: event.category.id, name: event.category.name || "" } : null,
+  starts_at: event?.starts_at || null,
+  is_online: Boolean(event?.is_online),
+});
+
 /** A stable number for anything: a numeric id is its own seed, text is hashed. */
 export function seedOf(value) {
   if (typeof value === "number" && Number.isFinite(value)) return Math.abs(Math.floor(value));

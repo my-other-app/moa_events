@@ -29,14 +29,15 @@ import "@/styles/pricing.css";
 
 /*
  * The site's type, self-hosted by next/font with size-adjusted fallbacks so
- * nothing moves when it arrives. Latin Extended too: it has the ₹. The
- * stylesheets name them through these variables (--dc-font, --dc-display
- * and friends).
+ * nothing moves when it arrives. Only Latin is preloaded; the other subsets
+ * (Latin Extended has the ₹) are declared and load when a page uses them.
+ * No italics: the site sets none (every <em> is upright). The stylesheets
+ * name them through these variables (--dc-font, --dc-display and friends).
  */
-const dmSans = DM_Sans({ subsets: ["latin", "latin-ext"], style: ["normal", "italic"], axes: ["opsz"], display: "swap", variable: "--font-dm-sans" });
-const bebasNeue = Bebas_Neue({ subsets: ["latin", "latin-ext"], weight: "400", display: "swap", variable: "--font-bebas-neue" });
+const dmSans = DM_Sans({ subsets: ["latin"], style: ["normal"], axes: ["opsz"], display: "swap", variable: "--font-dm-sans" });
+const bebasNeue = Bebas_Neue({ subsets: ["latin"], weight: "400", display: "swap", variable: "--font-bebas-neue" });
 // Only the live room and play use Inter: not preloaded on every page.
-const inter = Inter({ subsets: ["latin"], style: ["normal", "italic"], axes: ["opsz"], display: "swap", variable: "--font-inter", preload: false });
+const inter = Inter({ subsets: ["latin"], axes: ["opsz"], display: "swap", variable: "--font-inter", preload: false });
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),

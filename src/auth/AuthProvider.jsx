@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accountApi } from "@/api/account";
-import SignInSheet from "@/components/auth/signinsheet";
 import { AuthContext, describeSignInError, userFromSession } from "./context";
 import { cleanEmail, markPasswordResetMissing } from "./email";
 import { cancelOneTap, credentialClaims, forgetGoogleChoice, googleEnabled, promptOneTap, setCredentialHandler } from "./google";
 import { jwtClaims } from "./jwt";
 import { clearSession, forgetGuestTokens, getSession, setSession, subscribe, updateSession } from "./session";
+
+// The sheet and its forms load the first time someone opens it, not with every page.
+const SignInSheet = lazy(() => import("@/components/auth/signinsheet"));
 
 const IDLE = { status: "idle", error: null };
 const noSession = () => null;
@@ -297,17 +299,19 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {enabled ? (
-        <SignInSheet
-          key={sheet.n}
-          open={sheet.open}
-          reason={sheet.reason}
-          start={sheet.view}
-          email={sheet.email}
-          attempt={attempt}
-          onClose={closeSignIn}
-          onFail={failSignIn}
-        />
+      {enabled && sheet.n > 0 ? (
+        <Suspense fallback={null}>
+          <SignInSheet
+            key={sheet.n}
+            open={sheet.open}
+            reason={sheet.reason}
+            start={sheet.view}
+            email={sheet.email}
+            attempt={attempt}
+            onClose={closeSignIn}
+            onFail={failSignIn}
+          />
+        </Suspense>
       ) : null}
     </AuthContext.Provider>
   );

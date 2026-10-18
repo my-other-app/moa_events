@@ -1,3 +1,10 @@
+"use client";
+
+/*
+ * A client component on purpose: a server-rendered page that shows forty
+ * icons sends each as its name instead of its whole drawing twice (as HTML
+ * and again as the page's data). The drawings come once, in this module.
+ */
 /** Line icons (Feather-style), always decorative: the text next to them says the thing. */
 const PATHS = {
   rss: (

@@ -1,6 +1,6 @@
 import { Link } from "@/lib/router";
 import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, statusPill } from "@/utils/format";
-import { eventHref, seatsInfo } from "@/utils/cover";
+import { coverFields, eventHref, seatsInfo } from "@/utils/cover";
 import { Avatar, Img } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import Icon from "./icons";
@@ -77,7 +77,7 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
         <Img
           src={imageUrl(event.poster, "medium")}
           alt={`Poster for ${event.name}`}
-          fallback={<EventCover event={event} />}
+          fallback={<EventCover event={coverFields(event)} />}
           extra={row ? null : <DateBadge iso={event.starts_at} />}
         />
         {row ? null : <Pills event={event} />}

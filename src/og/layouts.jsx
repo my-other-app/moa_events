@@ -6,7 +6,7 @@
  * Pure: every picture is a function of plain data, with remote images
  * already fetched as data: URLs (./assets.js).
  */
-import { Motif, tidySvg } from "@/components/discover/cover";
+import { Motif, tidySvg } from "@/components/discover/coverart";
 import { coverLook, dateParts, initials } from "@/utils/cover";
 
 export const INK = "#111827";

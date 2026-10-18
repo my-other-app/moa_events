@@ -1,6 +1,5 @@
 import { Link } from "@/lib/router";
-import { calendarLinks } from "@/utils/calendar";
-import { dateTile, eventUrl, scheduleLines, seatsLeft } from "@/utils/eventpage";
+import { dateTile, eventUrl, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { formatCount, formatPrice, plural } from "@/utils/format";
 import { Agenda } from "./agenda";
 import { Avatar, Section } from "./bits";
@@ -25,6 +24,19 @@ import {
 import Icon from "./icons";
 
 const rupees = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+
+/** What "Add to calendar" needs, and no more (the button works its links out in the browser). */
+const calendarEvent = (e) => ({
+  id: e.id,
+  slug: e.slug,
+  name: e.name,
+  starts_at: e.starts_at,
+  ends_at: e.ends_at,
+  duration_hours: e.duration_hours,
+  is_online: e.is_online,
+  location_name: e.location_name,
+  about: summary(e.about, 600),
+});
 
 function ClubRow({ club }) {
   const inner = (
@@ -153,7 +165,7 @@ export function EventView({ page }) {
           <Facts event={event} venueLink={hasVenue && !event.is_online} />
           <div className="ep-actions">
             <ShareButton title={event.name} text={club ? `${event.name} — ${club.name}` : event.name} url={url} />
-            <CalendarButton links={calendarLinks(event, url)} />
+            <CalendarButton event={calendarEvent(event)} url={url} />
           </div>
         </header>
 

@@ -61,7 +61,8 @@ describe("the store badges", () => {
       </MemoryRouter>
     );
     fireEvent.click(screen.getByRole("button", { name: "Get the app" }));
-    const prompt = screen.getByRole("dialog", { name: "Get MyOtherApp" });
+    // The prompt's code loads the first time it is opened.
+    const prompt = await screen.findByRole("dialog", { name: "Get MyOtherApp" });
     expect(within(prompt).getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
     expect(within(prompt).getByRole("link", { name: "Download on the App Store" })).toHaveAttribute("href", "https://apps.apple.com/app/id1");
     fireEvent.keyDown(document, { key: "Escape" });
