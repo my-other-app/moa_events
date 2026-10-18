@@ -7,13 +7,16 @@ import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
 import Icon from "./icons";
 import { EpIcon } from "./eventbits";
+import { RegisterGo } from "../register/registercta";
 
 /*
  * The event page's parts. What is defined here has no state and renders on
  * the server (the page sends it as HTML, with no script). The parts that
  * react to the reader — the poster's fallback, Share, Add to calendar, the
  * section tabs, the live strip, "Read more" — are the client islands in
- * eventislands.jsx, re-exported here so callers import from one place.
+ * eventislands.jsx, re-exported here so callers import from one place; the
+ * register button (Finish payment, or the ticket, for someone signed in) is
+ * the registration flow's own, in register/registercta.jsx.
  */
 export { About, CalendarButton, LiveStrips, SectionNav, ShareButton } from "./eventislands";
 export { EpIcon, RichText } from "./eventbits";
@@ -111,20 +114,11 @@ export function RegisterCard({ event }) {
           {state.note ? <p className={`ep-cta-note${state.tone === "warn" ? " is-warn" : ""}`}>{state.note}</p> : null}
         </div>
         <div className="ep-cta-go">
-          {state.href ? (
-            <Link className="dc-btn ep-cta-btn" to={state.href}>
-              {state.label}
-            </Link>
-          ) : (
-            <button type="button" className="dc-btn ep-cta-btn" disabled>
-              {state.label}
-            </button>
-          )}
-          {state.also ? (
-            <Link className="ep-cta-also" to={state.also.href}>
-              {state.also.label}
-            </Link>
-          ) : null}
+          {/* The button, the same for everyone in the HTML; signed in, it becomes Finish payment or the ticket (a client island). */}
+          <RegisterGo
+            eventId={String(event.id)}
+            state={{ kind: state.kind, label: state.label, href: state.href || null, also: state.also ? { label: state.also.label, href: state.also.href } : null }}
+          />
         </div>
       </div>
       {showMeter ? (

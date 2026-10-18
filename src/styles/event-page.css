@@ -1298,3 +1298,12 @@ a.ep-club:hover .ep-club-go {
     animation: none;
   }
 }
+
+/* Signed in: what the register button now does for you. */
+.ep-cta-mine {
+  align-self: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+  text-align: center;
+}
