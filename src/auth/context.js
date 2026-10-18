@@ -98,6 +98,12 @@ export const SIGN_IN_REFUSALS = {
   },
   // A password account with two-step verification on: the form asks for the code.
   TOTP_REQUIRED: { kind: "totp", message: "This account has two-step verification on. Enter the 6-digit code from your authenticator app, or a recovery code." },
+  // A club's account (403): clubs sign in on their dashboard, never here as an attendee.
+  CLUB_NOT_VERIFIED: {
+    kind: "refused",
+    message: "This email signs in to a club's dashboard, not to a MyOtherApp account. Use the clubs dashboard for it, or sign in here with your own account.",
+    club: true,
+  },
 };
 
 /** What went wrong signing in, said plainly: {kind, message}. */

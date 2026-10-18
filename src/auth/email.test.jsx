@@ -227,6 +227,35 @@ describe("signing in with email", () => {
     await waitFor(() => expect(calls("/api/v1/auth/sessions/sess-club")).toHaveLength(1));
     expect(calls("/api/v1/auth/sessions/sess-club")[0].auth).toBe(`Bearer ${access}`);
   });
+
+  it("says a club's account can't sign in here when the API refuses it at the door (403 CLUB_NOT_VERIFIED)", async () => {
+    on("post", "/api/v1/auth/token", refused(403, "Your club is waiting for approval. We will email you when it is approved.", "CLUB_NOT_VERIFIED"));
+    show();
+    const sheet = await openEmail();
+    type(sheet, "Email", "club@example.org");
+    type(sheet, "Password", "club-pass");
+    fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
+    const alert = await within(sheet).findByRole("alert");
+    expect(alert).toHaveTextContent("This email signs in to a club's dashboard, not to a MyOtherApp account.");
+    expect(within(alert).getByRole("link", { name: "Open the clubs dashboard" })).toBeInTheDocument();
+    expect(status()).toBe("signed-out");
+  });
+
+  it("says the same when the profile is refused with CLUB_NOT_VERIFIED, and ends the session it was handed", async () => {
+    const access = accessToken({ sid: "sess-club2" });
+    on("post", "/api/v1/auth/token", (c) => reply(c, 200, { access_token: access, refresh_token: "refresh-club", token_type: "Bearer" }));
+    on("get", "/api/v1/user/profile/me", refused(403, "Club is not verified", "CLUB_NOT_VERIFIED"));
+    on("delete", "/api/v1/auth/sessions/sess-club2", (c) => reply(c, 200, { message: "Session signed out" }));
+    show();
+    const sheet = await openEmail();
+    type(sheet, "Email", "club@example.org");
+    type(sheet, "Password", "club-pass");
+    fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent("This email signs in to a club's dashboard, not to a MyOtherApp account.");
+    expect(status()).toBe("signed-out");
+    expect(localStorage.getItem("moa.session")).toBeNull();
+    await waitFor(() => expect(calls("/api/v1/auth/sessions/sess-club2")).toHaveLength(1));
+  });
 });
 
 describe("an account with a second factor", () => {
@@ -506,7 +535,7 @@ describe("one session, whichever way in", () => {
     on("post", "/api/v1/auth/token", (c) => reply(c, 200, { access_token: soon, refresh_token: "refresh-mail", token_type: "Bearer" }));
     on("post", "/api/v1/auth/refresh", (c) => {
       expect(form(c)).toEqual({ token: "refresh-mail" });
-      return reply(c, 200, { access_token: fresh, refresh_token: "refresh-mail", token_type: "Bearer" });
+      return reply(c, 200, { access_token: fresh, refresh_token: "refresh-mail-2", token_type: "Bearer" });
     });
     on("get", "/api/v1/user/following", (c) => reply(c, 200, { items: [], next: null }));
     on("delete", "/api/v1/auth/sessions/sess-mail", (c) => reply(c, 200, { message: "Session signed out" }));
@@ -528,6 +557,9 @@ describe("one session, whichever way in", () => {
     expect(calls("/api/v1/auth/refresh")).toHaveLength(1);
     expect(calls("/api/v1/user/following")[0].auth).toBe(`Bearer ${fresh}`);
     expect(getSession().access_token).toBe(fresh);
+    // The refresh token rotated: the new one is kept, here and in storage.
+    expect(getSession().refresh_token).toBe("refresh-mail-2");
+    expect(JSON.parse(localStorage.getItem("moa.session")).refresh_token).toBe("refresh-mail-2");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign me out" }));
     expect(status()).toBe("signed-out");

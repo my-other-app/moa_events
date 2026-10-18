@@ -160,7 +160,7 @@ export function describeAuthError(error, flow) {
     // The rate limiter's own refusal ({error: "Rate limit exceeded: …"}) says nothing a person needs.
     return { kind: "busy", message: BUSY };
   }
-  if (code === "ACCOUNT_SUSPENDED") return refusedHere(said, code);
+  if (code === "ACCOUNT_SUSPENDED" || code === "CLUB_NOT_VERIFIED") return refusedHere(said, code);
   if (code === "TOTP_REQUIRED") return { ...SIGN_IN_REFUSALS.TOTP_REQUIRED };
   if (code === "TOTP_INVALID") return { kind: "fields", fields: { totp: said || "That code is not valid." }, message: said };
   if (code === "CODE_INVALID" || code === "CODE_LOCKED" || code === "CODE_EXPIRED") {
@@ -180,16 +180,13 @@ export function describeAuthError(error, flow) {
 
 /**
  * The password was right but the account isn't one this site signs in: the
- * profile is refused (403) for a club's dashboard login, and for a suspended
- * account (ACCOUNT_SUSPENDED; an older server only said so in words).
+ * profile is refused (403) for a club's dashboard login (CLUB_NOT_VERIFIED,
+ * or an older server's plain 403), and for a suspended account
+ * (ACCOUNT_SUSPENDED; an older server only said so in words).
  */
 export function refusedHere(said, code = null) {
-  if (code === "ACCOUNT_SUSPENDED" || /suspend/i.test(String(said || ""))) return { ...SIGN_IN_REFUSALS.ACCOUNT_SUSPENDED };
-  return {
-    kind: "refused",
-    message: "This email signs in to a club's dashboard, not to a MyOtherApp account. Use the clubs dashboard for it, or sign in here with your own account.",
-    club: true,
-  };
+  if (code === "ACCOUNT_SUSPENDED" || (code !== "CLUB_NOT_VERIFIED" && /suspend/i.test(String(said || "")))) return { ...SIGN_IN_REFUSALS.ACCOUNT_SUSPENDED };
+  return { ...SIGN_IN_REFUSALS.CLUB_NOT_VERIFIED };
 }
 
 /** What a resend countdown starts from: the server's `retry_after` when it gave one. */
