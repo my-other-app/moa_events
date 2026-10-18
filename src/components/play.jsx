@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { errorLine, liveApi } from "@/api/live";
+import { subscribe } from "@/api/liveStream";
 import { currentPlayer, forgetPlayer } from "@/utils/live";
 
 const MARK = ["▲", "◆", "●", "■", "★", "✚"];
@@ -13,6 +14,8 @@ const MARK = ["▲", "◆", "●", "■", "★", "✚"];
  * clock, the right answer once the clock is out, the board at the end. Its
  * server half (src/app/play/[eventId]/page.jsx) hands over the event's id;
  * who is playing is in this browser's storage, read once the page is up.
+ * The player's state is pushed (src/api/liveStream.js), or asked for every
+ * 2 seconds where it cannot be.
  */
 const Play = ({ eventId }) => {
   const [player, setPlayer] = useState(null);
@@ -22,36 +25,36 @@ const Play = ({ eventId }) => {
   const [flash, setFlash] = useState(null);
   const [error, setError] = useState(null);
   const [gone, setGone] = useState(false);
-  const timer = useRef(null);
 
   useEffect(() => {
     setPlayer(currentPlayer(eventId));
     setLooked(true);
   }, [eventId]);
 
-  const load = useCallback(async () => {
-    if (!player) return;
-    try {
-      const s = await liveApi.playState(eventId, player.player_key);
-      setState(s);
-      setLeft(s.question ? s.question.time_left : 0);
-      setError(null);
-    } catch (e) {
-      if (e?.response?.status === 401 || e?.response?.status === 404) {
-        forgetPlayer(eventId);
-        setPlayer(null);
-        setGone(true);
-      } else setError(errorLine(e, "Lost the room for a moment…"));
-    }
-  }, [eventId, player]);
-
+  const playerKey = player?.player_key;
   useEffect(() => {
-    load();
-    timer.current = setInterval(load, 2000);
-    return () => clearInterval(timer.current);
-  }, [load]);
+    if (!playerKey) return undefined;
+    return subscribe(
+      "quiz",
+      { eventId, player: playerKey },
+      {
+        snapshot: (s) => {
+          setState(s);
+          setLeft(s.question ? s.question.time_left : 0);
+          setError(null);
+        },
+        error: (e) => {
+          if (e?.response?.status === 401 || e?.response?.status === 404) {
+            forgetPlayer(eventId);
+            setPlayer(null);
+            setGone(true);
+          } else setError(errorLine(e, "Lost the room for a moment…"));
+        },
+      }
+    );
+  }, [eventId, playerKey]);
 
-  // The clock runs locally between refreshes so it does not jump by twos.
+  // The clock runs locally between snapshots, from the time_left each one brings.
   useEffect(() => {
     if (!state?.question || left <= 0) return undefined;
     const t = setTimeout(() => setLeft((n) => Math.max(0, n - 1)), 1000);

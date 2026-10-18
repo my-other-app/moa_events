@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { errorLine, liveApi } from "@/api/live";
+import { subscribe } from "@/api/liveStream";
 import { currentPlayer, rememberPlayer } from "@/utils/live";
 
 const KIND = { schedule: "Schedule change", room: "Room change", general: "Update" };
@@ -242,14 +243,15 @@ const Questions = ({ eventId, feed, onChange }) => {
  * The room on a phone: the banner, the poll that is up, the quiz if it runs,
  * the questions. Its server half (src/app/events/[slug]/live/page.jsx) finds
  * the event and hands over its id, slug and name, so the top of the room is
- * in the first paint; the feed is asked for every few seconds after.
+ * in the first paint; the feed is pushed after (src/api/liveStream.js), or
+ * asked for every 5 seconds where it cannot be.
  */
 const Live = ({ eventId, eventSlug = null, eventName = null }) => {
   const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
   const [feed, setFeed] = useState(null);
   const [error, setError] = useState(false);
-  const timer = useRef(null);
 
+  /** One read now: "Retry", and after a question is asked. */
   const load = useCallback(async () => {
     try {
       setFeed(await liveApi.fetchFeed(eventId));
@@ -259,11 +261,21 @@ const Live = ({ eventId, eventSlug = null, eventName = null }) => {
     }
   }, [eventId]);
 
-  useEffect(() => {
-    load();
-    timer.current = setInterval(load, 5000);
-    return () => clearInterval(timer.current);
-  }, [load]);
+  useEffect(
+    () =>
+      subscribe(
+        "room",
+        { eventId },
+        {
+          snapshot: (f) => {
+            setFeed(f);
+            setError(false);
+          },
+          error: () => setError(true),
+        }
+      ),
+    [eventId]
+  );
 
   const name = feed?.event?.name || eventName;
   const top = (
