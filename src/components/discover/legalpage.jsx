@@ -49,6 +49,8 @@ function Block({ block }) {
  * A legal text as a page to read: the title and when it last changed, a
  * list of its sections (beside it on a desk), then the text itself. All of
  * it rendered on the server, from @/content/legal (src/app/privacy, terms).
+ * /privacy#delete-account, the account-deletion address given to Google
+ * Play, is in the HTML, so the browser opens on that section by itself.
  */
 export function LegalPage({ doc }) {
   const other = doc.key === "privacy" ? LEGAL.terms : LEGAL.privacy;

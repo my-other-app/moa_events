@@ -84,4 +84,48 @@ describe("the legal pages", () => {
     at("/privacy", <LegalPage doc={PRIVACY} />);
     expect(screen.getAllByRole("link", { name: "support@myotherapp.in" })[0]).toHaveAttribute("href", "mailto:support@myotherapp.in");
   });
+
+  it("names what the app collects, and keeps /privacy#delete-account, the page Google Play links to, on how to delete an account", () => {
+    at("/privacy", <LegalPage doc={PRIVACY} />);
+    const main = screen.getByRole("main");
+    const collect = within(main).getByRole("region", { name: "1. What We Collect" });
+    for (const t of ["push-notification token", "Firebase Crashlytics", "Firebase Analytics", "answers to the organiser's questions", "Reports and blocks:"])
+      expect(collect.textContent).toContain(t);
+    // The app's old claims are gone: it asks for no location, and has no Mixpanel.
+    expect(main.textContent).not.toMatch(/Mixpanel|college ID|because it's a mobile app/);
+    // The section is in the HTML under its id, so the browser opens the address on it by itself.
+    const section = within(main).getByRole("region", { name: "6. Deleting Your Account" });
+    expect(section).toHaveAttribute("id", "delete-account");
+    const steps = within(section).getByRole("heading", { level: 3, name: "In the app" }).nextElementSibling;
+    expect(steps.tagName).toBe("OL");
+    expect([...steps.children].map((li) => li.textContent)).toEqual([
+      "Open the Profile tab and tap Settings.",
+      "Scroll to the bottom and tap Delete Account.",
+      "Tap DELETE to confirm. You're signed out straight away.",
+    ]);
+    expect(within(section).getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
+    for (const h of ["By email", "What is deleted", "What is kept"]) expect(within(section).getByRole("heading", { level: 3, name: h })).toBeInTheDocument();
+    expect(section.textContent).toContain("Payment records:");
+  });
+
+  it("states the rules for posts, how to report and block, and the promise to act within 24 hours", () => {
+    at("/terms", <LegalPage doc={TERMS} />);
+    const main = screen.getByRole("main");
+    const text = main.textContent.replace(/\s+/g, " ");
+    // What the stores ask of an app with people's posts in it: rules, a way to report and block, and a promise to act.
+    const rules = within(main).getByRole("region", { name: "Acceptable Use" });
+    expect(rules).toHaveTextContent("zero tolerance for objectionable content and abusive users");
+    for (const t of ["Spam:", "Harassment:", "Hate:", "Sexual content:", "Violence:", "Misinformation:", "Illegal content:", "Impersonation:"])
+      expect(within(rules).getByText(t)).toBeInTheDocument();
+    const reporting = within(main).getByRole("region", { name: "Reporting and Blocking" });
+    expect(reporting).toHaveTextContent(
+      "We review reports and act within 24 hours, which may include removing content and suspending or terminating accounts."
+    );
+    expect(reporting).toHaveTextContent("Report comment");
+    expect(reporting).toHaveTextContent("Settings → Blocked Users");
+    expect(text).not.toMatch(/do not actively monitor/i);
+    // No fee the checkout doesn't charge.
+    expect(text).not.toMatch(/2% processing fee/);
+    expect(within(main).getAllByRole("link", { name: /delete your account/i })[0]).toHaveAttribute("href", "/privacy#delete-account");
+  });
 });
