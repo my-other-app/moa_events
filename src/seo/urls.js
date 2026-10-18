@@ -24,6 +24,8 @@ export const eventRefOf = (event) => (event?.slug ? String(event.slug) : event?.
 
 export const eventPagePath = (event, sub = "") => `/events/${enc(eventRefOf(event))}${sub ? `/${sub}` : ""}`;
 export const clubPagePath = (club) => `/clubs/${enc(club.slug)}`;
+/** A topic's page (`interest`: one of its interests, the same page filtered). */
+export const topicPagePath = (topic, interest = null) => `/topics/${enc(topic.slug)}${interest ? `?interest=${enc(interest)}` : ""}`;
 
 const sized = (path, size) => (size && size !== "original" ? `${path}?size=${size}` : path);
 
@@ -46,12 +48,14 @@ export const media = {
 export const ogImage = {
   event: (ref, v) => `/og/events/${enc(ref)}${v ? `?v=${enc(v)}` : ""}`,
   club: (slug, v) => `/og/clubs/${enc(slug)}${v ? `?v=${enc(v)}` : ""}`,
+  topic: (slug, v) => `/og/topics/${enc(slug)}${v ? `?v=${enc(v)}` : ""}`,
 };
 
 /** The RSS feeds. */
 export const feeds = {
   events: (query = "") => `/events/rss.xml${query ? (query.startsWith("?") ? query : `?${query}`) : ""}`,
   club: (slug) => `/clubs/${enc(slug)}/rss.xml`,
+  topic: (slug, interest = null) => `/topics/${enc(slug)}/rss.xml${interest ? `?interest=${enc(interest)}` : ""}`,
 };
 
 /** A short, stable fingerprint of some values (FNV-1a, base 36): for ?v= on pictures that change. */

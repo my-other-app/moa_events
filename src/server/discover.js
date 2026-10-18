@@ -48,6 +48,8 @@ export const TAGS = {
   lists: "lists",
   sitemap: "sitemap",
   plans: "plans",
+  /** The topics and their interests (GET /interests/topics, /interests/list). */
+  topics: "topics",
 };
 
 /** Pages revalidate every minute. */

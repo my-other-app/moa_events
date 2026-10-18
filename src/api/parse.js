@@ -66,6 +66,19 @@ const PRICES = allowed(PRICE_OPTIONS);
 const EVENT_SORTS = allowed(EVENT_SORT_OPTIONS);
 const CLUB_SORTS = allowed(CLUB_SORT_OPTIONS);
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
+const TOPIC = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/** ?topic=: a topic's slug (or id), lower case; "" for anything else. */
+export const topicParam = (v) => {
+  const s = String(v ?? "").trim().toLowerCase();
+  return TOPIC.test(s) ? s : "";
+};
+
+/** ?topic= and ?interest= for the API (both may go: the API lets the interest win when they disagree). */
+const topicQuery = (filters) => ({
+  topic: topicParam(filters.topic),
+  interest: filters.interest && ID.test(String(filters.interest)) ? String(filters.interest) : "",
+});
 
 const pick = (value, set) => (value && set.has(value) ? value : "");
 const text = (v) => (typeof v === "string" ? v.trim().slice(0, 120) : "");
@@ -116,6 +129,7 @@ export const readNear = (v) => nearParam(nearPoint(v));
 export function readEventFilters(params) {
   const get = (k) => params.get(k) || "";
   const category = get("category");
+  const interest = get("interest");
   const q = text(get("q"));
   const days = dayRange(get("from"), get("to"));
   const sort = pick(get("sort"), EVENT_SORTS);
@@ -127,6 +141,8 @@ export function readEventFilters(params) {
     type: pick(get("type"), TYPES),
     price: pick(get("price"), PRICES),
     category: ID.test(category) ? category : "",
+    topic: topicParam(get("topic")),
+    interest: ID.test(interest) ? interest : "",
     sort: sort === "relevance" && !q ? "" : sort,
     radius_km: radius(get("radius_km")),
     near: readNear(get("near")),
@@ -139,6 +155,7 @@ export function readClubFilters(params) {
   const interest = get("interest");
   return {
     q: text(get("q")),
+    topic: topicParam(get("topic")),
     interest: ID.test(interest) ? interest : "",
     sort: pick(get("sort"), CLUB_SORTS),
     radius_km: radius(get("radius_km")),
@@ -175,6 +192,7 @@ export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PA
     from: days?.from,
     to: days?.to,
     category: filters.category && ID.test(String(filters.category)) ? String(filters.category) : "",
+    ...topicQuery(filters),
     type: pick(filters.type, TYPES),
     price: pick(filters.price, PRICES),
     ...coords(where),
@@ -191,6 +209,7 @@ export function calendarQuery(filters = {}, where = null, month) {
     month: isMonth(month) ? month : "",
     q: text(filters.q),
     category: filters.category && ID.test(String(filters.category)) ? String(filters.category) : "",
+    ...topicQuery(filters),
     type: pick(filters.type, TYPES),
     price: pick(filters.price, PRICES),
     ...coords(where),
@@ -202,7 +221,7 @@ export function calendarQuery(filters = {}, where = null, month) {
 export function clubsQuery(filters = {}, where = null, { offset = 0, limit = PAGE_SIZE } = {}) {
   return compact({
     q: text(filters.q),
-    interest: filters.interest && ID.test(String(filters.interest)) ? String(filters.interest) : "",
+    ...topicQuery(filters),
     ...coords(where),
     radius_km: radiusFor(filters, where),
     sort: sortFor(pick(filters.sort, CLUB_SORTS), where, "nearby"),
@@ -248,6 +267,91 @@ export function parseClubRef(c) {
   return { id: idOf(o.id), name: name || "A club", slug: str(o.slug), logo: o.logo || null };
 }
 
+/* ---------- topics ---------- */
+
+/*
+ * Topics are the main categories (Development, Deep Tech, Arts, ...); each
+ * holds interests (Web Development, Robotics, ...), which is what people,
+ * clubs and events pick. An event's or a club's topics are worked out by
+ * the API from its interests. A topic without a slug has no page, so it is
+ * dropped: an older API (one category, "arts", and no slugs) has none.
+ */
+const SLUG = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/** A colour that is safe to put in a style: #rgb or #rrggbb; null for anything else. */
+export const topicColor = (v) => (typeof v === "string" && HEX.test(v.trim()) ? v.trim() : null);
+
+const slugOf = (v) => (typeof v === "string" && SLUG.test(v.trim()) ? v.trim() : null);
+
+/**
+ * An emoji to show beside the name: only a short run of pictographs (no
+ * letters, digits or markup), so a link, a picture's address or the
+ * placeholder "string" some rows were saved with never shows.
+ */
+const iconOf = (icon, type) => {
+  const s = str(icon)?.trim();
+  if (!s || (type && type !== "emoji")) return null;
+  return s.length <= 16 && /\p{Extended_Pictographic}/u.test(s) && !/[\p{L}\p{N}<>/:.\s]/u.test(s) ? s : null;
+};
+
+/** A topic as an event or a club carries it: {id, slug, name, color}. */
+export function parseTopicRef(t) {
+  const o = obj(t);
+  const slug = slugOf(o?.slug);
+  if (!o || !slug || !str(o.name)) return null;
+  return { id: idOf(o.id), slug, name: o.name.trim(), color: topicColor(o.color) };
+}
+
+/** One of a topic's interests. Counts are null when the API didn't count (/interests/list). */
+function parseTopicInterest(i) {
+  const o = obj(i);
+  if (!o || idOf(o.id) === null || !str(o.name)) return null;
+  return { id: o.id, slug: slugOf(o.slug), name: o.name.trim(), icon: iconOf(o.icon, o.icon_type), upcoming_events: o.upcoming_events === undefined ? null : Math.max(0, n(o.upcoming_events)) };
+}
+
+/**
+ * A topic, from GET /interests/topics (with live counts) or /interests/list
+ * (without: `upcoming_events` and `clubs` are null). Null without a slug.
+ */
+export function parseTopic(t) {
+  const o = obj(t);
+  const slug = slugOf(o?.slug);
+  if (!o || !slug || !str(o.name)) return null;
+  const count = (v) => (v === undefined || v === null ? null : Math.max(0, n(v)));
+  return {
+    id: idOf(o.id),
+    slug,
+    name: o.name.trim(),
+    icon: iconOf(o.icon, o.icon_type),
+    color: topicColor(o.color),
+    description: textOf(o.description),
+    upcoming_events: count(o.upcoming_events),
+    clubs: count(o.clubs),
+    interests: list(o.interests, parseTopicInterest),
+  };
+}
+
+/** Every topic that has a page (a slug), in the API's order; [] for an answer that isn't a list. */
+export function parseTopics(d) {
+  const rows = Array.isArray(d) ? d : Array.isArray(obj(d)?.items) ? d.items : [];
+  const seen = new Set();
+  return list(rows, parseTopic).filter((t) => (seen.has(t.slug) ? false : seen.add(t.slug)));
+}
+
+/** A topic in the events list's facets: {id, slug, name, color, upcoming}. */
+function parseTopicFacet(f) {
+  const ref = parseTopicRef(f);
+  return ref ? { ...ref, upcoming: Math.max(0, n(obj(f).upcoming)) } : null;
+}
+
+/** The topic a slug or an id names, among `topics`; null when none does. */
+export function findTopic(topics, ref) {
+  const key = String(ref ?? "").toLowerCase();
+  if (!key || !Array.isArray(topics)) return null;
+  return topics.find((t) => t.slug.toLowerCase() === key) || topics.find((t) => t.id !== null && String(t.id) === key) || null;
+}
+
 export function parseEvent(e) {
   const o = obj(e);
   if (!o || idOf(o.id) === null) return null;
@@ -278,6 +382,7 @@ export function parseEvent(e) {
     created_at: str(o.created_at),
     updated_at: str(o.updated_at),
     summary: typeof o.summary === "string" && o.summary.trim() ? o.summary.replace(/\r\n?/g, "\n").trim() : null,
+    topics: list(o.topics, parseTopicRef),
   };
 }
 
@@ -306,6 +411,7 @@ export function parseClub(c) {
     followers: Math.max(0, n(o.followers)),
     upcoming_events: Math.max(0, n(o.upcoming_events)),
     interests: Array.isArray(o.interests) ? o.interests.map((i) => (typeof i === "string" ? i : str(obj(i)?.name))).filter(Boolean) : [],
+    topics: list(o.topics, parseTopicRef),
     distance_km: nOrNull(o.distance_km),
     website_url: str(o.website_url),
     // Only on the club's own page:
@@ -404,7 +510,7 @@ export const isEmptyHome = (d) =>
 
 export function parseEventsPage(d) {
   const o = obj(d) || {};
-  return { ...page(o, list(o.items, parseEvent)), where: parseWhere(o.where), categories: list(o.categories, parseCategory) };
+  return { ...page(o, list(o.items, parseEvent)), where: parseWhere(o.where), categories: list(o.categories, parseCategory), topics: list(o.topics, parseTopicFacet) };
 }
 
 export function parseClubsPage(d) {
@@ -519,6 +625,7 @@ export function parseEventDetail(e) {
     registration_open: Boolean(o.registration_open),
     category: category && idOf(category.id) !== null && str(category.name) ? { id: category.id, name: str(category.name) } : null,
     interests: Array.isArray(o.interests) ? o.interests.map((i) => (typeof i === "string" ? str(i) : str(obj(i)?.name))).filter(Boolean) : [],
+    topics: list(o.topics, parseTopicRef),
     guidelines: textOf(o.guidelines),
     contact: { name: str(contact.name), email: str(contact.email), phone: str(contact.phone) },
     url: str(o.url),
