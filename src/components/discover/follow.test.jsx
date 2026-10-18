@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 const get = vi.fn();
 const post = vi.fn();
@@ -8,7 +8,8 @@ vi.mock("@/api/client", () => ({ default: { get, post, delete: vi.fn(() => Promi
 vi.mock("@/utils/visit", () => ({ countVisit: vi.fn() }));
 
 const { AuthProvider } = await import("@/auth/AuthProvider");
-const ClubPage = (await import("./clubpage.jsx")).default;
+const { ClubView } = await import("./clubpage.jsx");
+const { parseClubPage } = await import("@/api/discover");
 const { PROFILE, accessToken, enableSignIn, resetAuth, signInAs, stubGoogle } = await import("@/test/auth");
 
 const page = {
@@ -40,13 +41,12 @@ function answer() {
   });
 }
 
-const show = () =>
+/* The club page as the server renders it (with the API's answer `data`), under the site's sign-in. */
+const show = (data = page) =>
   render(
     <MemoryRouter initialEntries={["/clubs/circuit-society"]}>
       <AuthProvider>
-        <Routes>
-          <Route path="/clubs/:slug" element={<ClubPage />} />
-        </Routes>
+        <ClubView data={parseClubPage(data)} />
       </AuthProvider>
     </MemoryRouter>,
   );
@@ -152,12 +152,11 @@ describe("an empty club page, signed in", () => {
     enableSignIn();
     signInAs();
     get.mockImplementation(async (url) => {
-      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, upcoming: [] } };
       if (url === "/api/v1/clubs/info/3") return { data: { user_data: { is_following: false } } };
       return { data: PROFILE };
     });
     post.mockResolvedValue({ data: { is_following: true } });
-    show();
+    show({ ...page, upcoming: [] });
     const empty = (await screen.findByRole("heading", { name: "Nothing scheduled yet" })).parentElement;
     expect(within(empty).getByText("Follow Circuit Society to hear the moment they announce their next event.")).toBeInTheDocument();
     fireEvent.click(within(empty).getByRole("button", { name: "Follow" }));

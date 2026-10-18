@@ -1,14 +1,15 @@
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 vi.mock("@/utils/visit", () => ({ countVisit: vi.fn() }));
 
 const { countVisit } = await import("@/utils/visit");
-const ClubPage = (await import("./clubpage.jsx")).default;
+const { parseClubPage } = await import("@/api/discover");
+const { ClubMissing, ClubView } = await import("./clubpage.jsx");
 
 const page = {
   club: {
@@ -35,14 +36,16 @@ const page = {
   partners: [{ name: "Acme Labs", role: "Venue partner", logo: null }],
 };
 
-const show = (path) =>
+/*
+ * The club page as the server renders it: src/app/clubs/[slug]/page.jsx
+ * fetches GET /discover/clubs/{slug} and renders <ClubView> (tested in
+ * src/app/_tests/club-route.test.js); the islands (follow, the visit, Show
+ * more) run here as in the browser. `data` is the API's answer.
+ */
+const show = (path, data) =>
   render(
     <StrictMode>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/clubs/:slug" element={<ClubPage />} />
-        </Routes>
-      </MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{data ? <ClubView data={parseClubPage(data)} /> : <ClubMissing />}</MemoryRouter>
     </StrictMode>
   );
 
@@ -53,11 +56,9 @@ beforeEach(() => {
 
 describe("a club's page", () => {
   it("counts one visit with the link it came by, and shows every section", async () => {
-    get.mockResolvedValue({ data: page });
-    show("/clubs/circuit-society?ref=x7k2m9pq&follow=1");
+    show("/clubs/circuit-society?ref=x7k2m9pq&follow=1", page);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Circuit Society" }, { timeout: 5000 })).toBeInTheDocument();
-    expect(get).toHaveBeenCalledWith("/api/v1/discover/clubs/circuit-society", { params: undefined, skipAuth: true });
     expect(countVisit).toHaveBeenCalledTimes(1);
     const [slug, params] = countVisit.mock.calls[0];
     expect(slug).toBe("circuit-society");
@@ -82,8 +83,8 @@ describe("a club's page", () => {
     expect(screen.getByRole("link", { name: /Instagram/ })).toHaveAttribute("href", "https://instagram.com/circuit");
     // A link that is not http(s) is never offered.
     expect(screen.queryByRole("link", { name: /YouTube/ })).toBeNull();
-    // The title is set in an effect, which can land a beat after the page paints.
-    await waitFor(() => expect(document.title).toBe("Circuit Society · MyOtherApp"));
+    // Its upcoming events, by RSS.
+    expect(screen.getByRole("link", { name: /Follow Circuit Society.s events by RSS/ })).toHaveAttribute("href", "/clubs/circuit-society/rss.xml");
 
     fireEvent.click(screen.getByRole("button", { name: "Follow in the app" }));
     const dialog = screen.getByRole("dialog", { name: "Follow Circuit Society" });
@@ -93,8 +94,7 @@ describe("a club's page", () => {
   });
 
   it("shows the team with only the links that are safe to follow, and the partners as a logo wall", async () => {
-    get.mockResolvedValue({
-      data: {
+    show("/clubs/circuit-society", {
         ...page,
         team: [
           {
@@ -110,9 +110,7 @@ describe("a club's page", () => {
           { name: "Acme Labs", role: "Venue partner", logo: "https://cdn.example/acme.png" },
           { name: "Kerala Startup Mission", role: null, logo: null },
         ],
-      },
     });
-    show("/clubs/circuit-society");
     const team = await screen.findByRole("region", { name: "Team" }, { timeout: 5000 });
     const people = within(team).getAllByRole("listitem");
     expect(people).toHaveLength(2); // a member without a name is dropped
@@ -142,8 +140,7 @@ describe("a club's page", () => {
   });
 
   it("hides the team and partners when there are none", async () => {
-    get.mockResolvedValue({ data: { ...page, team: [], partners: [] } });
-    show("/clubs/circuit-society");
+    show("/clubs/circuit-society", { ...page, team: [], partners: [] });
     expect(await screen.findByRole("heading", { level: 1, name: "Circuit Society" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 2, name: "Team" })).toBeNull();
     expect(screen.queryByRole("heading", { level: 2, name: "Partners" })).toBeNull();
@@ -153,8 +150,7 @@ describe("a club's page", () => {
   });
 
   it("leaves out empty sections and the website button when there is no site", async () => {
-    get.mockResolvedValue({ data: { club: { id: 4, slug: "quiet", name: "Quiet Club" }, upcoming: [] } });
-    show("/clubs/quiet");
+    show("/clubs/quiet", { club: { id: 4, slug: "quiet", name: "Quiet Club" }, upcoming: [] });
     expect(await screen.findByRole("heading", { level: 1, name: "Quiet Club" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Nothing scheduled yet" })).toBeInTheDocument();
     for (const name of ["About", "Threads", "Past events", "Team", "Partners"]) {
@@ -167,11 +163,10 @@ describe("a club's page", () => {
   it("shows more past events twelve at a time, saying how far along it is, until there are no more", async () => {
     const past = (from, to) => Array.from({ length: to - from }, (_, i) => ({ id: 100 + from + i, slug: `past-${from + i}`, name: `Past ${from + i}`, starts_at: "2026-08-01T12:30:00Z", status: "ended" }));
     get.mockImplementation(async (url, config) => {
-      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, club: { ...page.club, events_held: 20 }, past: past(0, 6) } };
       const { offset, limit } = config.params;
       return { data: { items: past(offset, Math.min(20, offset + limit)), total: 20, offset, limit } };
     });
-    show("/clubs/circuit-society");
+    show("/clubs/circuit-society", { ...page, club: { ...page.club, events_held: 20 }, past: past(0, 6) });
     const region = await screen.findByRole("region", { name: "Past events" }, { timeout: 5000 });
     const rows = () => within(region).getAllByRole("article");
     expect(rows()).toHaveLength(6);
@@ -196,11 +191,10 @@ describe("a club's page", () => {
 
   it("drops Show more where the API has no list of a club's events", async () => {
     const six = Array.from({ length: 6 }, (_, i) => ({ id: 200 + i, name: `Old ${i}`, starts_at: "2026-08-01T12:30:00Z", status: "ended" }));
-    get.mockImplementation(async (url) => {
-      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, club: { ...page.club, events_held: 9 }, past: six } };
+    get.mockImplementation(async () => {
       throw Object.assign(new Error("404"), { response: { status: 404 } });
     });
-    show("/clubs/circuit-society");
+    show("/clubs/circuit-society", { ...page, club: { ...page.club, events_held: 9 }, past: six });
     const region = await screen.findByRole("region", { name: "Past events" }, { timeout: 5000 });
     fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
     await waitFor(() => expect(within(region).queryByRole("button", { name: "Show more" })).toBeNull());
@@ -212,11 +206,10 @@ describe("a club's page", () => {
   it("offers more upcoming events too, when the club has more than its page carries", async () => {
     const up = (from, to) => Array.from({ length: to - from }, (_, i) => ({ id: 300 + from + i, name: `Soon ${from + i}`, starts_at: "2026-11-01T12:30:00Z", status: "upcoming" }));
     get.mockImplementation(async (url, config) => {
-      if (url === "/api/v1/discover/clubs/circuit-society") return { data: { ...page, club: { ...page.club, upcoming_events: 62 }, upcoming: up(0, 60) } };
       const { offset } = config.params;
       return { data: { items: up(offset, 62), total: 62 } };
     });
-    show("/clubs/circuit-society");
+    show("/clubs/circuit-society", { ...page, club: { ...page.club, upcoming_events: 62 }, upcoming: up(0, 60) });
     const region = await screen.findByRole("region", { name: "Upcoming events" }, { timeout: 5000 });
     expect(within(region).getByText("Showing 60 of 62")).toBeInTheDocument();
     fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
@@ -225,10 +218,9 @@ describe("a club's page", () => {
   });
 
   it("says when the club does not exist, without counting a visit", async () => {
-    get.mockRejectedValue(Object.assign(new Error("404"), { response: { status: 404 } }));
-    show("/clubs/nobody");
+    show("/clubs/nobody", null);
     expect(await screen.findByRole("heading", { name: "We couldn't find that club" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse clubs" })).toHaveAttribute("href", "/clubs");
     expect(countVisit).not.toHaveBeenCalled();
-    expect(document.title).toBe("Club not found · MyOtherApp");
   });
 });
