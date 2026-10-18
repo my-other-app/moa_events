@@ -73,6 +73,8 @@ export function eventItem(card, { detail = null } = {}) {
   const published = card.published_at || card.created_at || detail?.published_at || detail?.created_at || card.starts_at;
   const ends = card.ends_at || detail?.ends_at || null;
   const where = card.is_online ? "Online" : card.location_name || "Venue to be announced";
+  // Its type, its topics (newer APIs), then its interests (from its page), each once.
+  const tags = [...new Set([category, ...(card.topics || []).map((t) => t.name), ...(detail?.interests || [])].filter(Boolean))];
   const lines = [
     "    <item>",
     `      <title>${xmlText(card.name)}</title>`,
@@ -80,8 +82,7 @@ export function eventItem(card, { detail = null } = {}) {
     `      <guid isPermaLink="true">${xmlText(link)}</guid>`,
     `      <description>${cdata(itemHtml(card, { about: detail?.about || card.summary || null, link }))}</description>`,
     rfc822(published) ? `      <pubDate>${rfc822(published)}</pubDate>` : null,
-    category ? `      <category>${xmlText(category)}</category>` : null,
-    ...(detail?.interests || []).filter((i) => i && i !== category).map((i) => `      <category>${xmlText(i)}</category>`),
+    ...tags.map((t) => `      <category>${xmlText(t)}</category>`),
     `      <enclosure url="${xmlText(enclosure.url)}" length="0" type="${enclosure.type}"/>`,
     club ? `      <dc:creator>${xmlText(club)}</dc:creator>` : null,
     istIso(card.starts_at) ? `      <ev:startdate>${istIso(card.starts_at)}</ev:startdate>` : null,
