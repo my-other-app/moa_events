@@ -1,5 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "@/lib/router";
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { errorLine, liveApi } from "@/api/live";
 import { currentPlayer, rememberPlayer } from "@/utils/live";
@@ -94,7 +97,7 @@ export const PollCard = ({ eventId, poll, onChange }) => {
 };
 
 const JoinQuiz = ({ eventId, title }) => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState(null);
@@ -107,7 +110,7 @@ const JoinQuiz = ({ eventId, title }) => {
     try {
       const p = await liveApi.joinQuiz(code.trim(), name.trim());
       rememberPlayer(p.event_id, p);
-      navigate(`/play/${p.event_id}`);
+      router.push(`/play/${p.event_id}`);
     } catch (err) {
       setError(errorLine(err, "Could not join. Check the code on the screen."));
     } finally {
@@ -120,7 +123,7 @@ const JoinQuiz = ({ eventId, title }) => {
       <h2 id="quiz-heading">{title || "The quiz is on"}</h2>
       <p className="live-sub">Type the code on the screen and your name. Fast right answers score most.</p>
       {player ? (
-        <button type="button" className="live-btn" onClick={() => navigate(`/play/${eventId}`)}>
+        <button type="button" className="live-btn" onClick={() => router.push(`/play/${eventId}`)}>
           Back in as {player.name}
         </button>
       ) : (
@@ -137,12 +140,24 @@ const JoinQuiz = ({ eventId, title }) => {
   );
 };
 
+/** The server's answer when the room takes no questions (409 QA_CLOSED). */
+const qaClosed = (error) => error?.response?.status === 409 && error?.response?.data?.error_code === "QA_CLOSED";
+
+/**
+ * The questions from the floor. The ask box shows only while the room takes
+ * questions: the feed says so (`qa.open`), and so does a refused question
+ * (409 QA_CLOSED), which closes the box for the rest of the visit. With the
+ * box closed, the questions already asked stay, to read and vote on; with
+ * none either, there is nothing to show.
+ */
 const Questions = ({ eventId, feed, onChange }) => {
   const [text, setText] = useState("");
   const [name, setName] = useState("");
   const [sent, setSent] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState(false);
+  const open = Boolean(feed.qa?.open) && !refused;
   const ask = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -153,7 +168,8 @@ const Questions = ({ eventId, feed, onChange }) => {
       setText("");
       onChange();
     } catch (err) {
-      setError(errorLine(err, "That did not send. Try again."));
+      if (qaClosed(err)) setRefused(true);
+      else setError(errorLine(err, "That did not send. Try again."));
     } finally {
       setBusy(false);
     }
@@ -165,11 +181,24 @@ const Questions = ({ eventId, feed, onChange }) => {
       /* the next refresh sets it straight */
     }
   };
+  if (!open && feed.questions.length === 0) {
+    return refused ? (
+      <p className="live-note" role="status">
+        Questions aren&rsquo;t open right now.
+      </p>
+    ) : null;
+  }
   return (
     <section className="live-card" aria-labelledby="qa-heading">
-      <h2 id="qa-heading">Ask the room</h2>
-      <p className="live-sub">{feed.qa.approve_first ? "Questions show once the organiser lets them through. Vote up the ones you want answered." : "Questions go straight to the board. Vote up the ones you want answered."}</p>
-      {feed.qa.open && (
+      <h2 id="qa-heading">{open ? "Ask the room" : "Questions from the room"}</h2>
+      <p className="live-sub">
+        {!open
+          ? "Questions aren\u2019t open right now. Vote up the ones you want answered."
+          : feed.qa.approve_first
+            ? "Questions show once the organiser lets them through. Vote up the ones you want answered."
+            : "Questions go straight to the board. Vote up the ones you want answered."}
+      </p>
+      {open && (
         <form className="live-form" onSubmit={ask}>
           <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder="Your question" aria-label="Your question" />
           <div className="live-row">
@@ -210,12 +239,12 @@ const Questions = ({ eventId, feed, onChange }) => {
 };
 
 /**
- * The room on a phone: the banner, the poll that is up, the quiz if it runs, the questions.
- * Under /events/{slug}/live it is handed the event's id and slug; the id from the address is the fallback.
+ * The room on a phone: the banner, the poll that is up, the quiz if it runs,
+ * the questions. Its server half (src/app/events/[slug]/live/page.jsx) finds
+ * the event and hands over its id, slug and name, so the top of the room is
+ * in the first paint; the feed is asked for every few seconds after.
  */
-const Live = ({ eventId: eventIdProp, eventSlug } = {}) => {
-  const params = useParams();
-  const eventId = eventIdProp ?? params.eventId;
+const Live = ({ eventId, eventSlug = null, eventName = null }) => {
   const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
   const [feed, setFeed] = useState(null);
   const [error, setError] = useState(false);
@@ -236,23 +265,42 @@ const Live = ({ eventId: eventIdProp, eventSlug } = {}) => {
     return () => clearInterval(timer.current);
   }, [load]);
 
+  const name = feed?.event?.name || eventName;
+  const top = (
+    <div className="live-top">
+      <Link href={eventPage}>← Event</Link>
+      {name ? <h1>{name}</h1> : null}
+      <span className="live-dot">Live</span>
+    </div>
+  );
+
   if (error && !feed) {
     return (
-      <div className="loader-container">
-        <p>The room could not load. Please check your connection and try again.</p>
-        <button onClick={load}>RETRY</button>
+      <div className="live-page">
+        {top}
+        <div className="loader-container" role="alert">
+          <p>The room could not load. Please check your connection and try again.</p>
+          <button type="button" onClick={load}>
+            RETRY
+          </button>
+        </div>
       </div>
     );
   }
-  if (!feed) return <p></p>;
+  if (!feed) {
+    return (
+      <div className="live-page">
+        {top}
+        <p className="live-sub" role="status">
+          Opening the room…
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="live-page">
-      <div className="live-top">
-        <Link to={eventPage}>← Event</Link>
-        <h1>{feed.event.name}</h1>
-        <span className="live-dot">Live</span>
-      </div>
+      {top}
       {feed.banner && (
         <div className="live-banner" role="status">
           <span className="live-kind">{KIND[feed.banner.kind] || "Update"}</span>
