@@ -4,8 +4,9 @@ import { eventFor, eventSubMetadata } from "@/server/eventscoped";
 /*
  * /events/{slug}/live: the live room. The server finds the event (404, 308
  * from an old slug or an id, query kept) and sets the head (never indexed);
- * the room is a client component that polls its feed, with the event's
- * name in the first paint.
+ * the room is a client component that follows its feed (pushed, or polled
+ * where it cannot be: src/api/liveStream.js), with the event's name in the
+ * first paint.
  */
 export const dynamic = "force-dynamic";
 
