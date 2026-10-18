@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeFetch } from "@/test/next";
-import { ApiError, apiGet, apiUrl, serverApiBase } from "./api";
+import { ApiError, apiGet, apiHeaders, apiUrl, forwardsVisitor, serverApiBase } from "./api";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -33,6 +33,25 @@ describe("reading the API on the server", () => {
     vi.stubEnv("API_SITE_TOKEN", "s3cret");
     const fetchImpl = fakeFetch({ "/x": { body: {} } });
     await apiGet("/x", { fetchImpl });
-    expect(fetchImpl.calls[0].init.headers).toMatchObject({ Accept: "application/json", "X-Site-Token": "s3cret" });
+    expect(fetchImpl.calls[0].init.headers).toEqual({ Accept: "application/json", "X-Site-Token": "s3cret" });
+  });
+
+  it("says which visitor a read is for (X-Visitor-IP), only beside the token", async () => {
+    const fetchImpl = fakeFetch({ "/x": { body: {} } });
+    const visitor = { ip: "49.37.10.2" };
+    // Without the token: neither goes, whoever the read is for.
+    await apiGet("/x", { fetchImpl, visitor });
+    expect(fetchImpl.calls[0].init.headers).toEqual({ Accept: "application/json" });
+    expect(forwardsVisitor(visitor)).toBe(false);
+
+    vi.stubEnv("API_SITE_TOKEN", "s3cret");
+    await apiGet("/x", { fetchImpl, visitor });
+    expect(fetchImpl.calls[1].init.headers).toEqual({ Accept: "application/json", "X-Site-Token": "s3cret", "X-Visitor-IP": "49.37.10.2" });
+    expect(forwardsVisitor(visitor)).toBe(true);
+    // A read for nobody (an ISR page, a feed) has the token alone.
+    await apiGet("/x", { fetchImpl, visitor: { ip: null } });
+    expect(fetchImpl.calls[2].init.headers).toEqual({ Accept: "application/json", "X-Site-Token": "s3cret" });
+    expect(forwardsVisitor({ ip: null })).toBe(false);
+    expect(apiHeaders()).toEqual({ Accept: "application/json", "X-Site-Token": "s3cret" });
   });
 });

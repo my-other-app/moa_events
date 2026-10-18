@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { parseClubPage, parseEventPage } from "@/api/parse";
+import { parseClubPage, parseEventPage, parseThread } from "@/api/parse";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
-import { clubMetadata, eventMetadata, eventOgVersion, pageMetadata } from "./metadata";
+import { clubMetadata, eventMetadata, eventOgVersion, pageMetadata, threadHeadline, threadMetadata } from "./metadata";
 
 describe("a page's head", () => {
   it("names the page with the site, points at its one address on myotherapp.in, and fills the share tags", () => {
@@ -76,5 +76,29 @@ describe("a club's head", () => {
       "application/rss+xml": [{ url: "https://myotherapp.in/clubs/circuit-society/rss.xml", title: "Upcoming events from Circuit Society" }],
     });
     expect(meta.openGraph.images[0].url).toMatch(/^https:\/\/myotherapp\.in\/og\/clubs\/circuit-society\?v=/);
+  });
+});
+
+describe("a post's head", () => {
+  const post = (over = {}) =>
+    parseThread({ id: "t1", club: { id: 3, name: "Circuit Society", slug: "circuit-society" }, body: "Kits are in! Pick yours up at Lab 3B before Friday, and bring your student ID with you.", created_at: "2026-10-15T10:00:00Z", ...over });
+
+  it("is titled as the old page was, quotes the post, and shares its picture or the club's", () => {
+    const meta = threadMetadata(post({ image: "https://b.s3.amazonaws.com/k.jpg?Signature=x" }));
+    expect(meta.title).toEqual({ absolute: "Circuit Society on MyOtherApp: “Kits are in! Pick yours up at Lab 3B before Friday, and brin…”" });
+    expect(meta.alternates.canonical).toBe("https://myotherapp.in/threads/t1");
+    expect(meta.openGraph).toMatchObject({ type: "article", url: "https://myotherapp.in/threads/t1" });
+    expect(meta.openGraph.images[0].url).toBe("https://myotherapp.in/media/threads/t1/image");
+    expect(meta.description).toMatch(/^Kits are in! Pick yours up/);
+    const plain = threadMetadata(post());
+    expect(plain.openGraph.images[0]).toMatchObject({ url: "https://myotherapp.in/og/clubs/circuit-society", width: 1200, height: 630 });
+    expect(JSON.stringify(meta)).not.toMatch(/Signature=/);
+  });
+
+  it("says what a poll asks when the post has no words", () => {
+    const meta = threadMetadata(post({ body: "", kind: "poll", poll: { options: [{ id: "a", label: "Friday" }, { id: "b", label: "Saturday" }], votes: 0 } }));
+    expect(meta.title).toEqual({ absolute: "Circuit Society on MyOtherApp" });
+    expect(meta.description).toBe("A poll from Circuit Society on MyOtherApp: Friday, Saturday.");
+    expect(threadHeadline(post({ body: "\n  First line\nsecond" }))).toBe("First line");
   });
 });

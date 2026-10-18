@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import apiClient from "./client";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
+import { formatTotal } from "@/utils/format";
+import { parseClubsPage, parseEventsPage, parseThreadsPage } from "./parse";
 import {
+  ANYWHERE,
   calendarQuery,
   clubsQuery,
   discoverApi,
@@ -10,6 +13,8 @@ import {
   filtersToSearch,
   forgetEvents,
   isEmptyHome,
+  nearParam,
+  nearPoint,
   parseCalendar,
   parseClubEventsPage,
   parseClubPage,
@@ -26,7 +31,26 @@ import {
 describe("the find-events filters", () => {
   it("are read from the address, dropping anything unknown", () => {
     const f = readEventFilters(new URLSearchParams("q=%20robots%20&when=this_week&type=online&price=gratis&sort=popular&category=7&radius_km=33&utm_source=x"));
-    expect(f).toEqual({ q: "robots", when: "this_week", from: "", to: "", type: "online", price: "", category: "7", sort: "popular", radius_km: null });
+    expect(f).toEqual({ q: "robots", when: "this_week", from: "", to: "", type: "online", price: "", category: "7", sort: "popular", radius_km: null, near: "" });
+  });
+
+  it("carry a place as ?near=lat,lng, tidied to about a hundred metres, and nothing else as one", () => {
+    const near = (v) => readEventFilters(new URLSearchParams({ near: v })).near;
+    expect(near("18.52044,73.85674")).toBe("18.52,73.857");
+    expect(near(" 9.9312 , 76.2673 ")).toBe("9.931,76.267");
+    for (const bad of ["", "pune", "91,10", "10,181", "0,0", "1,2,3", "1e3,2"]) expect(near(bad)).toBe("");
+    expect(nearPoint("18.52,73.857")).toEqual({ lat: 18.52, lng: 73.857 });
+    expect(nearParam({ lat: 18.52044, lng: 73.85674 })).toBe("18.52,73.857");
+    expect(nearParam(null)).toBe("");
+  });
+
+  it("ask for everywhere (radius 0, no order by distance) for a list about no place", () => {
+    expect(eventsQuery({ sort: "distance", radius_km: 25, type: "online" }, ANYWHERE)).toEqual({ type: "online", radius_km: 0, offset: 0, limit: 12 });
+    expect(eventsQuery({ sort: "popular" }, ANYWHERE)).toEqual({ sort: "popular", radius_km: 0, offset: 0, limit: 12 });
+    expect(calendarQuery({ radius_km: 25 }, ANYWHERE, "2026-10")).toEqual({ month: "2026-10", radius_km: 0 });
+    expect(clubsQuery({ sort: "nearby", radius_km: 25 }, ANYWHERE)).toEqual({ radius_km: 0, offset: 0, limit: 12 });
+    // A point is a point, whatever else.
+    expect(eventsQuery({ sort: "distance" }, { lat: 1, lng: 2 })).toEqual({ sort: "distance", lat: 1, lng: 2, offset: 0, limit: 12 });
   });
 
   it("take picked days over the presets, in order, and never a span the API refuses", () => {
@@ -102,13 +126,31 @@ describe("the calendar and a club's events", () => {
 describe("the find-clubs filters", () => {
   it("read and build the clubs query", () => {
     const f = readClubFilters(new URLSearchParams("q=drone&interest=12&sort=nearby&radius_km=50"));
-    expect(f).toEqual({ q: "drone", interest: "12", sort: "nearby", radius_km: 50 });
+    expect(f).toEqual({ q: "drone", interest: "12", sort: "nearby", radius_km: 50, near: "" });
     expect(clubsQuery(f, { lat: 1, lng: 2 })).toEqual({ q: "drone", interest: "12", sort: "nearby", radius_km: 50, lat: 1, lng: 2, offset: 0, limit: 12 });
     expect(readClubFilters(new URLSearchParams("sort=distance")).sort).toBe("");
   });
 });
 
 describe("reading the responses", () => {
+  it("reads when a card went up and changed, and its summary, from newer APIs (null from older ones)", () => {
+    expect(parseEvent({ id: 9, published_at: "2026-10-17T09:00:00Z", updated_at: "2026-10-18T09:00:00Z", summary: "  Bring a laptop.\r\n  " })).toMatchObject({
+      published_at: "2026-10-17T09:00:00Z",
+      updated_at: "2026-10-18T09:00:00Z",
+      summary: "Bring a laptop.",
+    });
+    expect(parseEvent({ id: 9 })).toMatchObject({ published_at: null, updated_at: null, summary: null });
+    expect(parseEvent({ id: 9, summary: "   " }).summary).toBeNull();
+  });
+
+  it("knows when a list's total is only where the API stopped counting", () => {
+    expect(parseEventsPage({ items: [{ id: 1 }], total: 1000, total_capped: true })).toMatchObject({ total: 1000, capped: true });
+    expect(parseClubsPage({ items: [], total: 1000, total_capped: true }).capped).toBe(true);
+    expect(parseThreadsPage({ items: [], total: 4 }).capped).toBe(false);
+    expect(formatTotal(1000, true)).toBe("1,000+");
+    expect(formatTotal(1200)).toBe("1.2k");
+  });
+
   it("fills a sparse event card with safe defaults", () => {
     expect(parseEvent({ id: 9 })).toMatchObject({
       id: 9,

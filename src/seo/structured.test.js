@@ -1,10 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { parseClubPage, parseEventPage } from "@/api/parse";
+import { parseClubPage, parseComment, parseEventPage, parseThread } from "@/api/parse";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
+import { plansResponse } from "@/test/plansFixture";
+import { parsePlans, plansJsonLd } from "@/utils/pricing";
 import { availability, siteJsonLd } from "./jsonld";
-import { clubStructuredData, eventStructuredData } from "./structured";
-import { validateBreadcrumbs, validateEvent, validateOrganization } from "./validate";
+import { clubStructuredData, clubsListStructuredData, eventStructuredData, eventsListStructuredData, threadStructuredData } from "./structured";
+import { validateBreadcrumbs, validateDiscussionPosting, validateEvent, validateItemList, validateOrganization, validateSoftwareApplication } from "./validate";
 
 const event = (over = {}, page = {}) => parseEventPage(fullEvent({ ...page, event: { ...fullEvent().event, ...over } }));
 
@@ -197,5 +199,135 @@ describe("the site's own structured data", () => {
         "query-input": "required name=search_term_string",
       },
     });
+  });
+});
+
+describe("a find page's structured data", () => {
+  it("is an ItemList of the events shown, in order, each at its canonical address", () => {
+    const items = [
+      { id: 68, slug: "hack-night-04", name: "Hack Night 04" },
+      { id: 70, slug: null, name: "No slug yet" },
+    ];
+    const ld = eventsListStructuredData(items, { name: "Online events", path: "/events?type=online" });
+    expect(validateItemList(ld)).toEqual({ errors: [], warnings: [] });
+    expect(ld).toEqual({
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      name: "Online events",
+      url: "https://myotherapp.in/events?type=online",
+      numberOfItems: 2,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, url: "https://myotherapp.in/events/hack-night-04", name: "Hack Night 04" },
+        { "@type": "ListItem", position: 2, url: "https://myotherapp.in/events/70", name: "No slug yet" },
+      ],
+    });
+  });
+
+  it("lists clubs by their pages, leaving out one without an address", () => {
+    const ld = clubsListStructuredData(
+      [
+        { id: 1, slug: "circuit-society", name: "Circuit Society" },
+        { id: 2, slug: null, name: "Nameless" },
+      ],
+      { name: "Clubs on MyOtherApp", path: "/clubs" }
+    );
+    expect(validateItemList(ld).errors).toEqual([]);
+    expect(ld.itemListElement.map((i) => i.url)).toEqual(["https://myotherapp.in/clubs/circuit-society"]);
+    expect(ld.numberOfItems).toBe(1);
+  });
+
+  it("is checked: positions in order, absolute addresses, none twice", () => {
+    const bad = { "@context": "https://schema.org", "@type": "ItemList", numberOfItems: 3, itemListElement: [{ "@type": "ListItem", position: 2, url: "/x" }, { "@type": "ListItem", position: 2, url: "/x" }] };
+    const { errors } = validateItemList(bad);
+    expect(errors).toEqual(expect.arrayContaining(["item 1 has position 2", "item 1 needs an absolute url", "item 2: /x is listed twice", "numberOfItems is 3 for 2 items"]));
+  });
+});
+
+describe("a post's structured data", () => {
+  const thread = (over = {}) =>
+    parseThread({
+      id: "t1",
+      club: { id: 3, name: "Circuit Society", slug: "circuit-society", logo: "https://b.s3.amazonaws.com/l.png?Signature=x" },
+      body: "Kits are in!\nPick yours up at Lab 3B before Friday.",
+      image: { medium: "https://b.s3.amazonaws.com/k.jpg?Signature=x&Expires=1" },
+      likes: 12,
+      comments: 2,
+      created_at: "2026-10-15T10:00:00Z",
+      ...over,
+    });
+  const comments = [
+    parseComment({ id: "c1", body: "On my way", author: { name: "Rohan P.", is_club: false }, created_at: "2026-10-15T11:00:00Z" }),
+    parseComment({ id: "c2", body: "See you!", author: { name: "Circuit Society", is_club: true }, created_at: "2026-10-15T11:30:00Z" }),
+  ];
+
+  it("is a DiscussionForumPosting Google reads: the club as author, when, the words, the picture, likes and comments", () => {
+    const [ld, crumbs] = threadStructuredData(thread(), comments);
+    expect(validateDiscussionPosting(ld)).toEqual({ errors: [], warnings: [] });
+    expect(validateBreadcrumbs(crumbs).errors).toEqual([]);
+    expect(ld).toMatchObject({
+      "@type": "DiscussionForumPosting",
+      url: "https://myotherapp.in/threads/t1",
+      headline: "Kits are in!",
+      text: "Kits are in!\nPick yours up at Lab 3B before Friday.",
+      image: "https://myotherapp.in/media/threads/t1/image",
+      author: { "@type": "Organization", name: "Circuit Society", url: "https://myotherapp.in/clubs/circuit-society" },
+      datePublished: "2026-10-15T15:30:00+05:30",
+      interactionStatistic: [
+        { "@type": "InteractionCounter", interactionType: "https://schema.org/LikeAction", userInteractionCount: 12 },
+        { "@type": "InteractionCounter", interactionType: "https://schema.org/CommentAction", userInteractionCount: 2 },
+      ],
+      commentCount: 2,
+      comment: [
+        { "@type": "Comment", text: "On my way", author: { "@type": "Person", name: "Rohan P." }, datePublished: "2026-10-15T16:30:00+05:30" },
+        { "@type": "Comment", text: "See you!", author: { "@type": "Organization", name: "Circuit Society" } },
+      ],
+    });
+    expect(JSON.stringify(ld)).not.toMatch(/Signature=|Expires=/);
+    expect(crumbs.itemListElement.map((i) => i.name)).toEqual(["Home", "Threads", "Kits are in!"]);
+  });
+
+  it("says what a poll asks when the post has no words, and leaves out what it hasn't got", () => {
+    const poll = thread({ body: "", image: null, comments: 0, poll: { options: [{ id: "a", label: "Friday", share: 60 }, { id: "b", label: "Saturday", share: 40 }], votes: 5 }, kind: "poll" });
+    const [ld] = threadStructuredData(poll, []);
+    expect(validateDiscussionPosting(ld).errors).toEqual([]);
+    expect(ld.headline).toBe("Poll from Circuit Society");
+    expect(ld.text).toBe("Poll: Friday / Saturday");
+    expect(ld.image).toBeUndefined();
+    expect(ld.comment).toBeUndefined();
+    expect(ld.commentCount).toBe(0);
+  });
+
+  it("is checked: an author with a name, a zoned date, words or a picture, counts that are whole numbers", () => {
+    const { errors } = validateDiscussionPosting({
+      "@context": "https://schema.org",
+      "@type": "DiscussionForumPosting",
+      author: { "@type": "Thing" },
+      datePublished: "2026-10-15T10:00:00",
+      interactionStatistic: [{ "@type": "InteractionCounter", interactionType: "https://schema.org/Like", userInteractionCount: 1.5 }],
+      comment: [{ "@type": "Comment", author: { "@type": "Person", name: "R" } }],
+    });
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        "author must be a Person or an Organization",
+        "author.name is required",
+        "datePublished must be ISO 8601 with a time zone",
+        "text, image or video is required",
+        'interactionStatistic[0].interactionType "https://schema.org/Like" isn\'t one schema.org knows',
+        "interactionStatistic[0].userInteractionCount must be a whole number",
+        "comment[0].datePublished is required",
+        "comment[0].text, image or video is required",
+      ])
+    );
+  });
+});
+
+describe("the plans' structured data", () => {
+  it("is a SoftwareApplication with a priced Offer per plan and cycle", () => {
+    const ld = plansJsonLd(parsePlans(plansResponse()), { url: "https://myotherapp.in/pricing", siteUrl: "https://myotherapp.in", description: "Plans." });
+    expect(validateSoftwareApplication(ld)).toEqual({ errors: [], warnings: [] });
+    expect(ld.offers.length).toBeGreaterThan(3);
+    expect(validateSoftwareApplication({ "@context": "https://schema.org", "@type": "SoftwareApplication", name: "x", offers: [{ "@type": "Offer", price: "9" }] }).errors).toEqual(
+      expect.arrayContaining(["offers[0].price must be a number", "offers[0].priceCurrency must be a 3-letter code"])
+    );
   });
 });

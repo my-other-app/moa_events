@@ -8,7 +8,7 @@
 import { SITE_URL } from "@/config";
 import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
-import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, ogImage } from "./urls";
+import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
 export const TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -93,4 +93,43 @@ export function clubMetadata(data) {
     image: { url: absoluteUrl(ogImage.club(club.slug, clubOgVersion(data))), width: 1200, height: 630, alt: club.name },
     rss: { url: feeds.club(club.slug), title: `Upcoming events from ${club.name}` },
   });
+}
+
+/** A post's name: its first line (up to 110 characters), else "Poll from …" or "Post from …". */
+export function threadHeadline(thread) {
+  const first = String(thread.body || "")
+    .split(/\n/)
+    .map((l) => l.trim())
+    .find(Boolean);
+  if (first) return summary(first, 110);
+  return `${thread.poll ? "Poll" : "Post"} from ${thread.club.name}`;
+}
+
+/**
+ * A post's page: titled as the old page was ("Circuit Society on MyOtherApp:
+ * “first words…”"), its picture (else the club's share picture), canonical
+ * /threads/{id}. `thread` is the raw parsed post.
+ */
+export function threadMetadata(thread) {
+  const club = thread.club;
+  const body = String(thread.body || "").replace(/\s+/g, " ").trim();
+  const quote = body ? `: “${body.slice(0, 60).trim()}${body.length > 60 ? "…" : ""}”` : "";
+  const description =
+    summary(body) ||
+    (thread.poll ? summary(`A poll from ${club.name} on ${SITE_NAME}: ${thread.poll.options.map((o) => o.label).join(", ")}.`) : `A post from ${club.name} on ${SITE_NAME}.`);
+  const image = thread.image
+    ? { url: absoluteUrl(media.threadImage(thread.id, "original")), alt: `Picture posted by ${club.name}` }
+    : club.slug
+      ? { url: absoluteUrl(ogImage.club(club.slug)), width: 1200, height: 630, alt: club.name }
+      : OG_IMAGE;
+  return pageMetadata({ absoluteTitle: `${club.name} on ${SITE_NAME}${quote}`, description, path: `/threads/${encodeURIComponent(thread.id)}`, image, type: "article" });
+}
+
+/**
+ * A find page's head: its title and words, and what search engines do with
+ * it (src/seo/listings.js): `indexing` is {index, path}; a page that isn't
+ * kept has no canonical (and says noindex, follow).
+ */
+export function listingMetadata({ title, description, indexing, rss = null }) {
+  return pageMetadata({ title, description, path: indexing.path, canonical: Boolean(indexing.path), noindex: !indexing.index, rss });
 }

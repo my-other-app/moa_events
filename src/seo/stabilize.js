@@ -84,3 +84,31 @@ export function stableClubPage(data) {
     partners: data.partners.map((p, i) => ({ ...p, logo: p.logo && slug ? media.clubPartner(slug, i) : null })),
   };
 }
+
+/** A club in a list (a card): its logo and its cover. */
+export function stableClubCard(club) {
+  if (!club) return club;
+  const slug = club.slug;
+  return {
+    ...club,
+    logo: club.logo && slug ? sizes((s) => media.clubLogo(slug, s)) : null,
+    cover: club.cover && slug ? sizes((s) => media.clubCover(slug, s)) : null,
+  };
+}
+
+/** parseHome's result, with every image on a stable address. */
+export function stableHome(home) {
+  if (!home) return home;
+  return {
+    ...home,
+    near: home.near.map(stableCard),
+    this_week: home.this_week.map(stableCard),
+    online: home.online.map(stableCard),
+    popular: home.popular.map(stableCard),
+    clubs: home.clubs.map(stableClubCard),
+    threads: home.threads.map(stableThread),
+  };
+}
+
+/** A page of a list ({items, ...}) with each item made stable by `fn`. */
+export const stablePage = (page, fn) => (page ? { ...page, items: page.items.map(fn) } : page);

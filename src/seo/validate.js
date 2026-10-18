@@ -149,6 +149,99 @@ export function validateOrganization(ld) {
   return r;
 }
 
+/**
+ * An ItemList of pages (a "summary page" carousel): ListItems at positions
+ * 1…n, each with an absolute url, no address twice.
+ * https://developers.google.com/search/docs/appearance/structured-data/carousel
+ */
+export function validateItemList(ld) {
+  const r = result();
+  if (ld?.["@context"] !== "https://schema.org") r.err('@context must be "https://schema.org"');
+  if (ld?.["@type"] !== "ItemList") r.err('@type must be "ItemList"');
+  const items = asList(ld?.itemListElement);
+  if (!items.length) r.warn("an empty list");
+  const seen = new Set();
+  items.forEach((it, i) => {
+    if (it["@type"] !== "ListItem") r.err(`item ${i + 1} must be a ListItem`);
+    if (it.position !== i + 1) r.err(`item ${i + 1} has position ${it.position}`);
+    if (!ABS.test(it.url || "")) r.err(`item ${i + 1} needs an absolute url`);
+    if (seen.has(it.url)) r.err(`item ${i + 1}: ${it.url} is listed twice`);
+    seen.add(it.url);
+    if (!it.name) r.warn(`item ${i + 1}: name is recommended`);
+  });
+  if (ld?.numberOfItems !== undefined && ld.numberOfItems !== items.length) r.err(`numberOfItems is ${ld.numberOfItems} for ${items.length} items`);
+  return r;
+}
+
+const COUNTERS = ["LikeAction", "CommentAction", "WriteAction", "ShareAction", "FollowAction", "ViewAction"].map((s) => SCHEMA + s);
+
+function checkAuthor(a, r, at) {
+  if (!a) {
+    r.err(`${at}author is required`);
+    return;
+  }
+  for (const x of asList(a)) {
+    if (!["Person", "Organization"].includes(x["@type"])) r.err(`${at}author must be a Person or an Organization`);
+    if (!x.name) r.err(`${at}author.name is required`);
+  }
+}
+
+/**
+ * A forum post, as Google's discussion forum rich result reads it: an
+ * author with a name, when it was posted, and words or a picture; the
+ * counts and comments it carries well formed.
+ * https://developers.google.com/search/docs/appearance/structured-data/discussion-forum
+ */
+export function validateDiscussionPosting(ld) {
+  const r = result();
+  if (ld?.["@context"] !== "https://schema.org") r.err('@context must be "https://schema.org"');
+  if (!["DiscussionForumPosting", "SocialMediaPosting"].includes(ld?.["@type"])) r.err('@type must be "DiscussionForumPosting"');
+  checkAuthor(ld?.author, r, "");
+  for (const a of asList(ld?.author)) if (!ABS.test(a?.url || "")) r.warn("author.url is recommended");
+  if (!ld?.datePublished) r.err("datePublished is required");
+  else if (!ISO_WITH_ZONE.test(ld.datePublished)) r.err("datePublished must be ISO 8601 with a time zone");
+  if (!ld?.text && !asList(ld?.image).length && !ld?.video) r.err("text, image or video is required");
+  if (!ld?.headline) r.warn("headline is recommended");
+  if (!ABS.test(ld?.url || "")) r.warn("url is recommended (absolute)");
+  for (const img of asList(ld?.image)) if (!ABS.test(typeof img === "string" ? img : img?.url || "")) r.err("image must be an absolute URL");
+  const stats = asList(ld?.interactionStatistic);
+  if (!stats.length) r.warn("interactionStatistic is recommended");
+  stats.forEach((s, i) => {
+    if (s["@type"] !== "InteractionCounter") r.err(`interactionStatistic[${i}] must be an InteractionCounter`);
+    if (!COUNTERS.includes(s.interactionType)) r.err(`interactionStatistic[${i}].interactionType "${s.interactionType}" isn't one schema.org knows`);
+    if (!Number.isInteger(s.userInteractionCount) || s.userInteractionCount < 0) r.err(`interactionStatistic[${i}].userInteractionCount must be a whole number`);
+  });
+  if (ld?.commentCount !== undefined && (!Number.isInteger(ld.commentCount) || ld.commentCount < 0)) r.err("commentCount must be a whole number");
+  asList(ld?.comment).forEach((c, i) => {
+    const at = `comment[${i}].`;
+    if (c["@type"] !== "Comment") r.err(`${at}@type must be "Comment"`);
+    checkAuthor(c.author, r, at);
+    if (!c.datePublished) r.err(`${at}datePublished is required`);
+    else if (!ISO_WITH_ZONE.test(c.datePublished)) r.err(`${at}datePublished must be ISO 8601 with a time zone`);
+    if (!c.text && !c.image && !c.video) r.err(`${at}text, image or video is required`);
+  });
+  return r;
+}
+
+/** The clubs' plans: a SoftwareApplication with an Offer per plan and cycle, each priced. */
+export function validateSoftwareApplication(ld) {
+  const r = result();
+  if (ld?.["@context"] !== "https://schema.org") r.err('@context must be "https://schema.org"');
+  if (ld?.["@type"] !== "SoftwareApplication") r.err('@type must be "SoftwareApplication"');
+  if (!ld?.name) r.err("name is required");
+  if (!ld?.applicationCategory) r.warn("applicationCategory is recommended");
+  const offers = asList(ld?.offers);
+  if (!offers.length) r.err("offers is required");
+  offers.forEach((o, i) => {
+    const at = `offers[${i}]`;
+    if (o["@type"] !== "Offer") r.err(`${at} must be an Offer`);
+    if (typeof o.price !== "number" || o.price < 0) r.err(`${at}.price must be a number`);
+    if (!/^[A-Z]{3}$/.test(o.priceCurrency || "")) r.err(`${at}.priceCurrency must be a 3-letter code`);
+    if (!ABS.test(o.url || "")) r.warn(`${at}.url is recommended (absolute)`);
+  });
+  return r;
+}
+
 const RFC822 = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} (GMT|[+-]\d{4})$/;
 
 const NS = {

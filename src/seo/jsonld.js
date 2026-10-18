@@ -235,3 +235,52 @@ export function siteJsonLd() {
     },
   ];
 }
+
+/**
+ * A list of things that each have their own page (the events or clubs a
+ * find page shows): an ItemList of ListItems, each its position, address
+ * and name, in the order shown — Google's "summary page" shape.
+ *   items   [{url, name}], urls absolute
+ */
+export function itemListJsonLd({ name, url, items }) {
+  return clean({
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    url,
+    numberOfItems: items.length,
+    itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, url: it.url, name: it.name || null })),
+  });
+}
+
+const counter = (type, n) => ({ "@type": "InteractionCounter", interactionType: `${SCHEMA}${type}`, userInteractionCount: Math.max(0, Math.floor(Number(n) || 0)) });
+
+/**
+ * A club's post, as Google reads a forum post (DiscussionForumPosting):
+ * who posted it (the club), when, what it says and shows, how many liked
+ * it and how many comments it has, and the comments shown with it.
+ *   comments   [{text, author: {name, is_club}, datePublished}]
+ */
+export function discussionPostingJsonLd({ url, headline, text, image = null, author, datePublished, likes = 0, commentCount = 0, comments = [], isPartOf = null }) {
+  return clean({
+    "@context": "https://schema.org",
+    "@type": "DiscussionForumPosting",
+    "@id": `${url}#post`,
+    mainEntityOfPage: url,
+    url,
+    headline,
+    text: text || null,
+    image: isHttp(image) ? image : null,
+    author: author ? { "@type": "Organization", name: author.name, url: isHttp(author.url) ? author.url : null } : null,
+    datePublished: istIso(datePublished),
+    isPartOf: isPartOf ? { "@type": "WebPage", "@id": isPartOf, url: isPartOf } : null,
+    interactionStatistic: [counter("LikeAction", likes), counter("CommentAction", commentCount)],
+    commentCount: Math.max(0, Math.floor(Number(commentCount) || 0)),
+    comment: comments.map((c) => ({
+      "@type": "Comment",
+      text: c.text,
+      datePublished: istIso(c.datePublished),
+      author: { "@type": c.author?.is_club ? "Organization" : "Person", name: c.author?.name || "Someone" },
+    })),
+  });
+}

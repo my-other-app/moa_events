@@ -74,6 +74,38 @@ const radius = (v) => {
   return RADIUS_OPTIONS.includes(n) ? n : null;
 };
 
+/* ---------- where a list is about ---------- */
+
+/**
+ * A list is about one of three places:
+ *   {lat, lng}   a point (the address's ?near=, or a location the visitor shared)
+ *   ANYWHERE     everywhere: no point, no distance, every event or club
+ *   null         wherever the API places whoever asks, by their address
+ * The pages use the first two; the third is what a browser's own call
+ * without a point always meant.
+ */
+export const ANYWHERE = Object.freeze({ anywhere: true });
+export const isAnywhere = (where) => Boolean(where && where.anywhere === true);
+
+const COORD = /^-?\d{1,3}(\.\d{1,10})?$/;
+const round3 = (v) => Math.round(v * 1000) / 1000;
+
+/** A point from ?near=lat,lng: rounded to about a hundred metres; null for anything else. */
+export function nearPoint(v) {
+  const m = /^\s*([^,\s]+)\s*,\s*([^,\s]+)\s*$/.exec(String(v ?? ""));
+  if (!m || !COORD.test(m[1]) || !COORD.test(m[2])) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180 || (lat === 0 && lng === 0)) return null;
+  return { lat: round3(lat), lng: round3(lng) };
+}
+
+/** A point as ?near= carries it: "18.52,73.856". */
+export const nearParam = (point) => (point && Number.isFinite(point.lat) && Number.isFinite(point.lng) ? `${round3(point.lat)},${round3(point.lng)}` : "");
+
+/** ?near= tidied: the same point, written the one way; "" for none. */
+export const readNear = (v) => nearParam(nearPoint(v));
+
 /* ---------- the filters, as the page URL carries them ---------- */
 
 /**
@@ -97,6 +129,7 @@ export function readEventFilters(params) {
     category: ID.test(category) ? category : "",
     sort: sort === "relevance" && !q ? "" : sort,
     radius_km: radius(get("radius_km")),
+    near: readNear(get("near")),
   };
 }
 
@@ -109,6 +142,7 @@ export function readClubFilters(params) {
     interest: ID.test(interest) ? interest : "",
     sort: pick(get("sort"), CLUB_SORTS),
     radius_km: radius(get("radius_km")),
+    near: readNear(get("near")),
   };
 }
 
@@ -127,7 +161,12 @@ const coords = (where) =>
 
 const compact = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== "" && v !== null && v !== undefined));
 
-/** The query for GET /discover/events: the filters, the stored point if any, the page. Days, when picked, stand in for "when". */
+/** Everywhere (ANYWHERE, no point): radius 0, which the API reads as "anywhere"; otherwise the filter's radius. */
+const radiusFor = (filters, where) => (isAnywhere(where) ? 0 : radius(filters.radius_km));
+/** An order by distance means nothing everywhere. */
+const sortFor = (sort, where, near) => (isAnywhere(where) && sort === near ? "" : sort);
+
+/** The query for GET /discover/events: the filters, the point if any (or ANYWHERE), the page. Days, when picked, stand in for "when". */
 export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PAGE_SIZE } = {}) {
   const days = dayRange(filters.from, filters.to);
   return compact({
@@ -139,8 +178,8 @@ export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PA
     type: pick(filters.type, TYPES),
     price: pick(filters.price, PRICES),
     ...coords(where),
-    radius_km: radius(filters.radius_km),
-    sort: pick(filters.sort, EVENT_SORTS),
+    radius_km: radiusFor(filters, where),
+    sort: sortFor(pick(filters.sort, EVENT_SORTS), where, "distance"),
     offset,
     limit,
   });
@@ -155,7 +194,7 @@ export function calendarQuery(filters = {}, where = null, month) {
     type: pick(filters.type, TYPES),
     price: pick(filters.price, PRICES),
     ...coords(where),
-    radius_km: radius(filters.radius_km),
+    radius_km: radiusFor(filters, where),
   });
 }
 
@@ -165,8 +204,8 @@ export function clubsQuery(filters = {}, where = null, { offset = 0, limit = PAG
     q: text(filters.q),
     interest: filters.interest && ID.test(String(filters.interest)) ? String(filters.interest) : "",
     ...coords(where),
-    radius_km: radius(filters.radius_km),
-    sort: pick(filters.sort, CLUB_SORTS),
+    radius_km: radiusFor(filters, where),
+    sort: sortFor(pick(filters.sort, CLUB_SORTS), where, "nearby"),
     offset,
     limit,
   });
@@ -233,9 +272,12 @@ export function parseEvent(e) {
     capacity: nOrNull(o.capacity),
     status: STATUSES.has(o.status) ? o.status : "upcoming",
     url: str(o.url),
-    // When it was put up, for the feeds' order and dates (sent by newer APIs only).
+    // When it was put up and last changed, for the feeds' order and dates, and
+    // the first words of its description (sent by newer APIs only).
     published_at: str(o.published_at),
     created_at: str(o.created_at),
+    updated_at: str(o.updated_at),
+    summary: typeof o.summary === "string" && o.summary.trim() ? o.summary.replace(/\r\n?/g, "\n").trim() : null,
   };
 }
 
@@ -330,9 +372,14 @@ const parseInterest = (i) => {
   return { id: o.id, name: str(o.name) || "", clubs: Math.max(0, n(o.clubs)) };
 };
 
+/**
+ * A page of a list. `capped`: the API stopped counting (past 1,000 it says
+ * total 1000 with total_capped), so `total` is a floor, and later pages
+ * still come.
+ */
 const page = (d, items) => {
   const o = obj(d) || {};
-  return { items, total: Math.max(items.length, n(o.total, items.length)), offset: n(o.offset), limit: n(o.limit, PAGE_SIZE) };
+  return { items, total: Math.max(items.length, n(o.total, items.length)), capped: o.total_capped === true, offset: n(o.offset), limit: n(o.limit, PAGE_SIZE) };
 };
 
 export function parseHome(d) {
