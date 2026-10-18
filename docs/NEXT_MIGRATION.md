@@ -32,7 +32,9 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | `/clubs/{slug}` | **SSR + ISR** | `clubs/[slug]/page.jsx` | Organization (+ upcoming events) + BreadcrumbList; islands: follow (button, count, empty state, prompt), `?follow=` hint, visit count, Show more |
 | `/` | **SSR + ISR** | `page.jsx` + `homepage.jsx` | the same for everyone: hero, categories, numbers, this week, clubs, online, popular, posts; Organization and WebSite (SearchAction) JSON-LD, RSS link. Islands: near you (`/api/near`, below), the search and its place |
 | `/events` | **Dynamic** (edge-cached 60 s) | `events/page.jsx` + `eventspage.jsx` | filters in the query; the first 12 events, chips and count in the HTML; ItemList JSON-LD; canonical / noindex rules below; RSS link to the same list. Islands: filters, place, sheet, dates, order, "Load more", the calendar (`?view=calendar`) |
-| `/clubs` | **Dynamic** (edge-cached 60 s) | `clubs/page.jsx` + `clubspage.jsx` | the same for clubs (`interest`, `sort`, `radius_km`, `near`); ItemList |
+| `/clubs` | **Dynamic** (edge-cached 60 s) | `clubs/page.jsx` + `clubspage.jsx` | the same for clubs (`topic`, `interest`, `sort`, `radius_km`, `near`); ItemList |
+| `/topics` | **SSR + ISR** (5 min) | `topics/page.jsx` + `topicspage.jsx` | every topic as a card (colour, mark, words, interests, upcoming events and clubs); CollectionPage + ItemList; 404 while the API has no topics (below) |
+| `/topics/{slug}` | **Dynamic** (edge-cached 60 s) | `topics/[slug]/page.jsx` + `topicspage.jsx` | the topic, its interests as chips (`?interest={id}`, canonical always the unfiltered page), its first 12 upcoming events ("Load more" as on `/events`), its first 8 clubs, the other topics; CollectionPage + ItemList + BreadcrumbList (Home › Topics › Topic); its feed advertised; an id or another spelling → 308; unknown → `topics/[slug]/not-found.jsx` (404) |
 | `/threads` | **SSR + ISR** | `threads/page.jsx` + `threadspage.jsx` | the first 12 posts; "Load more" and the signed-in line are islands |
 | `/threads/{id}` | **SSR + ISR** | `threads/[id]/page.jsx` | the post (read as nobody), counts, comments; DiscussionForumPosting + BreadcrumbList; like, vote, "Add a comment" are islands (read again as the signed-in reader); gone → `threads/[id]/not-found.jsx` (404) |
 | `/about` | **SSR + ISR** | `about/page.jsx` + `aboutpage.jsx` | words from `@/content/about`, the home page's numbers |
@@ -45,11 +47,11 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | `/events/{slug}/live`, `/compete` | Dynamic + client component | → `live`, `compete` | same; the room's top (the event's name) is in the first paint |
 | `/play/{eventId}`, `/feedback/{eventId}/{registrationId}` | Dynamic + client component | → `play`, `feedback` | the server checks the address's shape (404 otherwise) and hands it over (feedback: `?k=` too); `noindex` |
 | `/tickets/{ticketid}`, `/certificates/{ticketid}` | Dynamic + client component | → `ticket`, `certificate` | same; the ticket is read in the browser (only its holder's token opens it); `noindex` |
-| `/events/rss.xml`, `/clubs/{slug}/rss.xml` | Route handler | `events/rss.xml/route.js`, … | RSS 2.0 + the RSS event module; cached 10 min at the edge |
-| `/sitemap.xml`, `/sitemaps/{name}.xml` | Route handler | `sitemap.xml/route.js`, `sitemaps/[name]/route.js` | a sitemap index; pages of ≤ 5,000 |
+| `/events/rss.xml`, `/clubs/{slug}/rss.xml`, `/topics/{slug}/rss.xml` | Route handler | `events/rss.xml/route.js`, … | RSS 2.0 + the RSS event module; cached 10 min at the edge; a topic's takes `?interest=` |
+| `/sitemap.xml`, `/sitemaps/{name}.xml` | Route handler | `sitemap.xml/route.js`, `sitemaps/[name]/route.js` | a sitemap index; pages of ≤ 5,000; `topics.xml` (`/topics` and each topic) only while the API has topics |
 | `/robots.txt` | Metadata route | `robots.js` | |
 | `/media/...` | Route handler | `media/[...path]/route.jsx` | stable image addresses (307) and the drawn cover (PNG) |
-| `/og/events/{slug}`, `/og/clubs/{slug}` | Route handler | `og/…/route.jsx` | 1200×630 share pictures, `?v=` changes with what they show |
+| `/og/events/{slug}`, `/og/clubs/{slug}`, `/og/topics/{slug}` | Route handler | `og/…/route.jsx` | 1200×630 share pictures, `?v=` changes with what they show |
 | `/api/share/{path}` (or `?path=`) | Route handler | `api/share/[...path]/route.js` | the preview page bots get for client pages (below); only the registration, live and competition pages still use it |
 | `/api/revalidate` | Route handler | `api/revalidate/route.js` | `POST`, `Bearer REVALIDATE_SECRET`: `{events, clubs, sitemap}` |
 | anything else | 404 | `not-found.jsx` | the old 404 page; clubs have their own (`clubs/[slug]/not-found.jsx`) |
@@ -140,6 +142,16 @@ Every filter of `/events` lives in the address (`q`, `when`, `from`/`to`, `categ
 
 Which addresses search engines keep (`src/seo/listings.js`): the page itself (an order alone counts as the page: canonical `/events`), and one browsing filter alone with something in it, at its own tidy canonical (`/events?category=3`, `?type=online`, `?price=free`, `?when=this_week`; `/clubs?interest=4`). Every other mix (words, days, a place, a radius, the calendar, two filters) is `noindex, follow` with no canonical. Tracking parameters never reach a canonical. Category chips are real links, so crawlers can reach the kept addresses.
 
+## Topics
+
+A **topic** is a main category (Development, Deep Tech, Arts, ...); its **interests** (Web Development, Robotics, ...) are what people, clubs and events pick, and an event's or club's topics come from its interests. (An event's *category* — Workshop, Talk — is its type, a different thing.) The API (the Topics contract of 2026-10-18, built on the backend in parallel): `GET /interests/topics` (with counts), `/interests/topics/{slug}`, `/interests/list` (gains `slug`, `color`, `description`), `?topic=<slug or id>&interest=<id>` on `/discover/events`, `/discover/clubs` and the calendar, a `topics` facet on the events list, and `topics: [{id, slug, name, color}]` on cards and pages.
+
+`src/server/topics.js` reads them (cached five minutes, tagged `topics`; `/api/revalidate` takes `"topics": true`). Where they show: `/topics`, a page per topic, a feed per topic, `sitemaps/topics.xml`, the Topic filter on `/events` (from the list's facet; the topics are read only once one is picked, for its interests' chips) and `/clubs` (the picked topic's interests become the chips), chips on an event's and a club's page, the event's JSON-LD (`about` each topic's page, the names first in `keywords`, and the trail Home › Topic › Event), the club's `knowsAbout`, the feeds' `<category>`, and "Topics" in the footer (the header has no room for a fifth link at tablet widths). `/events?topic=x` alone has `/topics/x` as its canonical (the same events, first); `/clubs?topic=x` alone is kept at its own address.
+
+**Before the API has topics** (today's: `/interests/topics` answers 405, and the list is one category, "arts", with no slug): a topic without a slug has no page, so there are none. `/topics`, every `/topics/{slug}`, its feed and its picture are 404s, the sitemap leaves them out, the footer has no link, the find pages have no Topic filter, and nothing else changes. `/interests/topics`' absence is remembered per server instance for five minutes (Next caches only 200s, and the root layout asks on every render). Once `/interests/list` has slugs, `/topics` and the topic pages render from it, without counts, until `/interests/topics` arrives.
+
+The root layout's read (`hasTopics`, at most 2.5 s, false on any failure) makes the few fully static pages (`/privacy`, `/terms`, `/me/*`, the 404) regenerate every five minutes rather than never.
+
 ## Known limits and follow-ups
 
 - The whole stylesheet (157 KB, 29 KB gzipped) loads on every page, as it did before. Splitting it per route is safe once the client pages are ported.
@@ -149,6 +161,7 @@ Which addresses search engines keep (`src/seo/listings.js`): the page itself (an
 - Import `JsonLd` as `@/seo/JsonLd.jsx`: on a case-blind disk (macOS) vitest resolves `@/seo/JsonLd` to `jsonld.js`.
 - Later pages of a list ("Load more"), the calendar's month and the date picker's dots are read by the browser from the API directly, as before (on localhost that needs the browser's CORS checks off).
 - Past 1,000 results the API stops counting (`total: 1000`, `total_capped: true`): the pages say "1,000+", and "Load more" goes on until a page comes back short.
+- Paging (`nextPage` in `@/api/parse`): an API that sends `next_cursor` on `/discover/events`, `/clubs` (and the calendar's month, the events feed's second page) is followed with `after=<cursor>` and no offset, until the cursor is null; that API refuses offsets past 1,000 (422). An API without cursors (today's) is paged by offset as before, but never past 1,000: "Load more" stops there and says to narrow the search. The posts' list has no such limit. The site has no `?page=N` addresses (later pages come by "Load more" in the browser), so every crawlable list address is page one.
 
 ## What the backend should add (for better search results)
 

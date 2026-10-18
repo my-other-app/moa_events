@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 import { formatTotal } from "@/utils/format";
+
+const WHOLE = new Intl.NumberFormat("en-IN");
 import { Dialog } from "./bits";
 import Icon from "./icons";
 
@@ -130,9 +132,12 @@ export function FilterSheet({ open, onClose, onClear, doneLabel = "Show results"
  * fails. A `total` of null means "more, but we don't know how many";
  * `capped`, that the API stopped counting at `total` (1,000+): more may
  * come past it, so the list goes on until a page comes back short.
+ * `stopped`: there are more, but no further page can be asked for (an API
+ * without cursors serves offsets up to 1,000 only).
  */
-export function LoadMore({ shown, total, capped = false, busy, error, onMore, noun, label = "Load more", className = "" }) {
+export function LoadMore({ shown, total, capped = false, stopped = false, busy, error, onMore, noun, label = "Load more", className = "" }) {
   if (!shown) return null;
+  if (stopped && !error) return <p className={`dc-more ${className}`}>{`Showing the first ${WHOLE.format(shown)} ${noun}. Narrow the search or the filters to see the rest.`}</p>;
   if (total !== null && !capped && shown >= total && !error) {
     return <p className={`dc-more ${className}`}>{shown > 6 ? `That's all ${shown} ${noun}.` : null}</p>;
   }

@@ -84,6 +84,9 @@ describe("which file answers which address", () => {
     ["/clubs", "clubs/page.jsx"],
     ["/clubs/circuit-society", "clubs/[slug]/page.jsx"],
     ["/clubs/circuit-society/rss.xml", "clubs/[slug]/rss.xml/route.js"],
+    ["/topics", "topics/page.jsx"],
+    ["/topics/development", "topics/[slug]/page.jsx"],
+    ["/topics/development/rss.xml", "topics/[slug]/rss.xml/route.js"],
     ["/threads", "threads/page.jsx"],
     ["/threads/42", "threads/[id]/page.jsx"],
     ["/about", "about/page.jsx"],
@@ -99,10 +102,12 @@ describe("which file answers which address", () => {
     ["/certificates/abc-123", "certificates/[ticketid]/page.jsx"],
     ["/sitemap.xml", "sitemap.xml/route.js"],
     ["/sitemaps/events-1.xml", "sitemaps/[name]/route.js"],
+    ["/sitemaps/topics.xml", "sitemaps/[name]/route.js"],
     ["/robots.txt", null],
     ["/media/events/hack-night-04/poster", "media/[...path]/route.jsx"],
     ["/og/events/hack-night-04", "og/events/[slug]/route.jsx"],
     ["/og/clubs/circuit-society", "og/clubs/[slug]/route.jsx"],
+    ["/og/topics/development", "og/topics/[slug]/route.jsx"],
   ])("%s → %s", async (url, file) => {
     if (file === null) return; // robots.txt is Next's own metadata route (src/app/robots.js)
     expect((await resolve(url)).file).toBe(file);
@@ -121,7 +126,7 @@ describe("which file answers which address", () => {
   });
 
   it("never takes the site's own words for an old event address", async () => {
-    for (const word of ["/events", "/clubs", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms"]) {
+    for (const word of ["/events", "/clubs", "/topics", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms"]) {
       expect((await resolve(word)).file).not.toMatch(/^\[ref\]/);
     }
   });
@@ -151,6 +156,8 @@ describe("what link-preview bots get", () => {
       "/",
       "/events",
       "/clubs",
+      "/topics",
+      "/topics/development",
       "/threads",
       "/threads/42",
       "/about",

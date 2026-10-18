@@ -1,6 +1,8 @@
 import { Bebas_Neue, DM_Sans, Inter } from "next/font/google";
 import { SITE_URL } from "@/config";
 import { DEFAULT_DESCRIPTION, HOME_TITLE, OG_IMAGE, SITE_NAME, TITLE_TEMPLATE } from "@/seo/metadata";
+import { TopicsNavProvider } from "@/components/discover/topicsnav";
+import { hasTopics } from "@/server/topics";
 import Providers from "./providers";
 
 /*
@@ -26,6 +28,7 @@ import "@/styles/calendar.css";
 import "@/styles/pages.css";
 import "@/styles/forclubs.css";
 import "@/styles/pricing.css";
+import "@/styles/topics.css";
 
 /*
  * The site's type, self-hosted by next/font with size-adjusted fallbacks so
@@ -62,11 +65,20 @@ export const viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }) {
+/*
+ * Whether the footer links to /topics: read here once (cached five minutes,
+ * never waiting long, false on any failure), so every page's first paint
+ * agrees. The read makes the few fully static pages (/privacy, /terms, the
+ * signed-in shells) regenerate at most every five minutes too.
+ */
+export default async function RootLayout({ children }) {
+  const topics = await hasTopics();
   return (
     <html lang="en" className={`${dmSans.variable} ${bebasNeue.variable} ${inter.variable}`}>
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <TopicsNavProvider on={topics}>{children}</TopicsNavProvider>
+        </Providers>
       </body>
     </html>
   );

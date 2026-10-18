@@ -208,3 +208,60 @@ export function ClubCard({ club, cover, logo, facts }) {
     </div>
   );
 }
+
+/** Ink or white, whichever reads better on a colour (#rgb or #rrggbb). */
+export function inkOn(hex) {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || ""));
+  if (!m) return "#ffffff";
+  const h = m[1].length === 3 ? m[1].replace(/./g, (c) => c + c) : m[1];
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  // White text needs about 4.5:1 for small words; the big name reads at less.
+  return (1.05 / (lum + 0.05)) >= 3 ? "#ffffff" : INK;
+}
+
+const topicTitleSize = (t) => (t.length <= 12 ? 168 : t.length <= 20 ? 136 : 104);
+
+/**
+ * A topic's share picture: its colour, its name large, its words, a few of
+ * its interests, and how many events and clubs it has (when counted).
+ *   facts: {events, clubs}   already in words, or null
+ */
+export function TopicCard({ topic, facts }) {
+  const bg = topic.color || SLATE;
+  const ink = inkOn(bg);
+  const soft = ink === INK ? "rgba(17,24,39,0.72)" : "rgba(255,255,255,0.86)";
+  const name = clip(topic.name, 30);
+  const interests = topic.interests.slice(0, 6).map((i) => clip(i.name, 24));
+  const more = topic.interests.length - interests.length;
+  const line = [facts.events, facts.clubs].filter(Boolean).join("  ·  ");
+  return (
+    <div style={{ display: "flex", position: "relative", width: 1200, height: 630, backgroundColor: bg, fontFamily: "DM Sans", color: ink, overflow: "hidden" }}>
+      <div style={{ display: "flex", position: "absolute", width: 560, height: 560, right: -140, top: -180, borderRadius: 560, backgroundColor: ink === INK ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.10)" }} />
+      <div style={{ display: "flex", position: "absolute", width: 300, height: 300, right: 120, bottom: -170, borderRadius: 300, backgroundColor: ink === INK ? "rgba(255,255,255,0.20)" : "rgba(255,255,255,0.07)" }} />
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", width: 1200, height: 630, padding: "56px 64px 48px" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontWeight: 700, fontSize: 26, letterSpacing: 3, textTransform: "uppercase", color: soft }}>Topic</span>
+          <div style={{ display: "flex", marginTop: 10, fontFamily: "Bebas Neue", fontSize: topicTitleSize(name), lineHeight: 0.92 }}>{name}</div>
+          {topic.description ? <div style={{ display: "flex", marginTop: 14, maxWidth: 940, fontSize: 32, lineHeight: 1.3, color: soft }}>{clip(topic.description, 120)}</div> : null}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {interests.length ? (
+            <div style={{ display: "flex", flexWrap: "wrap", maxWidth: 1000 }}>
+              {interests.map((label, i) => (
+                <span key={i} style={{ display: "flex", marginRight: 12, marginTop: 12, padding: "8px 20px", borderRadius: 999, backgroundColor: "#ffffff", color: INK, fontSize: 26, fontWeight: 700 }}>
+                  {label}
+                </span>
+              ))}
+              {more > 0 ? <span style={{ display: "flex", marginTop: 12, padding: "8px 8px", fontSize: 26, fontWeight: 700, color: soft }}>+{more} more</span> : null}
+            </div>
+          ) : null}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 30 }}>
+            <span style={{ display: "flex", fontSize: 28, color: soft }}>{line}</span>
+            <span style={{ fontFamily: "Bebas Neue", fontSize: 44 }}>MyOtherApp</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

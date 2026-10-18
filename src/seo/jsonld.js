@@ -108,11 +108,13 @@ function offer(event, url) {
  *   clubUrl, clubLogo       absolute, or null
  *   description             plain text
  *   speakerImage(s, i)      an absolute photo address for a speaker, or null
+ *   topics                  [{name, url}]: what it is about (its topics' pages, absolute)
  */
-export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, description = null, speakerImage = () => null }) {
+export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, description = null, speakerImage = () => null, topics = [] }) {
   if (!event) return null;
   const fee = event.has_fee ? positive(event.fee) : 0;
   const pictures = [...(image ? [image] : []), ...images].filter(isHttp);
+  const words = [...new Set([...topics.map((t) => t.name), ...(Array.isArray(event.interests) ? event.interests : [])].filter(Boolean))];
   return clean({
     "@context": "https://schema.org",
     "@type": "Event",
@@ -126,7 +128,8 @@ export function eventJsonLd({ event, club = null, speakers = [], url, images = [
     image: [...new Set(pictures)],
     url,
     isAccessibleForFree: fee === 0 ? true : null,
-    keywords: Array.isArray(event.interests) && event.interests.length ? event.interests.join(", ") : null,
+    about: topics.map((t) => ({ "@type": "Thing", name: t.name, url: isHttp(t.url) ? t.url : null })),
+    keywords: words.length ? words.join(", ") : null,
     organizer: club ? { "@type": "Organization", name: club.name, url: clubUrl, logo: isHttp(clubLogo) ? clubLogo : null } : null,
     performer: speakers
       .filter((s) => s && s.name)
@@ -181,10 +184,12 @@ const SOCIAL_KEYS = ["instagram", "linkedin", "youtube", "x", "website"];
  *   data      parseClubPage's result
  *   url       the club page (absolute); logo, image: absolute or null
  *   events    [{card, url, image}] for the upcoming events
+ * What it knows about: its topics' names (when the API sends them), then its interests.
  */
 export function clubJsonLd({ club, url, logo = null, image = null, description = null, events = [] }) {
   if (!club) return null;
   const sameAs = [...SOCIAL_KEYS.map((k) => club.socials?.[k]), club.website_url].filter(isHttp);
+  const knows = [...new Set([...(club.topics || []).map((t) => t.name), ...(club.interests || [])].filter(Boolean))];
   const organizer = { "@type": "Organization", name: club.name, url };
   return clean({
     "@context": "https://schema.org",
@@ -198,7 +203,7 @@ export function clubJsonLd({ club, url, logo = null, image = null, description =
     slogan: club.tagline || null,
     email: club.contact_email || null,
     address: club.location_name ? { "@type": "PostalAddress", addressLocality: club.location_name, addressCountry: "IN" } : null,
-    knowsAbout: club.interests?.length ? club.interests : null,
+    knowsAbout: knows.length ? knows : null,
     sameAs: [...new Set(sameAs)],
     event: events.map((e) => eventCardJsonLd(e.card, { url: e.url, image: e.image, organizer })),
   });
@@ -242,14 +247,37 @@ export function siteJsonLd() {
  * and name, in the order shown — Google's "summary page" shape.
  *   items   [{url, name}], urls absolute
  */
-export function itemListJsonLd({ name, url, items }) {
+export function itemListJsonLd({ name, url, items, id = null }) {
   return clean({
     "@context": "https://schema.org",
     "@type": "ItemList",
+    "@id": id,
     name,
     url,
     numberOfItems: items.length,
     itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, url: it.url, name: it.name || null })),
+  });
+}
+
+/**
+ * A page that is a collection of other pages (/topics, a topic's page):
+ * its name and words, what it is about, and the list it shows, by @id (the
+ * ItemList goes alongside, as its own object).
+ *   about   {name, url?} or null; list: the ItemList's @id or null
+ */
+export function collectionPageJsonLd({ name, description = null, url, image = null, about = null, list = null }) {
+  return clean({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": url,
+    name,
+    description: description || null,
+    url,
+    image: isHttp(image) ? image : null,
+    inLanguage: "en-IN",
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    about: about ? { "@type": "Thing", name: about.name, url: isHttp(about.url) ? about.url : null } : null,
+    mainEntity: list ? { "@id": list } : null,
   });
 }
 

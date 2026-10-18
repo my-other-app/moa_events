@@ -1,0 +1,249 @@
+/*
+ * Topics: /topics, a topic's page, and the topic chips on event and club
+ * pages. A topic's colour arrives as --tp (set inline, a checked hex
+ * colour); everything here falls back to the site's own ink without it.
+ * Prefixed tp- so it can change on its own.
+ */
+
+.tp {
+  --tp-ink: var(--tp, var(--dc-primary));
+  --tp-wash: color-mix(in srgb, var(--tp, var(--dc-primary)) 12%, #fff);
+  --tp-line: color-mix(in srgb, var(--tp, var(--dc-primary)) 32%, #fff);
+}
+
+.tp-lede {
+  margin-top: 10px;
+  max-width: 640px;
+  font-size: 16px;
+  color: var(--dc-text);
+}
+
+/* ---------- the mark: an emoji or a letter on the topic's wash ---------- */
+
+.tp-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--tp, var(--dc-primary)) 14%, #fff);
+  color: var(--tp, var(--dc-primary));
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ---------- /topics ---------- */
+
+.tp-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 8px;
+}
+@media (min-width: 640px) {
+  .tp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1000px) {
+  .tp-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.tp-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  height: 100%;
+  padding: 18px 44px 18px 18px;
+  border: 1px solid var(--dc-line);
+  border-left: 5px solid var(--tp, var(--dc-primary));
+  border-radius: var(--dc-radius);
+  background: #fff;
+  color: var(--dc-text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.tp-card:hover {
+  border-color: var(--tp, var(--dc-ink));
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+}
+.tp-card:focus-visible {
+  outline: 2px solid var(--dc-ink);
+  outline-offset: 2px;
+}
+.tp-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.tp-card-name {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+.tp-card-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+}
+.tp-card-interests {
+  font-size: 13px;
+  color: var(--dc-muted);
+}
+.tp-card-counts {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.tp-card-go {
+  position: absolute;
+  top: 20px;
+  right: 16px;
+  color: var(--dc-muted);
+}
+.tp-card:hover .tp-card-go {
+  color: var(--tp, var(--dc-ink));
+}
+
+/* ---------- a topic's page ---------- */
+
+.tp-crumbs {
+  padding-top: 20px;
+  font-size: 13px;
+}
+.tp-crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tp-crumbs li {
+  color: var(--dc-muted);
+}
+.tp-crumbs li + li::before {
+  content: "›";
+  margin-right: 4px;
+  color: var(--dc-muted);
+}
+.tp-crumbs a {
+  color: var(--dc-text);
+}
+.tp-crumbs a:hover {
+  color: var(--dc-ink);
+  text-decoration: underline;
+}
+.tp-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 14px 0 18px;
+  padding: 20px;
+  border-radius: var(--dc-radius);
+  background: var(--tp-wash);
+  border: 1px solid var(--tp-line);
+}
+.tp-hero .tp-mark {
+  background: #fff;
+}
+.tp-hero-text {
+  min-width: 0;
+}
+.tp-hero h1 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(44px, 8vw, 68px);
+  line-height: 0.95;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.tp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.tp-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--dc-text);
+}
+.tp-feed:hover {
+  color: var(--dc-ink);
+  text-decoration: underline;
+}
+.tp-section {
+  margin-top: 10px;
+}
+.tp-h2 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--dc-ink);
+}
+.tp .dc-resultline {
+  align-items: baseline;
+}
+@media (max-width: 599px) {
+  .tp-hero {
+    padding: 16px;
+  }
+  .tp-hero .tp-mark {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 23px !important;
+  }
+}
+
+/* ---------- topic chips (event and club pages, more topics) ---------- */
+
+.tp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tp-chip,
+.ep-chip--topic {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 3px 12px;
+  border: 1px solid color-mix(in srgb, var(--tp, var(--dc-primary)) 35%, #fff);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tp, var(--dc-primary)) 9%, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.tp-chip:hover,
+a.ep-chip--topic:hover {
+  border-color: var(--tp, var(--dc-ink));
+}
+.tp-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tp, var(--dc-primary));
+}
+.tp-chips--wide .tp-chip {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.dc-club-topics {
+  margin-top: 10px;
+}

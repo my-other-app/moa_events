@@ -17,7 +17,7 @@ import { getClubs, getEvents } from "./discover";
  * are dropped, so the HTML depends on the address alone.
  */
 
-const placeless = (page) => ({ ...page, items: page.items.map((i) => (i.distance_km === null ? i : { ...i, distance_km: null })) });
+export const placeless = (page) => ({ ...page, items: page.items.map((i) => (i.distance_km === null ? i : { ...i, distance_km: null })) });
 
 export const listEvents = cache(async (search, ip = null) => {
   const state = eventsPageState(new URLSearchParams(search));

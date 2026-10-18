@@ -60,8 +60,8 @@ describe("the sitemap index", () => {
       "https://myotherapp.in/sitemaps/events-2.xml",
       "https://myotherapp.in/sitemaps/clubs-1.xml",
     ]);
-    // Never the whole list when the index is there.
-    expect(api.calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/v1/discover/sitemap/index"]);
+    // Never the whole list when the index is there (the topics are asked about alongside).
+    expect(api.calls.map((c) => new URL(c.url).pathname).filter((p) => p.startsWith("/api/v1/discover/"))).toEqual(["/api/v1/discover/sitemap/index"]);
   });
 
   it("still lists the fixed pages, briefly cached, when the API is down", async () => {

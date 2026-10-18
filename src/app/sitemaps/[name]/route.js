@@ -1,11 +1,14 @@
-import { PAGE_SIZE, entriesFor, parseSitemapName, staticEntries, urlsetXml } from "@/seo/sitemap";
+import { PAGE_SIZE, entriesFor, parseSitemapName, staticEntries, topicEntries, urlsetXml } from "@/seo/sitemap";
 import { ApiError } from "@/server/api";
 import { getSitemapPage, getSitemapSource } from "@/server/discover";
+import { getTopics } from "@/server/topics";
 
 /*
- * GET /sitemaps/pages.xml | events-{n}.xml | clubs-{n}.xml: one sitemap of
- * the index, at most 5,000 addresses. Pages come from the API's paged
- * sitemap when it has one; from its single list (page 1 only) when not.
+ * GET /sitemaps/pages.xml | topics.xml | events-{n}.xml | clubs-{n}.xml:
+ * one sitemap of the index, at most 5,000 addresses. Pages come from the
+ * API's paged sitemap when it has one; from its single list (page 1 only)
+ * when not. topics.xml is /topics and each topic's page; 404 while the API
+ * has no topics.
  */
 const XML = { "Content-Type": "application/xml; charset=utf-8" };
 const KEEP = "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
@@ -19,6 +22,10 @@ export async function GET(request, { params }) {
   if (!which) return missing();
   if (which.kind === "pages") return answer(urlsetXml(staticEntries()));
   try {
+    if (which.kind === "topics") {
+      const found = await getTopics();
+      return found ? answer(urlsetXml(topicEntries(found.topics))) : missing();
+    }
     const source = await getSitemapSource();
     if (source.paged) {
       const page = await getSitemapPage(which.kind, which.page);

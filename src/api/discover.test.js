@@ -31,7 +31,7 @@ import {
 describe("the find-events filters", () => {
   it("are read from the address, dropping anything unknown", () => {
     const f = readEventFilters(new URLSearchParams("q=%20robots%20&when=this_week&type=online&price=gratis&sort=popular&category=7&radius_km=33&utm_source=x"));
-    expect(f).toEqual({ q: "robots", when: "this_week", from: "", to: "", type: "online", price: "", category: "7", sort: "popular", radius_km: null, near: "" });
+    expect(f).toEqual({ q: "robots", when: "this_week", from: "", to: "", type: "online", price: "", category: "7", topic: "", interest: "", sort: "popular", radius_km: null, near: "" });
   });
 
   it("carry a place as ?near=lat,lng, tidied to about a hundred metres, and nothing else as one", () => {
@@ -126,7 +126,7 @@ describe("the calendar and a club's events", () => {
 describe("the find-clubs filters", () => {
   it("read and build the clubs query", () => {
     const f = readClubFilters(new URLSearchParams("q=drone&interest=12&sort=nearby&radius_km=50"));
-    expect(f).toEqual({ q: "drone", interest: "12", sort: "nearby", radius_km: 50, near: "" });
+    expect(f).toEqual({ q: "drone", topic: "", interest: "12", sort: "nearby", radius_km: 50, near: "" });
     expect(clubsQuery(f, { lat: 1, lng: 2 })).toEqual({ q: "drone", interest: "12", sort: "nearby", radius_km: 50, lat: 1, lng: 2, offset: 0, limit: 12 });
     expect(readClubFilters(new URLSearchParams("sort=distance")).sort).toBe("");
   });

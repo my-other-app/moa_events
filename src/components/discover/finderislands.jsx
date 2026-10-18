@@ -26,6 +26,7 @@ import {
   filtersToSearch,
   nearParam,
   nearPoint,
+  nextPage,
 } from "@/api/discover";
 import { activeClubFilters, activeEventFilters } from "@/seo/listings";
 import { monthCount } from "@/utils/eventcalendar";
@@ -42,6 +43,15 @@ import { LocationPill } from "./locationpill";
 import Icon from "./icons";
 
 const RADIUS_SELECT = [["", "Any distance"], ...RADIUS_OPTIONS.map((r) => [String(r), `Within ${r} km`])];
+
+/**
+ * The Topic select, when the page knows topics (`topics`: [[slug, name]]):
+ * picking one starts over on its interests.
+ */
+function TopicSelect({ topics, value, update }) {
+  if (!topics?.length) return null;
+  return <FilterSelect label="Topic" value={value || ""} options={[["", "Any topic"], ...topics]} onChange={(v) => update({ topic: v, interest: "" })} />;
+}
 
 const FinderContext = createContext(null);
 const useFinder = () => useContext(FinderContext);
@@ -155,14 +165,16 @@ export function SheetButton({ children }) {
  * The events' filter bar (when, type, price, distance; "Clear filters"),
  * the same controls in a sheet on a phone, and the date picker. `count` is
  * the list's size, for the sheet's button (`capped`: 1,000+); `dates` the
- * picked days in words; `calendar` hides "when" (the month picks it).
+ * picked days in words; `calendar` hides "when" (the month picks it);
+ * `topics` the Topic select's options ([[slug, name]]; none: no select)
+ * and `topic` the picked one's slug.
  */
-export function EventFilters({ count = null, capped = false, dates = "", calendar = false }) {
+export function EventFilters({ count = null, capped = false, dates = "", calendar = false, topics = [], topic = "" }) {
   const { filters, update, sheet, setSheet, picker, setPicker } = useFinder();
   const knowsWhere = Boolean(filters.near);
   const where = nearPoint(filters.near) || ANYWHERE;
   const active = activeEventFilters(filters, calendar);
-  const clearAll = () => update({ when: "", from: "", to: "", type: "", price: "", category: "", radius_km: null });
+  const clearAll = () => update({ when: "", from: "", to: "", type: "", price: "", category: "", topic: "", interest: "", radius_km: null });
   const applyDates = (from, to) => {
     setPicker(null);
     update({ when: "", from, to });
@@ -199,6 +211,7 @@ export function EventFilters({ count = null, capped = false, dates = "", calenda
   const controls = (inSheet) => (
     <>
       {calendar ? null : whenControl(inSheet)}
+      <TopicSelect topics={topics} value={topic} update={update} />
       <FilterSelect label="Type" value={filters.type} options={TYPE_OPTIONS} onChange={(v) => update({ type: v })} />
       <FilterSelect label="Price" value={filters.price} options={PRICE_OPTIONS} onChange={(v) => update({ price: v })} />
       {knowsWhere ? (
@@ -237,16 +250,17 @@ export function EventFilters({ count = null, capped = false, dates = "", calenda
   );
 }
 
-/** The clubs' filter bar (order and distance) and its sheet. */
-export function ClubFilters({ count = null, capped = false }) {
+/** The clubs' filter bar (order, topic and distance) and its sheet; `topics` and `topic` as for EventFilters. */
+export function ClubFilters({ count = null, capped = false, topics = [], topic = "" }) {
   const { filters, update, sheet, setSheet } = useFinder();
   const knowsWhere = Boolean(filters.near);
   const active = activeClubFilters(filters);
-  const clearAll = () => update({ interest: "", radius_km: null });
+  const clearAll = () => update({ topic: "", interest: "", radius_km: null });
   const sorts = knowsWhere ? CLUB_SORT_OPTIONS : CLUB_SORT_OPTIONS.map(([v, l]) => (v === "nearby" ? [v, "Nearby · set your location first", true] : [v, l]));
   const controls = (
     <>
       <FilterSelect label="Sort by" value={filters.sort || "popular"} defaultValue="popular" options={sorts} onChange={(v) => update({ sort: v === "popular" ? "" : v })} />
+      <TopicSelect topics={topics} value={topic} update={update} />
       {knowsWhere ? (
         <FilterSelect
           label="Distance"
@@ -334,36 +348,53 @@ const keyOf = (item) => item?.id ?? item?.slug;
  *             until one comes back short
  * The browser reads the API itself for these (as "Show more" on a club's
  * page does). A list about nowhere shows no distances, like the server's.
+ * `headingLevel`: the cards' headings, as the server's cards have them.
+ *
+ * Paging: `first` is the server's page ({cursored, cursor}); a later page is
+ * asked for after the last one's cursor when the API gives cursors, else by
+ * offset, never past MAX_OFFSET (the API refuses that): there the list
+ * stops, and says how to see the rest.
  */
-export function MoreResults({ kind, ids, total, capped = false, noun, className = "dc-grid dc-grid--4", children }) {
+export function MoreResults({ kind, ids, total, capped = false, first = null, noun, className = "dc-grid dc-grid--4", headingLevel = 2, children }) {
   const finder = useFinder();
   const filters = finder?.filters || {};
   const point = nearPoint(filters.near);
-  const [s, setS] = useState({ items: [], total, capped, busy: false, error: false });
+  // The posts' list has no offset limit; events and clubs stop at MAX_OFFSET without cursors.
+  const max = kind === "threads" ? Infinity : undefined;
+  const start = nextPage(first, ids.length, max);
+  // A first page with a null cursor is the whole list.
+  const [s, setS] = useState(() => ({ items: [], total: start ? total : ids.length, capped: start ? capped : false, busy: false, error: false, stopped: !start && !first?.cursored }));
+  const next = useRef(start);
   const count = useRef(ids.length);
   const seen = useRef(new Set(ids.map(String)));
 
-  const load = (offset) => {
-    if (kind === "threads") return discoverApi.threads({ offset, limit: PAGE_SIZE });
-    if (kind === "clubs") return discoverApi.clubs(filters, point || ANYWHERE, { offset, limit: PAGE_SIZE });
-    return discoverApi.events(filters, point || ANYWHERE, { offset, limit: PAGE_SIZE });
+  const load = (from) => {
+    const paging = { ...from, limit: PAGE_SIZE };
+    if (kind === "threads") return discoverApi.threads(paging);
+    if (kind === "clubs") return discoverApi.clubs(filters, point || ANYWHERE, paging);
+    return discoverApi.events(filters, point || ANYWHERE, paging);
   };
 
   const loadMore = () => {
+    if (!next.current) return;
     setS((x) => ({ ...x, busy: true, error: false }));
-    load(count.current).then(
+    load(next.current).then(
       (page) => {
         count.current += page.items.length;
+        next.current = nextPage(page, count.current, max);
+        const stopped = !next.current && !page.cursored;
         const fresh = page.items.filter((i) => !seen.current.has(String(keyOf(i))));
         fresh.forEach((i) => seen.current.add(String(keyOf(i))));
         const items = point ? fresh : fresh.map((i) => (i.distance_km === null || i.distance_km === undefined ? i : { ...i, distance_km: null }));
         setS((x) => {
           const all = [...x.items, ...items];
           const shown = ids.length + all.length;
-          // An empty page is the end, whatever the total said; past a capped total, so is a short one.
-          const end = !page.items.length || ((page.capped || x.capped) && page.items.length < PAGE_SIZE);
-          if (end) return { items: all, busy: false, error: false, total: shown, capped: false };
-          return { items: all, busy: false, error: false, total: Math.max(page.total, page.capped ? 0 : shown), capped: page.capped };
+          // An empty page is the end, whatever the total said; so is a null cursor; past a capped total, so is a short one.
+          const end = !page.items.length || (page.cursored ? !page.cursor : (page.capped || x.capped) && page.items.length < PAGE_SIZE);
+          if (end) return { items: all, busy: false, error: false, total: shown, capped: false, stopped: false };
+          // More, but not by offset: as deep as an API without cursors goes.
+          if (stopped && (page.capped || shown < page.total)) return { items: all, busy: false, error: false, total: shown, capped: false, stopped: true };
+          return { items: all, busy: false, error: false, total: Math.max(page.total, page.capped ? 0 : shown), capped: page.capped, stopped: false };
         });
       },
       () => setS((x) => ({ ...x, busy: false, error: true }))
@@ -377,15 +408,15 @@ export function MoreResults({ kind, ids, total, capped = false, noun, className 
         {children}
         {s.items.map((item) =>
           kind === "threads" ? (
-            <ThreadCard key={keyOf(item)} thread={item} headingLevel={2} />
+            <ThreadCard key={keyOf(item)} thread={item} headingLevel={headingLevel} />
           ) : kind === "clubs" ? (
-            <ClubCard key={keyOf(item)} club={item} headingLevel={2} />
+            <ClubCard key={keyOf(item)} club={item} headingLevel={headingLevel} />
           ) : (
-            <EventCard key={keyOf(item)} event={item} headingLevel={2} />
+            <EventCard key={keyOf(item)} event={item} headingLevel={headingLevel} />
           )
         )}
       </div>
-      <LoadMore shown={shown} total={s.total} capped={s.capped} busy={s.busy} error={s.error} onMore={loadMore} noun={noun} />
+      <LoadMore shown={shown} total={s.total} capped={s.capped} stopped={s.stopped} busy={s.busy} error={s.error} onMore={loadMore} noun={noun} />
     </>
   );
 }

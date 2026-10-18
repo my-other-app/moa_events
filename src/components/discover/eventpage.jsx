@@ -1,6 +1,7 @@
 import { Link } from "@/lib/router";
 import { dateTile, eventUrl, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { formatCount, formatPrice, plural } from "@/utils/format";
+import { topicPagePath } from "@/seo/urls";
 import { Agenda } from "./agenda";
 import { Avatar, Section } from "./bits";
 import { EventCard } from "./eventcard";
@@ -22,6 +23,7 @@ import {
   Venue,
 } from "./eventparts";
 import Icon from "./icons";
+import { topicTone } from "./topicbits";
 
 const rupees = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
@@ -127,6 +129,7 @@ export function EventView({ page }) {
   const contact = event.contact.email || event.contact.phone ? event.contact : null;
   const showTeam = team.length > 0 && teamSource !== "none";
   const hasAbout = Boolean(event.about) || event.interests.length > 0;
+  const topics = event.topics || [];
 
   const sections = [
     hasAbout && ["about", "About"],
@@ -148,9 +151,15 @@ export function EventView({ page }) {
       </div>
       <div className="dc-wrap ep-layout">
         <header className="ep-intro">
-          {event.category || prize ? (
+          {event.category || prize || topics.length ? (
             <p className="ep-chips">
               {event.category ? <span className="ep-chip ep-chip--cat">{event.category.name}</span> : null}
+              {topics.map((t) => (
+                <Link key={t.slug} className="ep-chip ep-chip--topic" to={topicPagePath(t)} style={topicTone(t)}>
+                  <span className="tp-chip-dot" aria-hidden="true" />
+                  {t.name}
+                </Link>
+              ))}
               {prize ? (
                 <a className="ep-chip" href="#prizes">
                   <EpIcon name="trophy" size={14} />₹{rupees.format(prize)} in prizes
@@ -181,7 +190,7 @@ export function EventView({ page }) {
             <EpSection id="about" title="About this event">
               {event.about ? <About text={event.about} /> : null}
               {event.interests.length ? (
-                <ul className="ep-tags" aria-label="Topics">
+                <ul className="ep-tags" aria-label="Interests">
                   {event.interests.map((t) => (
                     <li key={t}>{t}</li>
                   ))}

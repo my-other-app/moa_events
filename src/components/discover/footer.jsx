@@ -11,10 +11,13 @@ import { assetSrc } from "@/utils/asset";
 import { feeds } from "@/seo/urls";
 import Icon from "./icons";
 import { AppleGlyph, PlayGlyph } from "./stores";
+import { useTopicsNav } from "./topicsnav";
 import wordmark from "@/assets/wordmark-sm.png";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
+  // "Topics" only once the site has them (the header has no room for a fifth link).
+  const topics = useTopicsNav();
   return (
     <footer className="dc-footer dc-scope">
       <div className="dc-wrap">
@@ -32,6 +35,11 @@ export function SiteFooter() {
               <li>
                 <Link to="/events?type=online">Online events</Link>
               </li>
+              {topics ? (
+                <li>
+                  <Link to="/topics">Topics</Link>
+                </li>
+              ) : null}
               <li>
                 <Link to="/clubs">Clubs</Link>
               </li>
