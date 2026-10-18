@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildShareHtml, clip, routeFor, shareDocument } from "./share.js";
 import { escapeHtml } from "./site.js";
-import { fullEvent } from "../../src/test/eventFixture.js";
-import { plansResponse } from "../../src/test/plansFixture.js";
+import { fullEvent } from "@/test/eventFixture";
+import { plansResponse } from "@/test/plansFixture";
 
 /** The value of one tag in a document, as a bot would read it. */
 const tag = (html, attr, key) => {
@@ -73,7 +73,8 @@ describe("the preview page", () => {
     expect(tag(html, "property", "og:title")).toBe("Hack Night 04");
     expect(tag(html, "property", "og:url")).toBe("https://myotherapp.in/events/hack-night-04");
     expect(canonical(html)).toBe("https://myotherapp.in/events/hack-night-04");
-    expect(tag(html, "property", "og:image")).toBe("https://cdn.example/p-m.jpg");
+    // The share picture is the site's own, never the poster's presigned S3 link (it dies within the hour).
+    expect(tag(html, "property", "og:image")).toMatch(/^https:\/\/myotherapp\.in\/og\/events\/hack-night-04\?v=[a-z0-9]+$/);
     expect(tag(html, "property", "og:type")).toBe("website");
     expect(tag(html, "name", "twitter:card")).toBe("summary_large_image");
     expect(tag(html, "property", "og:description")).toMatch(/^Sun, 18 Oct · 6:00 PM IST · Lab 3B, COEP · ₹250\. Twenty-four hours of building\./);
@@ -84,10 +85,12 @@ describe("the preview page", () => {
     expect(ld).toMatchObject({ "@type": "Event", name: "Hack Night 04", offers: { price: 250, priceCurrency: "INR" } });
   });
 
-  it("uses the default picture for an event without a poster", async () => {
+  it("gives an event without a poster its share picture too (the drawn cover), under a different version", async () => {
     const page = fullEvent();
-    const doc = await shareDocument("/events/hack-night-04", { fetch: async () => ({ status: 200, data: { ...page, event: { ...page.event, poster: null, poster_thumb: null } } }) });
-    expect(tag(doc.html, "property", "og:image")).toBe("https://myotherapp.in/og-default.png");
+    const withPoster = await shareDocument("/events/hack-night-04", { fetch: async () => ({ status: 200, data: page }) });
+    const without = await shareDocument("/events/hack-night-04", { fetch: async () => ({ status: 200, data: { ...page, event: { ...page.event, poster: null, poster_thumb: null } } }) });
+    expect(tag(without.html, "property", "og:image")).toMatch(/^https:\/\/myotherapp\.in\/og\/events\/hack-night-04\?v=/);
+    expect(tag(without.html, "property", "og:image")).not.toBe(tag(withPoster.html, "property", "og:image"));
   });
 
   it("describes a club with its cover and tagline", async () => {
@@ -96,7 +99,7 @@ describe("the preview page", () => {
     expect(fetch).toHaveBeenCalledWith("/api/v1/discover/clubs/circuit-society");
     expect(tag(doc.html, "property", "og:title")).toBe("Circuit Society");
     expect(tag(doc.html, "property", "og:description")).toBe("We build things that blink");
-    expect(tag(doc.html, "property", "og:image")).toBe("https://cdn.example/c.jpg");
+    expect(tag(doc.html, "property", "og:image")).toMatch(/^https:\/\/myotherapp\.in\/og\/clubs\/circuit-society\?v=[a-z0-9]+$/);
     expect(canonical(doc.html)).toBe("https://myotherapp.in/clubs/circuit-society");
   });
 

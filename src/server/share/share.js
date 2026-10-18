@@ -1,17 +1,27 @@
 /**
- * The page a link-preview bot gets: WhatsApp, Telegram, Slack, X, LinkedIn,
+ * The page a link-preview bot gets for a page that is still drawn in the
+ * browser (src/seo/bots.js lists them; next.config.mjs rewrites the bots'
+ * requests to /api/share). WhatsApp, Telegram, Slack, X, LinkedIn,
  * Facebook, Discord and search engines read the tags in the HTML they are
- * sent and run no scripts, so the single-page app shows them nothing. For an
- * event or a club this builds a small page with its title, description,
- * picture and canonical address, and a link to the real page.
+ * sent and run no scripts, so a client page shows them nothing. This builds
+ * a small page with its title, description, picture and canonical address,
+ * its words, and a link to the real page.
+ *
+ * Server-rendered pages (/events/{slug}, /clubs/{slug}) don't come here:
+ * bots read them as they are. When the last client page is ported, this
+ * goes (docs/NEXT_MIGRATION.md).
  */
 import { CACHE, CACHE_SHORT, DEFAULT_IMAGE, SITE_NAME, SITE_URL, escapeHtml, fetchJson } from "./site.js";
-import { formatPrice, formatWhen, imageUrl } from "../../src/utils/format.js";
-import { eventJsonLd, jsonForScript } from "../../src/utils/eventld.js";
-import { LEGAL, inline, updatedLabel } from "../../src/content/legal.js";
-import { ABOUT } from "../../src/content/about.js";
-import { FOR_CLUBS, PRICING_PAGE, clubFaq } from "../../src/content/forclubs.js";
-import { parsePlans, planSummary, plansJsonLd, yearlyOffer } from "../../src/utils/pricing.js";
+import { parseClubPage, parseEventPage } from "@/api/parse";
+import { formatPrice, formatWhen } from "@/utils/format";
+import { jsonForScript } from "@/seo/jsonld";
+import { clubOgVersion, eventOgVersion } from "@/seo/metadata";
+import { eventStructuredData } from "@/seo/structured";
+import { absoluteUrl, ogImage } from "@/seo/urls";
+import { LEGAL, inline, updatedLabel } from "@/content/legal";
+import { ABOUT } from "@/content/about";
+import { FOR_CLUBS, PRICING_PAGE, clubFaq } from "@/content/forclubs";
+import { parsePlans, planSummary, plansJsonLd, yearlyOffer } from "@/utils/pricing";
 
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 /** First words of the site's own addresses, never an event's old /{ref}. */
@@ -88,8 +98,6 @@ export function clip(text, max = 200) {
   const space = cut.lastIndexOf(" ");
   return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,.;:!?-]+$/, "")}…`;
 }
-
-const absolute = (url) => (typeof url === "string" && /^https?:\/\//i.test(url) ? url : null);
 
 /** The whole document. Every value is escaped; the JSON-LD is made safe for a <script>. */
 export function buildShareHtml({ title, pageTitle, description, image, imageAlt, url, type = "website", lines = [], body = "", bodyHtml = "", linkText = "Open on MyOtherApp", jsonLd = null }) {
@@ -239,9 +247,10 @@ const generic = (key = "home", status = 200, cache = CACHE) => {
 };
 
 function eventDocument(d) {
-  const event = d?.event;
-  if (!event || !event.name) return null;
-  const club = d.club && d.club.name ? d.club : null;
+  const page = parseEventPage(d);
+  if (!page || !d?.event?.name) return null;
+  const { event } = page;
+  const club = page.club && page.club.name ? page.club : null;
   const ref = event.slug || event.id;
   const url = `${SITE_URL}/events/${encodeURIComponent(ref)}`;
   const when = formatWhen(event.starts_at);
@@ -249,43 +258,37 @@ function eventDocument(d) {
   const price = formatPrice(event.has_fee, event.fee);
   const facts = [when ? `${when} IST` : null, where, price].filter(Boolean).join(" · ");
   const about = clip(event.about, 160);
-  const poster = absolute(imageUrl(event.poster, "medium")) || absolute(imageUrl(event.poster_thumb, "medium"));
+  // The share picture: a stable address on the site, never the poster's presigned link (it dies within the hour).
+  const image = absoluteUrl(ogImage.event(ref, eventOgVersion(page)));
   return {
     title: event.name,
     pageTitle: `${event.name} · ${SITE_NAME}`,
     description: clip([facts, about || (club ? `Hosted by ${club.name} on ${SITE_NAME}.` : null)].filter(Boolean).join(". "), 220),
-    image: poster || DEFAULT_IMAGE,
-    imageAlt: poster ? `Poster for ${event.name}` : SITE_NAME,
+    image,
+    imageAlt: `${event.name}${facts ? ` · ${facts}` : ""}`,
     url,
     type: "website",
     lines: [facts, club ? `Hosted by ${club.name}` : null],
     body: typeof event.about === "string" ? event.about.slice(0, 5000) : "",
     linkText: event.registration_open ? `Register for ${event.name} on MyOtherApp` : `See ${event.name} on MyOtherApp`,
-    jsonLd: eventJsonLd({
-      event,
-      club,
-      speakers: Array.isArray(d.speakers) ? d.speakers : [],
-      image: poster,
-      url,
-      clubUrl: club?.slug ? `${SITE_URL}/clubs/${encodeURIComponent(club.slug)}` : null,
-      description: clip(event.about, 500) || null,
-    }),
+    jsonLd: eventStructuredData(page)[0],
   };
 }
 
 function clubDocument(d, slug) {
-  const club = d?.club;
-  if (!club || !club.name) return null;
-  const image = absolute(imageUrl(club.cover, "original")) || absolute(imageUrl(club.logo, "medium"));
-  const url = `${SITE_URL}/clubs/${encodeURIComponent(club.slug || slug)}`;
+  const data = parseClubPage(d);
+  const club = data?.club;
+  if (!club || !d?.club?.name) return null;
+  const ref = club.slug || slug;
+  const url = `${SITE_URL}/clubs/${encodeURIComponent(ref)}`;
   return {
     title: club.name,
     pageTitle: `${club.name} · ${SITE_NAME}`,
     description: clip(club.tagline || club.about || `Events and posts from ${club.name} on ${SITE_NAME}.`, 220),
-    image: image || DEFAULT_IMAGE,
-    imageAlt: image ? club.name : SITE_NAME,
+    image: absoluteUrl(ogImage.club(ref, clubOgVersion(data))),
+    imageAlt: club.name,
     url,
-    type: "profile",
+    type: "website",
     lines: [club.tagline, club.location_name].filter(Boolean),
     body: typeof club.about === "string" ? club.about.slice(0, 5000) : "",
     linkText: `See ${club.name} on MyOtherApp`,

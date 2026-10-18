@@ -1,11 +1,11 @@
 /**
- * What the link-preview and sitemap functions share. Files under api/_lib
- * are not functions themselves (Vercel skips names starting with "_").
- * No dependencies: global fetch only.
+ * What the link-preview page (./share.js) needs: the site's names, the
+ * caching it answers with, escaping, and one plain GET of the API.
  */
-export const SITE_URL = "https://myotherapp.in";
-export const SITE_NAME = "MyOtherApp";
-export const API_URL = (process.env.MOA_API_URL || "https://api.myotherapp.in").replace(/\/+$/, "");
+import { SITE_NAME, SITE_URL } from "@/config";
+import { serverApiBase } from "../api";
+
+export { SITE_NAME, SITE_URL };
 export const DEFAULT_IMAGE = `${SITE_URL}/og-default.png`;
 
 /** A good answer is kept at the edge for ten minutes and served stale for a day while it refreshes. */
@@ -23,7 +23,7 @@ export async function fetchJson(path, { timeoutMs = 4000, fetchImpl = globalThis
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetchImpl(`${API_URL}${path}`, { headers: { Accept: "application/json" }, signal: controller.signal });
+    const res = await fetchImpl(`${serverApiBase()}${path}`, { headers: { Accept: "application/json" }, signal: controller.signal });
     if (!res.ok) return { status: res.status, data: null };
     return { status: res.status, data: await res.json() };
   } finally {
