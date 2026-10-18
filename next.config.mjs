@@ -8,6 +8,8 @@
  *   - /me → /me/tickets, and /events/{id} handed to the old-address page;
  *   - metadata always in <head>, never streamed into <body> (canonical tags
  *     only count in the head);
+ *   - the find pages (/events, /clubs) kept a minute at Vercel's edge: they
+ *     are rendered per request, but their HTML depends on the address alone;
  *   - the OG fonts traced into the functions that read them.
  */
 import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
@@ -29,6 +31,16 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/og/**": ["./src/og/fonts/**"],
     "/media/**": ["./src/og/fonts/**"],
+  },
+  async headers() {
+    // Vercel-CDN-Cache-Control is Vercel's alone and outranks the
+    // "private, no-store" Next gives a dynamic page; the browser still gets
+    // that. Client navigations (RSC requests) are told apart by Next's Vary.
+    const edge = [{ key: "Vercel-CDN-Cache-Control", value: "max-age=60, stale-while-revalidate=300" }];
+    return [
+      { source: "/events", headers: edge },
+      { source: "/clubs", headers: edge },
+    ];
   },
   async redirects() {
     return [{ source: "/me", destination: "/me/tickets", permanent: false }];

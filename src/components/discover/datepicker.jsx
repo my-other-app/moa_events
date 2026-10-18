@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { useCalendarCounts } from "@/utils/eventcalendar";
 import {

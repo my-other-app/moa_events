@@ -1422,6 +1422,13 @@ button.dc-poll-option:hover {
 .dc-filters-toggle {
   display: none;
 }
+/* The results while the server renders the next list (a filter, a chip, the order changed). */
+.dc-results.is-pending {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.15s ease 0.12s;
+}
+
 .dc-resultline {
   display: flex;
   align-items: baseline;

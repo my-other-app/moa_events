@@ -1,13 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
-const FindEvents = (await import("./eventspage.jsx")).default;
+const { parseEventsPage } = await import("@/api/parse");
+const { FindEventsAt } = await import("@/test/serverlike");
 const { forgetCalendarCounts } = await import("@/utils/eventcalendar");
+
+/*
+ * The dates and the calendar on find events. The list is the server's
+ * (FindEventsAt renders the page again for each address, as the server
+ * does); the date picker's counts and the calendar's month are read in the
+ * browser, everywhere (radius 0) unless the address names a place.
+ */
 
 /** An event on a day of October 2026, at 6 PM India time. */
 const ev = (id, day = 20, extra = {}) => ({
@@ -37,43 +45,38 @@ const MONTH_EVENTS = [
 const WHERE_NONE = { source: "none", lat: null, lng: null };
 const WHERE_PUNE = { city: "Pune", source: "ip", lat: 18.52, lng: 73.86 };
 
-function api({ where = WHERE_NONE, calendar = true } = {}) {
+/** What the browser reads: the calendar's counts and a month's events. */
+function api({ calendar = true } = {}) {
   get.mockImplementation(async (url, config) => {
     const p = config.params;
     if (url === "/api/v1/discover/calendar") {
       if (!calendar) throw Object.assign(new Error("404"), { response: { status: 404 } });
       return { data: { month: p.month, days: COUNTS[p.month] || {} } };
     }
-    if (p.from && p.to && p.from !== p.to) return { data: { items: MONTH_EVENTS, total: MONTH_EVENTS.length, where } };
-    return { data: { items: [ev(1), ev(2)], total: 2, where } };
+    if (p.from && p.to && p.from !== p.to) return { data: { items: MONTH_EVENTS, total: MONTH_EVENTS.length, where: WHERE_NONE } };
+    return { data: { items: [ev(1), ev(2)], total: 2, where: WHERE_NONE } };
   });
 }
 
-function At() {
-  const loc = useLocation();
-  return <output data-testid="search">{loc.search}</output>;
-}
+/** What the server reads for each address: the first page. */
+let page;
+const serverPage = ({ where = WHERE_NONE } = {}) => vi.fn((state) => parseEventsPage({ items: [ev(1), ev(2)], total: 2, where: state.near ? where : WHERE_NONE }));
 
-const show = (path) =>
-  render(
+const show = (path, opts) => {
+  page = serverPage(opts);
+  return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route
-          path="/events"
-          element={
-            <>
-              <FindEvents />
-              <At />
-            </>
-          }
-        />
+        <Route path="/events" element={<FindEventsAt page={page} />} />
       </Routes>
     </MemoryRouter>
   );
+};
 
 const search = () => screen.getByTestId("search").textContent;
 const eventCalls = () => get.mock.calls.filter(([url]) => url === "/api/v1/discover/events").map(([, c]) => c.params);
 const lastEventsParams = () => eventCalls().at(-1);
+const lastServerFilters = () => page.mock.calls.at(-1)[0].filters;
 
 const openPicker = async () => {
   fireEvent.change(screen.getByLabelText("When"), { target: { value: "pick" } });
@@ -119,7 +122,7 @@ describe("picking dates", () => {
 
     // The counts come with the page's filters (not "when"), and put a dot on those days.
     const today = await within(grid).findByRole("button", { name: "Saturday, 17 October 2026, today, 5 events" });
-    expect(get).toHaveBeenCalledWith("/api/v1/discover/calendar", { params: { month: "2026-10", type: "online" }, skipAuth: true });
+    expect(get).toHaveBeenCalledWith("/api/v1/discover/calendar", { params: { month: "2026-10", type: "online", radius_km: 0 }, skipAuth: true });
     expect(today.querySelector(".dc-dp-dot")).not.toBeNull();
     expect(within(grid).getByRole("button", { name: "Sunday, 18 October 2026" }).querySelector(".dc-dp-dot")).toBeNull();
     expect(within(grid).getByRole("button", { name: "Tuesday, 20 October 2026, 1 event" })).toBeInTheDocument();
@@ -141,7 +144,7 @@ describe("picking dates", () => {
     fireEvent.click(within(pop).getByRole("button", { name: "Apply" }));
     await waitFor(() => expect(search()).toBe("?from=2026-10-17&to=2026-10-24&type=online"));
     expect(screen.queryByRole("dialog", { name: "Pick dates" })).toBeNull();
-    await waitFor(() => expect(lastEventsParams()).toEqual({ from: "2026-10-17", to: "2026-10-24", type: "online", offset: 0, limit: 12 }));
+    expect(lastServerFilters()).toMatchObject({ from: "2026-10-17", to: "2026-10-24", type: "online", when: "" });
 
     // The span shows as the filter's value and as a chip that takes it off.
     expect(screen.getByLabelText("When")).toHaveDisplayValue("17–24 Oct");
@@ -233,8 +236,8 @@ describe("the calendar view", () => {
     fireEvent.click(within(toggle).getByRole("button", { name: "Calendar" }));
     await waitFor(() => expect(search()).toBe("?type=online&sort=popular&view=calendar"));
     expect(within(toggle).getByRole("button", { name: "Calendar" })).toHaveAttribute("aria-pressed", "true");
-    // The month's events, 48 at a time, in date order whatever the list's order was.
-    await waitFor(() => expect(lastEventsParams()).toEqual({ from: "2026-10-01", to: "2026-10-31", type: "online", offset: 0, limit: 48 }));
+    // The month's events, 48 at a time, in date order whatever the list's order was, everywhere.
+    await waitFor(() => expect(lastEventsParams()).toEqual({ from: "2026-10-01", to: "2026-10-31", type: "online", radius_km: 0, offset: 0, limit: 48 }));
 
     const table = await screen.findByRole("table", { name: "October 2026" });
     // No "When" and no order while it's a calendar.
@@ -267,7 +270,7 @@ describe("the calendar view", () => {
     await waitFor(() => expect(search()).toBe("?from=2026-10-20&to=2026-10-20&type=online&sort=popular"));
     expect(await screen.findByRole("button", { name: "Remove dates: 20 Oct" })).toBeInTheDocument();
     expect(within(screen.getByRole("group", { name: "View" })).getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
-    await waitFor(() => expect(lastEventsParams()).toEqual({ from: "2026-10-20", to: "2026-10-20", type: "online", sort: "popular", offset: 0, limit: 12 }));
+    expect(lastServerFilters()).toMatchObject({ from: "2026-10-20", to: "2026-10-20", type: "online", sort: "popular" });
   });
 
   it("is an agenda grouped by day on a phone, with this month's past days folded away", async () => {
@@ -313,22 +316,26 @@ describe("the order", () => {
     expect(screen.getByLabelText("Sort by").closest(".dc-sort")).toHaveTextContent("Sort: Popular");
     unmount();
 
-    // With words, relevance; with a place (here the server's guess), distance.
-    api({ where: WHERE_PUNE });
-    show("/events?q=robots");
+    // With words, relevance; with a place in the address, distance.
+    api();
+    show("/events?q=robots&near=18.52,73.86", { where: WHERE_PUNE });
     await screen.findByRole("link", { name: "Event 1" });
-    await waitFor(() => expect(within(screen.getByLabelText("Sort by")).getByRole("option", { name: "Distance" })).toBeEnabled());
+    expect(within(screen.getByLabelText("Sort by")).getByRole("option", { name: "Distance" })).toBeEnabled();
     expect(options().map((o) => o.value)).toEqual(["relevance", "date", "distance", "popular"]);
     expect(screen.getByLabelText("Sort by")).not.toHaveAccessibleDescription();
     fireEvent.change(screen.getByLabelText("Sort by"), { target: { value: "relevance" } });
-    await waitFor(() => expect(lastEventsParams()).toMatchObject({ q: "robots", sort: "relevance" }));
+    await waitFor(() => expect(lastServerFilters()).toMatchObject({ q: "robots", sort: "relevance" }));
   });
 
-  it("forgets relevance when the words go", async () => {
+  it("forgets relevance when the words go, and distance without a place", async () => {
     api();
     show("/events?sort=relevance");
     await screen.findByRole("link", { name: "Event 1" });
     expect(screen.getByLabelText("Sort by")).toHaveValue("date");
-    expect(lastEventsParams()).toEqual({ offset: 0, limit: 12 });
+    expect(lastServerFilters()).toMatchObject({ sort: "" });
+    cleanup();
+    show("/events?sort=distance&radius_km=25");
+    expect(screen.getByLabelText("Sort by")).toHaveValue("date");
+    expect(lastServerFilters()).toMatchObject({ sort: "", radius_km: null });
   });
 });
