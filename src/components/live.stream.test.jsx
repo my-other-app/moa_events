@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { FakeEventSource } from "@/test/eventsource";
 
 /*
- * The live room and the quiz on the room's stream
+ * The live room, the quiz and the event page's strip on the room's stream
  * (src/api/liveStream.js): the same screens, filled by snapshots; the taps
  * still go by their POSTs; and on today's API (the stream answers 404) the
  * same polls as before, with the same screen.
@@ -27,6 +27,7 @@ const { liveApi } = await import("@/api/live");
 const { TIMING } = await import("@/api/liveStream");
 const Live = (await import("./live.jsx")).default;
 const Play = (await import("./play.jsx")).default;
+const { LiveStrips } = await import("./discover/eventislands.jsx");
 
 const question = { id: "x2", text: "Can we use TensorFlow Lite Micro?", author_name: "Rohan P.", status: "approved", pinned: false, votes: 14, created_at: "2026-10-13T12:55:00Z", voted: false, mine: false };
 const feed = {
@@ -52,6 +53,11 @@ const play = () => (
     <Routes>
       <Route path="/play/:id" element={<Play eventId="68" />} />
     </Routes>
+  </MemoryRouter>
+);
+const strips = (status) => (
+  <MemoryRouter>
+    <LiveStrips event={{ id: 123, slug: "hack-night-04", status }} />
   </MemoryRouter>
 );
 
@@ -152,6 +158,7 @@ describe("the live room, pushed", () => {
     liveApi.fetchFeed.mockResolvedValue(feed);
     renderToString(room());
     renderToString(play());
+    renderToString(strips("live"));
     expect(FakeEventSource.instances).toHaveLength(0);
     expect(liveApi.fetchFeed).not.toHaveBeenCalled();
   });
@@ -213,5 +220,53 @@ describe("the quiz, pushed", () => {
     expect(liveApi.playState).toHaveBeenCalledTimes(2);
     await act(() => vi.advanceTimersByTimeAsync(TIMING.afterOff - 2000));
     expect(FakeEventSource.instances).toHaveLength(2);
+  });
+});
+
+describe("the event page's live strip", () => {
+  const banner = { banner: { kind: "general", text: "Round two in ten minutes" }, poll: null, quiz: null, questions: [] };
+
+  it("is pushed while the event is live", () => {
+    render(strips("live"));
+    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(FakeEventSource.last.url).toContain("/api/v1/events/123/live/stream?view=room&key=");
+    push(banner, 1);
+    expect(screen.getByText("Round two in ten minutes")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open the live room" })).toHaveAttribute("href", "/events/hack-night-04/live");
+    push({ ...banner, banner: null }, 2);
+    expect(screen.queryByText("Round two in ten minutes")).toBeNull();
+    expect(liveApi.fetchFeed).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the half-minute poll on today's API", async () => {
+    vi.useFakeTimers();
+    liveApi.fetchFeed.mockResolvedValue(banner);
+    render(strips("live"));
+    act(() => FakeEventSource.last.refuse());
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByText("Round two in ten minutes")).toBeInTheDocument();
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
+    expect(liveApi.fetchFeed).toHaveBeenCalledWith(123);
+    await act(() => vi.advanceTimersByTimeAsync(29999));
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(2);
+  });
+
+  it("before the event, polls every half minute and holds no stream; after it, reads once", async () => {
+    vi.useFakeTimers();
+    liveApi.fetchFeed.mockResolvedValue(banner);
+    const upcoming = render(strips("upcoming"));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByText("Round two in ten minutes")).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(30000));
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(2);
+    upcoming.unmount();
+
+    vi.clearAllMocks();
+    render(strips("ended"));
+    await act(() => vi.advanceTimersByTimeAsync(5 * 60 * 1000));
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
+    expect(FakeEventSource.instances).toHaveLength(0);
   });
 });

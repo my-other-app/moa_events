@@ -8,6 +8,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/router";
 import { liveApi } from "@/api/live";
+import { subscribe } from "@/api/liveStream";
 import { competitionApi } from "@/api/competition";
 import { roomIsActive } from "@/utils/live";
 import { calendarLinks } from "@/utils/calendar";
@@ -189,14 +190,19 @@ export function SectionNav({ items }) {
 /* ---------- the room and the competition ---------- */
 
 /**
- * The strips over the page while something is on: the live room (polled
- * every half minute until the event ends) and the competition, if any.
+ * The strips over the page while something is on: the live room and the
+ * competition, if any. While the event is live the room is pushed (the
+ * stream the live room uses, src/api/liveStream.js; polled every half
+ * minute where there is none); before, it is polled every half minute, as
+ * it always was, so readers of upcoming events hold no stream; once the
+ * event has ended it is read once.
  */
 export function LiveStrips({ event }) {
   const [live, setLive] = useState(null);
   const [competition, setCompetition] = useState(null);
   const id = event.id;
   const ended = event.status === "ended";
+  const happening = event.status === "live";
 
   useEffect(() => {
     let alive = true;
@@ -210,6 +216,7 @@ export function LiveStrips({ event }) {
   }, [id]);
 
   useEffect(() => {
+    if (happening) return subscribe("room", { eventId: id, interval: 30000 }, setLive);
     let alive = true;
     const look = () =>
       liveApi
@@ -222,7 +229,7 @@ export function LiveStrips({ event }) {
       alive = false;
       if (t) clearInterval(t);
     };
-  }, [id, ended]);
+  }, [id, ended, happening]);
 
   const roomOn = roomIsActive(live);
   if (!roomOn && !competition?.enabled) return null;
