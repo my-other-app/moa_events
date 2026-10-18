@@ -25,8 +25,6 @@ export function Holding() {
 }
 
 const PAGES = {
-  threads: dynamic(() => import("@/components/discover/threadspage").then((m) => m.ThreadsPage), { ssr: false, loading: Holding }),
-  thread: dynamic(() => import("@/components/discover/threadspage").then((m) => m.ThreadPage), { ssr: false, loading: Holding }),
   "me-tickets": dynamic(() => import("@/components/me/mepages").then((m) => m.MyTicketsPage), { ssr: false, loading: Holding }),
   "me-following": dynamic(() => import("@/components/me/mepages").then((m) => m.FollowingPage), { ssr: false, loading: Holding }),
   register: dynamic(() => import("@/components/register/register"), { ssr: false, loading: Holding }),

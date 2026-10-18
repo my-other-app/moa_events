@@ -18,7 +18,6 @@ export const BOT_UA =
 
 /** [source pattern for next.config rewrites, the path /api/share is asked about]. */
 export const BOT_PAGES = [
-  { source: "/threads", path: "/threads" },
   { source: "/events/:slug/:sub(register|live|compete)", path: "/events/:slug/:sub" },
 ];
 

@@ -1,12 +1,44 @@
-import ClientPage from "../../_client/pages";
-import { pageMetadata } from "@/seo/metadata";
+import { notFound } from "next/navigation";
+import { SitePage } from "@/components/discover/chrome";
+import { ThreadView } from "@/components/discover/threadspage";
+import { JsonLd } from "@/seo/JsonLd.jsx";
+import { threadMetadata } from "@/seo/metadata";
+import { stableThread } from "@/seo/stabilize";
+import { threadStructuredData } from "@/seo/structured";
+import { getComments, getThreadPage } from "@/server/discover";
 
-/* One post. CLIENT PAGE (@/components/discover/threadspage, ThreadPage): it reads as the signed-in person, to show their like and vote. */
-export async function generateMetadata({ params }) {
-  const { id } = await params;
-  return pageMetadata({ title: "Threads", description: "A post from a club on MyOtherApp.", path: `/threads/${encodeURIComponent(id)}` });
+/*
+ * /threads/{id}: one post. SERVER-RENDERED, statically regenerated (ISR,
+ * at most once a minute): the post (its words, picture and poll), its
+ * counts and its comments are in the HTML, read as nobody, with its
+ * DiscussionForumPosting and BreadcrumbList structured data. Liking and
+ * voting are islands that read the post again as the signed-in reader.
+ * A post that is gone → ./not-found.jsx (a real 404).
+ */
+export const revalidate = 60;
+export const dynamicParams = true;
+
+export function generateStaticParams() {
+  return [];
 }
 
-export default function Thread() {
-  return <ClientPage name="thread" />;
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const thread = await getThreadPage(id);
+  if (!thread) return { title: "Post not found", robots: { index: false, follow: true } };
+  return threadMetadata(thread);
+}
+
+export default async function Thread({ params }) {
+  const { id } = await params;
+  const thread = await getThreadPage(id);
+  if (!thread) notFound();
+  // The comments are a second read: when only they fail, the post still shows.
+  const comments = await getComments(id).catch(() => null);
+  return (
+    <SitePage>
+      <JsonLd data={threadStructuredData(thread, comments || [])} />
+      <ThreadView thread={stableThread(thread)} comments={comments} />
+    </SitePage>
+  );
 }

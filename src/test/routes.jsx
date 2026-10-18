@@ -5,15 +5,12 @@
  * checked in src/app/routes.test.js.
  */
 import { Route, Routes } from "react-router-dom";
-import { ThreadPage, ThreadsPage } from "@/components/discover/threadspage";
 import { FollowingPage, MyTicketsPage } from "@/components/me/mepages";
 import NotFound from "@/components/notfound";
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/threads" element={<ThreadsPage />} />
-      <Route path="/threads/:id" element={<ThreadPage />} />
       <Route path="/me/tickets" element={<MyTicketsPage />} />
       <Route path="/me/following" element={<FollowingPage />} />
       <Route path="*" element={<NotFound />} />

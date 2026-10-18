@@ -138,14 +138,14 @@ describe("which file answers which address", () => {
 
 describe("what link-preview bots get", () => {
   it("is the real page for the server-rendered ones", async () => {
-    for (const url of ["/events/hack-night-04", "/clubs/circuit-society", "/123", "/register/123", "/123/live", "/", "/events", "/clubs", "/about", "/privacy", "/terms", "/for-clubs", "/pricing"]) {
+    for (const url of ["/events/hack-night-04", "/clubs/circuit-society", "/123", "/register/123", "/123/live", "/", "/events", "/clubs", "/threads", "/threads/42", "/about", "/privacy", "/terms", "/for-clubs", "/pricing"]) {
       expect((await resolve(url, { ua: BOT })).share).toBeUndefined();
       expect((await resolve(url, { ua: WHATSAPP })).share).toBeUndefined();
     }
   });
 
   it("is the small preview page for the ones still drawn in the browser", async () => {
-    for (const url of ["/threads", "/events/hack-night-04/register"]) {
+    for (const url of ["/events/hack-night-04/register"]) {
       expect(await resolve(url, { ua: BOT })).toEqual({ file: "api/share/[...path]/route.js", share: true, to: `/api/share${url}` });
       expect((await resolve(url)).share).toBeUndefined();
     }
