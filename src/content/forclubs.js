@@ -186,8 +186,9 @@ export function clubFaq({ yearlyMonthsFree = null, contactEmail = "support@myoth
       q: "How do payments and payouts work?",
       a: [
         "When an event has a fee, people pay through Razorpay as they register, and their ticket is issued once the payment goes through.",
-        "You set the ticket price; the checkout adds the platform and gateway fees set out in our [Terms](/terms). Finance shows every payment and refund beside your own expenses.",
-        `For how the money collected reaches your club, [write to us](mailto:${contactEmail}) and we'll walk you through it.`,
+        "You set the ticket price, and attendees pay exactly that. Finance shows every payment and refund beside your own expenses.",
+        "Connect your own Razorpay account under Payments in the dashboard and ticket money goes straight to your club. Until you do, payments go through MyOtherApp's account.",
+        `For how money collected through MyOtherApp's account reaches your club, [write to us](mailto:${contactEmail}) and we'll walk you through it.`,
       ],
     },
     {
