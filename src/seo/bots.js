@@ -26,7 +26,6 @@ export const BOT_PAGES = [
   { source: "/terms", path: "/terms" },
   { source: "/for-clubs", path: "/for-clubs" },
   { source: "/pricing", path: "/pricing" },
-  { source: "/events/:slug/:sub(register|live|compete)", path: "/events/:slug/:sub" },
 ];
 
 const BOT = new RegExp(`^${BOT_UA}$`);

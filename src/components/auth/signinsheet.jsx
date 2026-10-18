@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { describeSignInError, useAuth } from "@/auth/context";
 import { markPasswordResetMissing, passwordResetOffered } from "@/auth/email";

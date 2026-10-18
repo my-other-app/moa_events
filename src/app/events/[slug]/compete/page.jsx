@@ -1,7 +1,12 @@
-import ClientPage from "../../../_client/pages";
-import { eventFor, eventSubMetadata } from "../../../_client/event-scoped";
+import Compete from "@/components/compete";
+import { eventFor, eventSubMetadata } from "@/server/eventscoped";
 
-/* /events/{slug}/compete. CLIENT PAGE: the server finds the event; @/components/compete runs in the browser. */
+/*
+ * /events/{slug}/compete: a registered guest's team, tracks and submission.
+ * The server finds the event (404, 308 from an old slug or an id, query
+ * kept) and sets the head (never indexed); the rest is a client component,
+ * read with the visitor's own token.
+ */
 export const dynamic = "force-dynamic";
 
 export function generateMetadata({ params }) {
@@ -10,5 +15,5 @@ export function generateMetadata({ params }) {
 
 export default async function EventCompete({ params, searchParams }) {
   const page = await eventFor({ params, searchParams, sub: "compete" });
-  return <ClientPage name="compete" props={{ eventId: String(page.event.id), eventSlug: page.event.slug }} />;
+  return <Compete eventId={String(page.event.id)} eventSlug={page.event.slug} />;
 }

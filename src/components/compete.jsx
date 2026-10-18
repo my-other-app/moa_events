@@ -1,5 +1,7 @@
+"use client";
+
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "@/lib/router";
+import Link from "next/link";
 import { competitionApi, errorLine } from "@/api/competition";
 
 /**
@@ -203,10 +205,8 @@ function MyTeam({ eventId, me, onChange, say }) {
   );
 }
 
-/** Under /events/{slug}/compete it is handed the event's id and slug; the id from the address is the fallback. */
-const Compete = ({ eventId: eventIdProp, eventSlug } = {}) => {
-  const params = useParams();
-  const eventId = eventIdProp ?? params.eventId;
+/** Under /events/{slug}/compete: its server half finds the event and hands over its id and slug. */
+const Compete = ({ eventId, eventSlug = null }) => {
   const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
   const [me, setMe] = useState(null);
   const [error, setError] = useState(null);
@@ -233,7 +233,7 @@ const Compete = ({ eventId: eventIdProp, eventSlug } = {}) => {
     return (
       <div className="live-page">
         <div className="live-top">
-          <Link to={eventPage}>← Event</Link>
+          <Link href={eventPage}>← Event</Link>
           <h1>Competition</h1>
         </div>
         <p className="cp-note">{error}</p>
@@ -243,12 +243,24 @@ const Compete = ({ eventId: eventIdProp, eventSlug } = {}) => {
       </div>
     );
   }
-  if (!me) return <p></p>;
+  if (!me) {
+    return (
+      <div className="live-page">
+        <div className="live-top">
+          <Link href={eventPage}>← Event</Link>
+          <h1>Competition</h1>
+        </div>
+        <p className="cp-note" role="status">
+          Loading your team…
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="live-page">
       <div className="live-top">
-        <Link to={eventPage}>← Event</Link>
+        <Link href={eventPage}>← Event</Link>
         <h1>Competition</h1>
       </div>
       {toast ? (

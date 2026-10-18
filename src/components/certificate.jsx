@@ -1,12 +1,13 @@
-import { useParams } from "@/lib/router";
+"use client";
+
 import { useEffect, useState } from "react";
 import { eventsApi } from "@/api/events";
 import { API_BASE_URL as SITE_API_BASE_URL } from "@/config";
 import { QRCodeCanvas } from "qrcode.react";
 import Download from "@/components/download";
 
-const Certificate = () => {
-    const { ticketid } = useParams();
+/** A certificate, from the link in its email or My tickets. Its server half hands over the ticket's id. */
+const Certificate = ({ ticketid }) => {
     const [ticketData, setTicketData] = useState(null);
     const [style, setStyle] = useState(null);
     const [loading, setLoading] = useState(true);

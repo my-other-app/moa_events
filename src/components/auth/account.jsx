@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect, useId, useRef, useState } from "react";
-import { Link } from "@/lib/router";
+import Link from "next/link";
 import { useAuth } from "@/auth/context";
 import { initials } from "@/utils/cover";
 import Icon from "../discover/icons";
@@ -77,13 +79,13 @@ function AccountMenu({ user, onSignOut }) {
           </div>
           <ul className="ac-menu-list">
             <li>
-              <Link to="/me/tickets" onClick={close}>
+              <Link href="/me/tickets" onClick={close}>
                 <Icon name="ticket" size={18} />
                 My tickets
               </Link>
             </li>
             <li>
-              <Link to="/me/following" onClick={close}>
+              <Link href="/me/following" onClick={close}>
                 <Icon name="users" size={18} />
                 Following
               </Link>
