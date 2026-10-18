@@ -58,7 +58,8 @@ export function itemHtml(card, { about = null, link }) {
 
 /**
  * One <item> for an event card (as GET /discover/events sends it), with its
- * page's words when they were fetched (`detail`, parseEventPage's event).
+ * words: the card's `summary` (newer APIs), else its page's when they were
+ * fetched (`detail`, parseEventPage's event).
  */
 export function eventItem(card, { detail = null } = {}) {
   const ref = eventRefOf(card);
@@ -77,7 +78,7 @@ export function eventItem(card, { detail = null } = {}) {
     `      <title>${xmlText(card.name)}</title>`,
     `      <link>${xmlText(link)}</link>`,
     `      <guid isPermaLink="true">${xmlText(link)}</guid>`,
-    `      <description>${cdata(itemHtml(card, { about: detail?.about || null, link }))}</description>`,
+    `      <description>${cdata(itemHtml(card, { about: detail?.about || card.summary || null, link }))}</description>`,
     rfc822(published) ? `      <pubDate>${rfc822(published)}</pubDate>` : null,
     category ? `      <category>${xmlText(category)}</category>` : null,
     ...(detail?.interests || []).filter((i) => i && i !== category).map((i) => `      <category>${xmlText(i)}</category>`),

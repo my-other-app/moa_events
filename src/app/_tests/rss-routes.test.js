@@ -24,9 +24,15 @@ const card = (id, over = {}) => ({
 });
 
 let fetch;
+/** What a newer API answers to ?sort=newest (cards with when they went up, and their words); null: an older API, which says 422. */
+let newest = null;
 beforeEach(() => {
+  newest = null;
   fetch = fakeFetch((url) => {
     if (url.pathname === "/api/v1/discover/events") {
+      if (url.searchParams.get("sort") === "newest") {
+        return newest ? { body: { items: newest, total: newest.length, offset: 0, limit: 60, categories: [{ id: 3, name: "Workshop", upcoming: 3 }] } } : { status: 422, body: { detail: "sort" } };
+      }
       return { body: { items: [card(5), card(9), card(7), card(4, { status: "ended" })], total: 4, offset: 0, limit: 60, categories: [{ id: 3, name: "Workshop", upcoming: 3 }] } };
     }
     if (url.pathname.startsWith("/api/v1/discover/events/")) {
@@ -46,7 +52,10 @@ afterEach(() => vi.unstubAllGlobals());
 const events = async (query = "") => (await import("../events/rss.xml/route.js")).GET(new NextRequest(`https://myotherapp.in/events/rss.xml${query}`));
 const clubFeed = async (slug) =>
   (await import("../clubs/[slug]/rss.xml/route.js")).GET(new NextRequest(`https://myotherapp.in/clubs/${slug}/rss.xml`), { params: Promise.resolve({ slug }) });
-const listQuery = () => new URL(fetch.calls.find((c) => new URL(c.url).pathname === "/api/v1/discover/events").url).searchParams;
+const listCalls = () => fetch.calls.map((c) => new URL(c.url)).filter((u) => u.pathname === "/api/v1/discover/events");
+/** The list the feed was made from: by date (an older API), after its try at the newest. */
+const listQuery = () => listCalls().find((u) => u.searchParams.get("sort") !== "newest").searchParams;
+const pageReads = () => fetch.calls.filter((c) => new URL(c.url).pathname.startsWith("/api/v1/discover/events/"));
 const titles = (doc) => [...doc.getElementsByTagName("item")].map((i) => i.getElementsByTagName("title")[0].textContent);
 
 describe("/events/rss.xml", () => {
@@ -93,6 +102,33 @@ describe("/events/rss.xml", () => {
     const both = parseXml(await (await events("?city=Kochi&q=robots")).text());
     expect(listQuery().get("q")).toBe("robots");
     expect(titles(both)).toEqual(["Event 9", "Event 7", "Event 5"].filter((t) => Number(t.split(" ")[1]) % 2));
+  });
+
+  it("asks a newer API for the newest first, and takes each event's words from its card", async () => {
+    // Events have no publish time: the API orders by created_at, and the feed dates them by it.
+    newest = [
+      card(21, { created_at: "2026-10-17T09:00:00Z", updated_at: "2026-10-18T09:00:00Z", summary: "Twenty-one: a summary from the card." }),
+      card(30, { created_at: "2026-10-16T09:00:00Z", summary: "Thirty: newer id, put up earlier." }),
+      card(22, { created_at: "2026-10-15T09:00:00Z", status: "ended", summary: "Over." }),
+    ];
+    const res = await events("?type=in_person");
+    const xml = await res.text();
+    expect(validateRss(xml, parseXml)).toEqual({ errors: [], warnings: [] });
+    // One read, in the API's order, everywhere.
+    expect(listCalls()).toHaveLength(1);
+    expect(Object.fromEntries(listCalls()[0].searchParams)).toMatchObject({ sort: "newest", type: "in_person", radius_km: "0", limit: "60" });
+    const doc = parseXml(xml);
+    expect(titles(doc)).toEqual(["Event 21", "Event 30"]);
+    expect(doc.getElementsByTagName("pubDate")[0].textContent).toBe("Sat, 17 Oct 2026 09:00:00 GMT");
+    expect(doc.getElementsByTagName("description")[1].textContent).toContain("Twenty-one: a summary from the card.");
+    // No event's page was read for its words.
+    expect(pageReads()).toEqual([]);
+  });
+
+  it("falls back to an older API's list, and reads the pages of cards without words", async () => {
+    await events();
+    expect(listCalls().map((u) => u.searchParams.get("sort"))).toEqual(["newest", null]);
+    expect(pageReads()).toHaveLength(3);
   });
 
   it("says so (503, not kept) when the API is down", async () => {

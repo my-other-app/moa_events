@@ -1,8 +1,8 @@
 import { SITE_URL } from "@/config";
-import { filtersToSearch, readEventFilters } from "@/api/parse";
+import { ANYWHERE, filtersToSearch, readEventFilters } from "@/api/parse";
 import { FEED_CACHE, FEED_LIMIT, FEED_TYPE, feedCity, feedTitle, feedWhere, rssFeed } from "@/seo/rss";
 import { ApiError } from "@/server/api";
-import { getEvents } from "@/server/discover";
+import { getEvents, getNewestEvents } from "@/server/discover";
 import { feedItems } from "@/server/feeds";
 
 /*
@@ -15,6 +15,12 @@ import { feedItems } from "@/server/feeds";
  *   ?lat=..&lng=..[&radius_km=25] or ?near=lat,lng   (near a place)
  *   ?city=Kochi                                       (matched on the venue)
  *
+ * The newest-published first: an API that knows ?sort=newest is asked for
+ * them in that order (one read); one that doesn't is asked for the next
+ * 120 by date and the feed orders them itself. Each item's words are the
+ * card's `summary` where the API sends one, else its page's (read a few at
+ * a time, src/server/feeds.js).
+ *
  * Kept at the edge for ten minutes.
  */
 const PER_REQUEST = 60;
@@ -26,11 +32,13 @@ export async function GET(request) {
   const where = feedWhere(params);
   const city = feedCity(params);
   const query = { ...filters, q: filters.q || city };
+  const place = where || ANYWHERE;
   try {
-    const first = await getEvents(query, { where, offset: 0, limit: PER_REQUEST, revalidate: 300 });
+    const newest = await getNewestEvents(query, { where: place, limit: PER_REQUEST, revalidate: 300 });
+    const first = newest || (await getEvents(query, { where: place, offset: 0, limit: PER_REQUEST, revalidate: 300 }));
     let cards = first.items;
-    if (first.total > cards.length && cards.length >= PER_REQUEST) {
-      const second = await getEvents(query, { where, offset: PER_REQUEST, limit: PER_REQUEST, revalidate: 300 }).catch(() => null);
+    if (!newest && first.total > cards.length && cards.length >= PER_REQUEST) {
+      const second = await getEvents(query, { where: place, offset: PER_REQUEST, limit: PER_REQUEST, revalidate: 300 }).catch(() => null);
       if (second) cards = cards.concat(second.items);
     }
     cards = cards.filter((e) => e.status !== "ended").slice(0, MAX_CARDS);
