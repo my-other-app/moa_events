@@ -8,8 +8,9 @@
  *   - /me → /me/tickets, and /events/{id} handed to the old-address page;
  *   - metadata always in <head>, never streamed into <body> (canonical tags
  *     only count in the head);
- *   - the find pages (/events, /clubs) kept a minute at Vercel's edge: they
- *     are rendered per request, but their HTML depends on the address alone;
+ *   - the find pages (/events, /clubs) and a topic's page (/topics/{slug})
+ *     kept a minute at Vercel's edge: they are rendered per request, but
+ *     their HTML depends on the address alone;
  *   - the OG fonts traced into the functions that read them.
  */
 import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
@@ -40,6 +41,7 @@ const nextConfig = {
     return [
       { source: "/events", headers: edge },
       { source: "/clubs", headers: edge },
+      { source: "/topics/:slug", headers: edge },
     ];
   },
   async redirects() {

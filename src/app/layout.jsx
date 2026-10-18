@@ -26,6 +26,7 @@ import "@/styles/calendar.css";
 import "@/styles/pages.css";
 import "@/styles/forclubs.css";
 import "@/styles/pricing.css";
+import "@/styles/topics.css";
 
 /*
  * The site's type, self-hosted by next/font with size-adjusted fallbacks so

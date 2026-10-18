@@ -334,8 +334,9 @@ const keyOf = (item) => item?.id ?? item?.slug;
  *             until one comes back short
  * The browser reads the API itself for these (as "Show more" on a club's
  * page does). A list about nowhere shows no distances, like the server's.
+ * `headingLevel`: the cards' headings, as the server's cards have them.
  */
-export function MoreResults({ kind, ids, total, capped = false, noun, className = "dc-grid dc-grid--4", children }) {
+export function MoreResults({ kind, ids, total, capped = false, noun, className = "dc-grid dc-grid--4", headingLevel = 2, children }) {
   const finder = useFinder();
   const filters = finder?.filters || {};
   const point = nearPoint(filters.near);
@@ -377,11 +378,11 @@ export function MoreResults({ kind, ids, total, capped = false, noun, className 
         {children}
         {s.items.map((item) =>
           kind === "threads" ? (
-            <ThreadCard key={keyOf(item)} thread={item} headingLevel={2} />
+            <ThreadCard key={keyOf(item)} thread={item} headingLevel={headingLevel} />
           ) : kind === "clubs" ? (
-            <ClubCard key={keyOf(item)} club={item} headingLevel={2} />
+            <ClubCard key={keyOf(item)} club={item} headingLevel={headingLevel} />
           ) : (
-            <EventCard key={keyOf(item)} event={item} headingLevel={2} />
+            <EventCard key={keyOf(item)} event={item} headingLevel={headingLevel} />
           )
         )}
       </div>

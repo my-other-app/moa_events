@@ -21,6 +21,7 @@ const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 export const RESERVED = new Set([
   "events",
   "clubs",
+  "topics",
   "threads",
   "about",
   "privacy",

@@ -8,7 +8,7 @@
 import { SITE_URL } from "@/config";
 import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
-import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage } from "./urls";
+import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, topicPagePath } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
 export const TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -92,6 +92,50 @@ export function clubMetadata(data) {
     path: `/clubs/${encodeURIComponent(club.slug)}`,
     image: { url: absoluteUrl(ogImage.club(club.slug, clubOgVersion(data))), width: 1200, height: 630, alt: club.name },
     rss: { url: feeds.club(club.slug), title: `Upcoming events from ${club.name}` },
+  });
+}
+
+/* ---------- topics ---------- */
+
+export const TOPICS_TITLE = "Topics";
+
+/** /topics: every topic, by name in its words. */
+export function topicsMetadata(topics) {
+  const names = topics.map((t) => t.name);
+  const some = names.length > 4 ? `${names.slice(0, 4).join(", ")} and more` : names.join(", ");
+  return pageMetadata({
+    title: TOPICS_TITLE,
+    description: summary(`Browse events and clubs by topic${some ? `: ${some}` : ""}. Hackathons, workshops, meetups and more from the clubs on ${SITE_NAME}.`),
+    path: "/topics",
+  });
+}
+
+/** The ?v= for a topic's share picture: it changes when the picture would. */
+export function topicOgVersion(topic) {
+  return fingerprint(topic.name, topic.description, topic.color, topic.upcoming_events, topic.clubs, topic.interests.slice(0, 8).map((i) => i.name).join("|"));
+}
+
+/** What a topic page is about, in a sentence: its own words, else its interests. */
+export function topicDescription(topic, interest = null) {
+  if (interest) return summary(`Upcoming ${interest.name} events, and the clubs that run them, in ${topic.name} on ${SITE_NAME}.`);
+  if (topic.description) return summary(topic.description);
+  const some = topic.interests.slice(0, 4).map((i) => i.name);
+  return summary(`Upcoming ${topic.name} events${some.length ? ` (${some.join(", ")} and more)` : ""}, and the clubs that run them, on ${SITE_NAME}.`);
+}
+
+/**
+ * A topic's page: canonical /topics/{slug} whatever interest is picked
+ * (?interest= only filters the same page), its share picture, and its
+ * feed (the interest's, when one is picked).
+ */
+export function topicMetadata(topic, { interest = null } = {}) {
+  const title = interest ? `${interest.name} events and clubs` : `${topic.name} events and clubs`;
+  return pageMetadata({
+    title,
+    description: topicDescription(topic, interest),
+    path: topicPagePath(topic),
+    image: { url: absoluteUrl(ogImage.topic(topic.slug, topicOgVersion(topic))), width: 1200, height: 630, alt: `${topic.name} on ${SITE_NAME}` },
+    rss: { url: feeds.topic(topic.slug, interest ? interest.id : null), title: interest ? `${interest.name} events on ${SITE_NAME}` : `${topic.name} events on ${SITE_NAME}` },
   });
 }
 

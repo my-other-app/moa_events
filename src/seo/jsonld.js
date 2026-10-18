@@ -242,14 +242,37 @@ export function siteJsonLd() {
  * and name, in the order shown — Google's "summary page" shape.
  *   items   [{url, name}], urls absolute
  */
-export function itemListJsonLd({ name, url, items }) {
+export function itemListJsonLd({ name, url, items, id = null }) {
   return clean({
     "@context": "https://schema.org",
     "@type": "ItemList",
+    "@id": id,
     name,
     url,
     numberOfItems: items.length,
     itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, url: it.url, name: it.name || null })),
+  });
+}
+
+/**
+ * A page that is a collection of other pages (/topics, a topic's page):
+ * its name and words, what it is about, and the list it shows, by @id (the
+ * ItemList goes alongside, as its own object).
+ *   about   {name, url?} or null; list: the ItemList's @id or null
+ */
+export function collectionPageJsonLd({ name, description = null, url, image = null, about = null, list = null }) {
+  return clean({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": url,
+    name,
+    description: description || null,
+    url,
+    image: isHttp(image) ? image : null,
+    inLanguage: "en-IN",
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    about: about ? { "@type": "Thing", name: about.name, url: isHttp(about.url) ? about.url : null } : null,
+    mainEntity: list ? { "@id": list } : null,
   });
 }
 
