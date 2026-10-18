@@ -123,6 +123,26 @@ describe("signing in with Google", () => {
     expect(getSession()).toBeNull();
   });
 
+  it.each([
+    [403, "This account has been suspended", "ACCOUNT_SUSPENDED", "This account has been suspended. If you think that's a mistake, write to support@myotherapp.in."],
+    [401, "Invalid authentication credentials", "INVALID_GOOGLE_TOKEN", "Google's sign-in didn't go through — it may have timed out. Try again."],
+    [
+      401,
+      "Google account email is not verified",
+      "EMAIL_NOT_VERIFIED",
+      "Google hasn't verified this account's email address yet. Verify it with Google first, or use another Google account.",
+    ],
+  ])("says a %i %s refusal (%s) in plain words, and stays signed out", async (code, message, errorCode, said) => {
+    stubGoogle();
+    on("post", "/api/v1/auth/google", (c) => reply(c, code, { message, errors: null, error_code: errorCode, track_id: null }));
+    show();
+    const sheet = await openSheet();
+    fireEvent.click(await within(sheet).findByRole("button", { name: "Sign in with Google" }));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(said);
+    expect(status()).toBe("signed-out");
+    expect(getSession()).toBeNull();
+  });
+
   it("says when MyOtherApp can't be reached", async () => {
     stubGoogle();
     on("post", "/api/v1/auth/google", (c) => {
