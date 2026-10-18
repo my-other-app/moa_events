@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
 
@@ -465,6 +465,181 @@ describe("when the server says no", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await heading(/You.re in/)).toBeInTheDocument();
     expect(eventsApi.registerForEvent).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the refusals the server names by code", () => {
+  const refuse = (status, message, error_code, errors = null) => Object.assign(new Error(message), { status, data: { message, errors, error_code, track_id: null } });
+
+  it("REGISTRATIONS_CLOSED past the deadline says when it closed, with the way back, not 'already registered'", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(
+      refuse(400, "Registration deadline has passed", "REGISTRATIONS_CLOSED", { closed_reason: "deadline_passed", closed_at: "2026-10-12T18:29:00+00:00" }),
+    );
+    await toReview(free);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Registration has closed")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("Registration closed on Mon, 12 Oct · 11:59 PM IST.");
+    expect(within(alert).getByRole("link", { name: "Back to the event" })).toHaveAttribute("href", "/events/quiet-evening");
+    expect(within(alert).queryByText("You're already registered")).toBeNull();
+  });
+
+  it("REGISTRATIONS_CLOSED before it opens says when it opens", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(
+      refuse(400, "Registration has not started yet", "REGISTRATIONS_CLOSED", { closed_reason: "not_started", opens_at: "2026-10-20T04:30:00+00:00" }),
+    );
+    await toReview(free);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Registration hasn't opened yet")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("It opens Tue, 20 Oct · 10:00 AM IST.");
+  });
+
+  it("a 409 REGISTRATIONS_CLOSED is closed for now, never 'already registered', and never mentions plans", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(refuse(409, "This event isn't taking more registrations right now.", "REGISTRATIONS_CLOSED"));
+    await toReview(free);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Registration is closed for now")).toBeInTheDocument();
+    expect(within(alert).queryByText("You're already registered")).toBeNull();
+    expect(within(alert).queryByRole("button", { name: /different email/ })).toBeNull();
+    expect(alert.textContent).not.toMatch(/plan|upgrade|subscription/i);
+  });
+
+  it("EVENT_FULL says the seats are gone", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(refuse(400, "Event is full", "EVENT_FULL", { max_participants: 60 }));
+    await toReview(free);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("This event is full")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("All 60 seats are taken.");
+  });
+
+  it("SOLD_OUT goes back to the add-ons with that size marked sold out and the pick taken off", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(refuse(422, "Hack Night tee M is sold out", "SOLD_OUT", { item_id: "tee", variant_id: "m", available: 0 }));
+    show(paid, { items: [TEE] });
+    await heading(/Your details/);
+    fillDetails();
+    go();
+    await heading(/Add to your ticket/);
+    fireEvent.click(screen.getByRole("radio", { name: /^M/ }));
+    go();
+    await heading(/Review and pay/);
+    expect(screen.getByRole("button", { name: "Pay ₹700" })).toBeInTheDocument();
+    go();
+    await heading(/Add to your ticket/);
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Something in your order sold out")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("Hack Night tee M is sold out. Your order has been updated");
+    // The size is marked and can't be picked; the pick is gone from the total.
+    const m = screen.getByRole("radio", { name: /^M/ });
+    expect(m).toBeDisabled();
+    expect(m.closest("label")).toHaveTextContent("Sold out");
+    expect(screen.getByText("None yet")).toBeInTheDocument();
+    // Carrying on without it: back to the review, ticket only.
+    go();
+    expect(await screen.findByRole("button", { name: "Pay ₹250" })).toBeInTheDocument();
+  });
+
+  it("INVALID_ANSWERS puts each answer's problem beside its question", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(
+      refuse(400, "Check your answers: College or organisation, Pick a track.", "INVALID_ANSWERS", { college: "This field is required", track: "Invalid option selected" }),
+    );
+    show(paid, { questions: QUESTIONS.slice(0, 2) });
+    await heading(/Your details/);
+    fillDetails();
+    go();
+    await heading(/A few questions/);
+    fireEvent.change(field(/^College or organisation/), { target: { value: "COEP" } });
+    fireEvent.click(screen.getByRole("radio", { name: "IoT" }));
+    go();
+    await heading(/Review and pay/);
+    go();
+    await heading(/A few questions/);
+    expect(await screen.findByText("This field is required")).toBeInTheDocument();
+    expect(screen.getByText("Invalid option selected")).toBeInTheDocument();
+    expect(screen.getByText("Check the highlighted answers")).toBeInTheDocument();
+    expect(screen.getByText("Check your answers: College or organisation, Pick a track.")).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(field(/^College or organisation/)));
+  });
+});
+
+describe("when the payment can't start or finish", () => {
+  const coded = (code, status, message) => Object.assign(new Error(message), { code, status, stage: "order", errors: null, network: false });
+
+  it("says EVENT_ENDED in words, and charges nothing", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA123", pay_amount: 250, event_registration_id: "reg-1" });
+    paymentsApi.createPaymentOrder.mockRejectedValue(coded("EVENT_ENDED", 409, "This event is over; it can no longer be paid for."));
+    await toReview(paid);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("This event is over")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("It can't be paid for any more, so nothing was charged.");
+    expect(window.Razorpay).not.toHaveBeenCalled();
+  });
+
+  it("goes straight to the ticket when the order says ALREADY_PAID", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA123", pay_amount: 250, event_registration_id: "reg-1", full_name: "Asha Rao" });
+    paymentsApi.createPaymentOrder.mockRejectedValue(coded("ALREADY_PAID", 409, "This registration is already paid for."));
+    await toReview(paid);
+    go();
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+    expect(window.Razorpay).not.toHaveBeenCalled();
+  });
+
+  it("counts ALREADY_PAID from the check as paid", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA123", pay_amount: 250, event_registration_id: "reg-1" });
+    paymentsApi.createPaymentOrder.mockResolvedValue({ amount: 25000, razorpay_order_id: "order_1" });
+    paymentsApi.verifyPayment.mockRejectedValue(coded("ALREADY_PAID", 409, "This order is already paid."));
+    await toReview(paid);
+    go();
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    await act(() => razorpay.handler({ razorpay_order_id: "order_1", razorpay_payment_id: "pay_1" }));
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+  });
+
+  it("says a refused check (PAYMENT_NOT_FOUND) without asking to pay again", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA123", pay_amount: 250, event_registration_id: "reg-1" });
+    paymentsApi.createPaymentOrder.mockResolvedValue({ amount: 25000, razorpay_order_id: "order_1" });
+    paymentsApi.verifyPayment.mockRejectedValue(Object.assign(coded("PAYMENT_NOT_FOUND", 404, "Payment not found"), { stage: "verify" }));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await toReview(paid);
+    go();
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    await act(() => razorpay.handler({ razorpay_order_id: "order_1", razorpay_payment_id: "pay_1" }));
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Razorpay hasn't confirmed your payment yet")).toBeInTheDocument();
+    expect(alert).toHaveTextContent("don't pay again");
+  });
+});
+
+describe("a reload after registering", () => {
+  it("shows the ticket again, and leaving the page forgets it", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA77", pay_amount: 0, full_name: "Asha Rao", email: "asha@example.org" });
+    const first = await (async () => {
+      await toReview(free);
+      go();
+      await heading(/You.re in/);
+      return true;
+    })();
+    expect(first).toBe(true);
+    expect(JSON.parse(sessionStorage.getItem("moa.register.done.124")).ticket_id).toBe("MOA77");
+    cleanup();
+    // The page again, as a reload brings it: the ticket, not an empty form.
+    show(free);
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+    expect(screen.getByText("MOA77")).toBeInTheDocument();
+  });
+
+  it("forgets the ticket once the page is left, so the next visit starts afresh", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA77", pay_amount: 0 });
+    await toReview(free);
+    go();
+    await heading(/You.re in/);
+    cleanup();
+    await waitFor(() => expect(sessionStorage.getItem("moa.register.done.124")).toBeNull());
+    show(free);
+    expect(await heading(/Your details/)).toBeInTheDocument();
   });
 });
 

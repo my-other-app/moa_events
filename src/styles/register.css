@@ -1652,3 +1652,40 @@
     transition: none;
   }
 }
+
+/* ---------- a payment's problem, small (Finish payment) ---------- */
+
+.pay-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  text-align: left;
+  white-space: normal;
+}
+.pay-note--warn {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+.pay-note--calm {
+  border-color: var(--dc-line);
+  background: var(--dc-sunken);
+}
+.pay-note-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--dc-ink);
+}
+.pay-note-text {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dc-text);
+  overflow-wrap: anywhere;
+}
+.rg-finish-note {
+  max-width: 50ch;
+  margin-top: 16px;
+}

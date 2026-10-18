@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect, useRef } from "react";
-import { Link } from "@/lib/router";
+import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { eventPath, eventUrl, scheduleLines } from "@/utils/eventpage";
 import { rupees } from "@/utils/register";
@@ -57,7 +59,7 @@ export default function Success({ event, club, ticket }) {
                 tickets here. A copy is in your email too.
               </p>
               <div className="ac-inapp-links">
-                <Link className="dc-btn dc-btn--sm" to="/me/tickets">
+                <Link className="dc-btn dc-btn--sm" href="/me/tickets">
                   My tickets
                 </Link>
               </div>
@@ -79,9 +81,9 @@ export default function Success({ event, club, ticket }) {
         )}
 
         <p className="rg-done-more">
-          <Link to={eventPath(event)}>Back to the event</Link>
+          <Link href={eventPath(event)}>Back to the event</Link>
           <span aria-hidden="true">·</span>
-          <Link to="/events">Find more events</Link>
+          <Link href="/events">Find more events</Link>
         </p>
       </div>
 
@@ -121,7 +123,7 @@ export default function Success({ event, club, ticket }) {
             <p className="rg-ticket-kicker">Ticket ID</p>
             <p className="rg-ticket-number">{ticket.ticket_id}</p>
             <p className="rg-ticket-hint">Show this at the entrance.</p>
-            <Link className="dc-btn rg-ticket-open" to={ticketPath}>
+            <Link className="dc-btn rg-ticket-open" href={ticketPath}>
               View ticket
               <Icon name="arrowRight" size={18} />
             </Link>

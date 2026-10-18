@@ -1,20 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "@/lib/router";
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { eventsApi } from "@/api/events";
 import { useAuth } from "@/auth/context";
 import { cancelOneTap } from "@/auth/google";
 import { paymentsApi } from "@/api/payments";
-import { processPayment } from "@/utils/payment";
+import { describePayment, payOrder } from "@/utils/payment";
 import { currentRef } from "@/utils/ref";
 import { picksTotal } from "@/utils/picks";
 import { eventPath, eventUrl, registerState } from "@/utils/eventpage";
-import { usePageMeta } from "@/utils/meta";
 import {
+  applyStockRefusal,
   buildPayload,
   clearDraft,
   describeRegisterError,
   fieldId,
+  forgetDone,
+  keepDone,
+  loadDone,
   loadDraft,
+  myRegistration,
   orderLines,
   parseQuestions,
   rupees,
@@ -30,37 +37,43 @@ import { SitePage } from "../discover/chrome";
 import { CalendarButton, EpIcon } from "../discover/eventparts";
 import Icon from "../discover/icons";
 import { QuestionField, TextField } from "./fields";
+import { PayNote, Spinner, useFinishPayment } from "./finishpayment";
 import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
 import Success from "./success";
 
 /**
- * Registering for an event, at /events/{slug}/register.
+ * Registering for an event, at /events/{slug}/register. The page's server
+ * half (src/app/events/[slug]/register/page.jsx) finds the event and hands
+ * it here; this draws the same first paint on the server and in the browser
+ * (the form's skeleton, or why registration isn't open), then reads who is
+ * signed in and the form's questions.
  *
  * Steps, one screen each, and only the ones this event has:
  *   Details   name, email, phone
  *   Questions the organiser's own questions, if it asks any
  *   Add-ons   the event's shelf, if it sells anything
  *   Review    what was entered and the total, then Confirm (free) or Pay
- * then "You're in" with the ticket. The step is in the address (?step=), so
- * the phone's back button steps back; what was typed is kept for the tab.
+ * then "You're in" with the ticket. The step is in the address (?step=),
+ * changed with the browser's own history (Next follows it, and the server
+ * isn't asked again), so the phone's back button steps back; what was typed
+ * is kept for the tab, and the ticket survives a reload.
  *
  * The calls are the ones the form has always made, in the same order with
  * the same payloads: register; then, when there is something to pay, create
  * the order and open Razorpay, which verifies. Trying again after a closed
  * checkout sends the same registration again with the guest token the first
  * one left, and the server hands back the unpaid registration it already has
- * rather than making another. Its refusals are shown in its own words: 409
- * ALREADY_REGISTERED (with the app), 409 REGISTRATION_AWAITING_PAYMENT, and
- * 400 CLUB_EMAIL beside the email field.
+ * rather than making another. Its refusals are sorted by their error_code
+ * (utils/register.js: describeRegisterError) and each is said in words.
  *
  * Signed in (with Google, or an email and password), the name and email
  * come from the account and the email can't be changed: the registration
- * goes in with the account's token and lands straight in the account, so
- * the server sends no guest token back and none is kept. The calls and
- * payloads are the same; only the Authorization header differs. Signed out,
- * a quiet line offers signing in (Google, or the email form with what was
- * typed here already in it), and the guest path is exactly as it was.
+ * goes in with the account's token and lands straight in the account. The
+ * person's own registration comes first: one waiting for payment is paid as
+ * it is (Finish payment: no form, past the deadline too, until the event
+ * ends), and one already good shows its ticket. Signed out, a quiet line
+ * offers signing in, and the guest path is exactly as it was.
  */
 
 const DETAIL_KEYS = ["name", "email", "phone"];
@@ -95,6 +108,14 @@ function focusField(key) {
   el.focus({ preventScroll: true });
 }
 
+const scrollTop = () => {
+  try {
+    window.scrollTo(0, 0);
+  } catch {
+    /* not in a browser */
+  }
+};
+
 /* ---------- small parts ---------- */
 
 function Progress({ steps, index, onJump }) {
@@ -121,43 +142,45 @@ function Progress({ steps, index, onJump }) {
   );
 }
 
-function Spinner() {
-  return <span className="rg-spin" aria-hidden="true" />;
+/** "Your registration is waiting for payment": pay it here when signed in; otherwise sign in to, or the app. */
+function AwaitingActions({ eventId, onPaid }) {
+  const auth = useAuth();
+  const signedIn = auth.status === "signed-in";
+  // An older server can't say which registration to pay: the app can.
+  const [inApp, setInApp] = useState(false);
+  const { busy, problem, pay } = useFinishPayment({ eventId, onPaid, onOldServer: () => setInApp(true) });
+  if (signedIn && inApp) return <StoreButtons />;
+  if (signedIn) {
+    return (
+      <>
+        <button type="button" className="dc-btn dc-btn--sm" onClick={pay} disabled={busy}>
+          {busy ? (
+            <>
+              <Spinner />
+              Opening payment…
+            </>
+          ) : (
+            "Finish payment"
+          )}
+        </button>
+        <PayNote problem={problem} />
+      </>
+    );
+  }
+  return (
+    <>
+      {auth.enabled ? (
+        <button type="button" className="dc-btn dc-btn--sm" onClick={() => auth.openSignIn({ reason: "register" })}>
+          Sign in to finish payment
+        </button>
+      ) : null}
+      <StoreButtons />
+    </>
+  );
 }
 
-const PROBLEMS = {
-  dismissed: {
-    tone: "calm",
-    title: "Payment not completed",
-    text: () => "You closed the payment window before paying, so nothing was charged. Your details are saved — pay whenever you're ready.",
-  },
-  verify: {
-    tone: "warn",
-    title: "We couldn't confirm your payment yet",
-    text: (email) => `If money left your account, don't pay again: Razorpay confirms it to us and your ticket will reach ${email}. If nothing was charged, try again.`,
-  },
-  load: {
-    tone: "calm",
-    title: "The payment window didn't open",
-    text: () => "Check your connection, then try again. Nothing was charged.",
-  },
-  start: {
-    tone: "calm",
-    title: "We couldn't start the payment",
-    text: () => "Nothing was charged. Try again in a moment.",
-  },
-};
-
-const paymentProblem = (reason, message = null) => ({ kind: "payment", reason: PROBLEMS[reason] ? reason : "start", message });
-
-/** "Failed to create payment order" → "Failed to create payment order." */
-const sentence = (s) => {
-  const t = String(s || "").trim();
-  return t && !/[.!?]$/.test(t) ? `${t}.` : t;
-};
-
 /** What went wrong with the registration, said once and calmly, with the way forward. */
-function Problem({ problem, email, signedIn, onRetry, onChangeEmail, onSignIn }) {
+function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, onPaid }) {
   const box = useRef(null);
   // Said where the eye is: the checkout closes over the top of a long page.
   useEffect(() => {
@@ -172,16 +195,20 @@ function Problem({ problem, email, signedIn, onRetry, onChangeEmail, onSignIn })
   let title = "We couldn't register you";
   let text = problem.message;
   let actions = null;
+  const backToEvent = (
+    <Link className="dc-btn dc-btn--ghost dc-btn--sm" href={eventPath(event)}>
+      Back to the event
+    </Link>
+  );
   if (problem.kind === "payment") {
-    const p = PROBLEMS[problem.reason];
-    tone = p.tone;
-    title = p.title;
-    text = problem.message ? `${sentence(problem.message)} Nothing was charged.` : p.text(email);
+    tone = problem.tone;
+    title = problem.title;
+    text = problem.text;
   } else if (problem.kind === "duplicate") {
     tone = "info";
     title = "You're already registered";
     actions = signedIn ? (
-      <Link className="dc-btn dc-btn--sm" to="/me/tickets">
+      <Link className="dc-btn dc-btn--sm" href="/me/tickets">
         Open My tickets
       </Link>
     ) : (
@@ -203,7 +230,15 @@ function Problem({ problem, email, signedIn, onRetry, onChangeEmail, onSignIn })
   } else if (problem.kind === "awaiting") {
     tone = "info";
     title = "Your registration is waiting for payment";
-    actions = <StoreButtons />;
+    actions = <AwaitingActions eventId={String(event.id)} onPaid={onPaid} />;
+  } else if (problem.kind === "closed" || problem.kind === "full") {
+    tone = "calm";
+    title = problem.title;
+    actions = backToEvent;
+  } else if (problem.kind === "soldout") {
+    tone = "warn";
+    title = "Something in your order sold out";
+    text = `${problem.message} Your order has been updated: check it, then carry on.`;
   } else if (problem.kind === "network" || problem.kind === "server") {
     title = problem.kind === "network" ? "We couldn't reach MyOtherApp" : "Something broke on our side";
     actions = (
@@ -263,6 +298,25 @@ function FormSkeleton() {
   );
 }
 
+/** A panel beside the summary: registration closed, paid for, waiting for payment. */
+function Panel({ event, club, icon = "ticket", title, children, actions }) {
+  return (
+    <div className="rg-layout">
+      <Summary event={event} club={club} />
+      <div className="rg-main">
+        <div className="rg-closed" role="status">
+          <span className="rg-closed-icon" aria-hidden="true">
+            <EpIcon name={icon} size={26} />
+          </span>
+          <h1 className="rg-h1">{title}</h1>
+          {children}
+          <div className="rg-closed-actions">{actions}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- registration isn't open ---------- */
 
 function Closed({ event, club, gate }) {
@@ -274,50 +328,138 @@ function Closed({ event, club, gate }) {
     live: { title: "It's happening now", text: "Registration has closed, but the live room is open: polls, questions and the quiz." },
   }[gate.kind] || { title: "Registration isn't open", text: "Check the event page for the latest." };
   return (
-    <div className="rg-layout">
-      <Summary event={event} club={club} />
-      <div className="rg-main">
-        <div className="rg-closed" role="status">
-          <span className="rg-closed-icon" aria-hidden="true">
-            <EpIcon name={gate.kind === "soon" ? "calendarPlus" : "ticket"} size={26} />
-          </span>
-          <h1 className="rg-h1">{copy.title}</h1>
-          <p className="rg-closed-text">{copy.text}</p>
-          <div className="rg-closed-actions">
-            {gate.kind === "live" ? (
-              <Link className="dc-btn dc-btn--accent" to={eventPath(event, "live")}>
-                Open the live room
-              </Link>
-            ) : null}
-            {gate.kind === "soon" ? <CalendarButton event={event} url={eventUrl(event)} /> : null}
-            <Link className="dc-btn" to={eventPath(event)}>
-              Back to the event
+    <Panel
+      event={event}
+      club={club}
+      icon={gate.kind === "soon" ? "calendarPlus" : "ticket"}
+      title={copy.title}
+      actions={
+        <>
+          {gate.kind === "live" ? (
+            <Link className="dc-btn dc-btn--accent" href={eventPath(event, "live")}>
+              Open the live room
             </Link>
-            <Link className="dc-btn dc-btn--ghost" to="/events">
-              Find other events
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+          ) : null}
+          {gate.kind === "soon" ? <CalendarButton event={event} url={eventUrl(event)} /> : null}
+          <Link className="dc-btn" href={eventPath(event)}>
+            Back to the event
+          </Link>
+          <Link className="dc-btn dc-btn--ghost" href="/events">
+            Find other events
+          </Link>
+        </>
+      }
+    >
+      <p className="rg-closed-text">{copy.text}</p>
+    </Panel>
   );
+}
+
+/* ---------- signed in, and already registered ---------- */
+
+/** Registered, waiting for payment: pay it as it is. */
+function FinishPanel({ event, club, registration, onPaid }) {
+  const { busy, problem, pay } = useFinishPayment({ eventId: String(event.id), registrationId: registration.registrationId, onPaid });
+  return (
+    <Panel
+      event={event}
+      club={club}
+      title="Finish your payment"
+      actions={
+        <>
+          <button type="button" className="dc-btn dc-btn--accent" onClick={pay} disabled={busy}>
+            {busy ? (
+              <>
+                <Spinner />
+                Opening payment…
+              </>
+            ) : (
+              "Finish payment"
+            )}
+          </button>
+          <Link className="dc-btn dc-btn--ghost" href="/me/tickets">
+            My tickets
+          </Link>
+        </>
+      }
+    >
+      <p className="rg-closed-text">
+        You&rsquo;re registered for <strong>{event.name}</strong>, but it&rsquo;s waiting for payment: the ticket works at the door once it&rsquo;s paid. Pay now and
+        it&rsquo;s ready straight away.
+      </p>
+      <PayNote problem={problem} className="rg-finish-note" />
+    </Panel>
+  );
+}
+
+/** Registered and good at the door: the ticket. */
+function Registered({ event, club, ticketId }) {
+  return (
+    <Panel
+      event={event}
+      club={club}
+      title="You're registered"
+      actions={
+        <>
+          {ticketId ? (
+            <Link className="dc-btn" href={`/tickets/${encodeURIComponent(ticketId)}`}>
+              View your ticket
+            </Link>
+          ) : null}
+          <Link className="dc-btn dc-btn--ghost" href="/me/tickets">
+            My tickets
+          </Link>
+          <Link className="dc-btn dc-btn--ghost" href={eventPath(event)}>
+            Back to the event
+          </Link>
+        </>
+      }
+    >
+      <p className="rg-closed-text">Your ticket for {event.name} is in My tickets, in the MyOtherApp app and in your email.</p>
+    </Panel>
+  );
+}
+
+/* ---------- the questions, and the person's own registration ---------- */
+
+/**
+ * GET /events/info/{id}: the organiser's questions and the fee as the form
+ * knows them and, sent with the account's token, the person's own
+ * registration. Asked again when who is reading changes; what came before
+ * stays shown meanwhile. `who` is "" when signed out.
+ */
+function useEventInfo(eventId, enabled, who) {
+  const [state, setState] = useState({ status: "loading", data: null, who: null });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let alive = true;
+    setState((s) => (s.status === "error" ? { ...s, status: "loading" } : s));
+    Promise.resolve(eventsApi.fetchEvent(eventId)).then(
+      (d) => alive && setState(d ? { status: "ready", data: d, who } : { status: "error", data: null, who }),
+      () => alive && setState({ status: "error", data: null, who }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [eventId, enabled, who, attempt]);
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
+  return { ...state, retry };
 }
 
 /* ---------- the flow ---------- */
 
-function Flow({ event, club }) {
+function Flow({ event, club, info, onDone }) {
   const eventId = String(event.id);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [params, setParams] = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const auth = useAuth();
   const account = auth.status === "signed-in" && auth.user?.email ? auth.user : null;
   const accountEmail = account?.email || null;
   const accountName = account?.name || null;
   const accountPhone = account?.phone || null;
 
-  const [info, setInfo] = useState({ status: "loading", questions: [], fee: null });
-  const [attempt, setAttempt] = useState(0);
   const [items, setItems] = useState(null);
   const [draft] = useState(() => loadDraft(eventId));
   const [values, setValues] = useState(() => withAccount(draft?.values || EMPTY, accountEmail, accountName, accountPhone));
@@ -327,11 +469,14 @@ function Flow({ event, club }) {
   const [serverErrors, setServerErrors] = useState({});
   const [phase, setPhase] = useState("idle");
   const [problem, setProblem] = useState(null);
-  const [done, setDone] = useState(() => (location.state?.rgDone?.eventId === eventId ? location.state.rgDone : null));
+  // Came here to change one thing from the review: Continue goes back to it.
+  const [editing, setEditing] = useState(false);
   const busy = useRef(false);
   const heading = useRef(null);
   const focusNext = useRef(null);
   const submittedAs = useRef(null);
+  // Which step each step was opened from on this visit, for Back to step back through history.
+  const openedFrom = useRef({});
 
   // Signing in part-way through fills in what the account knows; the email becomes the account's.
   useEffect(() => {
@@ -348,26 +493,8 @@ function Flow({ event, club }) {
     });
   }, [accountEmail, accountName, accountPhone]);
 
-  // The organiser's questions (and the fee as the form knows it).
-  useEffect(() => {
-    if (done) return undefined;
-    let alive = true;
-    setInfo((s) => (s.status === "loading" ? s : { ...s, status: "loading" }));
-    Promise.resolve(eventsApi.fetchEvent(eventId))
-      .then((d) => {
-        if (!alive) return;
-        if (!d) setInfo({ status: "error", questions: [], fee: null });
-        else setInfo({ status: "ready", questions: parseQuestions(d.additional_details), fee: Number(d.reg_fee) > 0 ? Number(d.reg_fee) : null });
-      })
-      .catch(() => alive && setInfo({ status: "error", questions: [], fee: null }));
-    return () => {
-      alive = false;
-    };
-  }, [eventId, attempt, done]);
-
   // The shelf. Nothing on it (or no answer) means no add-ons step.
   useEffect(() => {
-    if (done) return undefined;
     let alive = true;
     Promise.resolve(eventsApi.fetchStoreCatalog(eventId))
       .then((cat) => alive && setItems(cat && cat.enabled && Array.isArray(cat.items) ? cat.items : []))
@@ -375,19 +502,20 @@ function Flow({ event, club }) {
     return () => {
       alive = false;
     };
-  }, [eventId, done]);
+  }, [eventId]);
 
   // What was typed, kept for the tab.
   useEffect(() => {
-    if (!done) saveDraft(eventId, { values, answers, picks });
-  }, [eventId, values, answers, picks, done]);
+    saveDraft(eventId, { values, answers, picks });
+  }, [eventId, values, answers, picks]);
 
   const ready = info.status === "ready" && items !== null;
-  const questions = info.questions;
+  const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
+  const infoFee = Number(info.data?.reg_fee) > 0 ? Number(info.data.reg_fee) : null;
   const shelf = useMemo(() => items || [], [items]);
   const steps = useMemo(() => stepsFor({ questions, items: shelf }), [questions, shelf]);
 
-  const fee = event.has_fee ? (event.fee ?? info.fee) : 0;
+  const fee = event.has_fee ? (event.fee ?? infoFee) : 0;
   const addOns = picksTotal(shelf, picks);
   const total = fee === null ? null : fee + addOns;
   const pays = total === null || total > 0;
@@ -407,47 +535,46 @@ function Flow({ event, club }) {
   let index = Math.max(0, steps.findIndex((s) => s.id === want));
   if (firstBad !== -1 && index > firstBad) index = firstBad;
   const step = steps[index];
-  const editing = Boolean(location.state?.rgEdit);
 
+  /** This page's address with the step `id` in it (the first step has none). */
+  const hrefFor = useCallback(
+    (id, search = params) => {
+      const next = new URLSearchParams(search.toString());
+      if (id === null || id === steps[0].id) next.delete("step");
+      else next.set("step", id);
+      const s = next.toString();
+      return `${pathname}${s ? `?${s}` : ""}`;
+    },
+    [params, pathname, steps],
+  );
+
+  // A step is a new entry in the browser's history, made without asking the
+  // server: Next follows pushState and replaceState, and so does useSearchParams.
   const goTo = (id, { replace = false, edit = false } = {}) => {
-    setParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        if (id === steps[0].id) next.delete("step");
-        else next.set("step", id);
-        return next;
-      },
-      { replace, state: { rgFrom: step.id, ...(edit ? { rgEdit: true } : {}) } }
-    );
+    setEditing(edit);
+    const href = hrefFor(id);
+    if (replace) window.history.replaceState(null, "", href);
+    else {
+      openedFrom.current[id] = step.id;
+      window.history.pushState(null, "", href);
+    }
   };
 
   // An address naming a step that can't be shown yet is put right.
   useEffect(() => {
-    if (!ready || done || !want || step.id === want) return;
-    setParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        if (index === 0) next.delete("step");
-        else next.set("step", step.id);
-        return next;
-      },
-      { replace: true }
-    );
-  }, [ready, done, want, step.id, index, setParams]);
+    if (!ready || !want || step.id === want) return;
+    window.history.replaceState(null, "", hrefFor(step.id));
+  }, [ready, want, step.id, hrefFor]);
 
   // A new step starts at the top, with its title focused (or the field that needs fixing).
   const seen = useRef(false);
   useEffect(() => {
-    if (!ready || done) return;
+    if (!ready) return;
     if (!seen.current) {
       seen.current = true;
       return;
     }
-    try {
-      window.scrollTo(0, 0);
-    } catch {
-      /* not in a browser */
-    }
+    scrollTop();
     if (focusNext.current) {
       const key = focusNext.current;
       focusNext.current = null;
@@ -455,11 +582,11 @@ function Flow({ event, club }) {
     } else {
       heading.current?.focus({ preventScroll: true });
     }
-  }, [step.id, ready, done]);
+  }, [step.id, ready]);
 
   // Google's One Tap, offered quietly on the details step to someone signed out.
   const { enabled: signInOn, tryOneTap } = auth;
-  const onDetails = ready && !done && step.id === "details";
+  const onDetails = ready && step.id === "details";
   useEffect(() => {
     if (!signInOn || accountEmail || !onDetails || !oneTapWelcome()) return undefined;
     tryOneTap();
@@ -490,6 +617,10 @@ function Flow({ event, club }) {
     setAnswers((s) => ({ ...s, [key]: v }));
     changed(`q:${key}`);
   };
+  const setShelfPicks = (next) => {
+    setPicks(next);
+    setProblem((p) => (p?.kind === "soldout" ? null : p));
+  };
   // A field is checked once it is left with something in it; an empty one waits for Continue.
   const leave = (key, value) => () => {
     if (value === "" || value === undefined) return;
@@ -502,8 +633,11 @@ function Flow({ event, club }) {
   const back = () => {
     const prev = steps[index - 1];
     if (!prev) return;
-    if (location.state?.rgFrom === prev.id) navigate(-1);
-    else goTo(prev.id, { replace: true });
+    // Opened from the step before: back through history, so the phone's back button agrees.
+    if (openedFrom.current[step.id] === prev.id) {
+      delete openedFrom.current[step.id];
+      router.back();
+    } else goTo(prev.id, { replace: true });
   };
 
   const changeEmail = () => {
@@ -514,33 +648,36 @@ function Flow({ event, club }) {
 
   /* ---------- registering ---------- */
 
-  const finish = (responseData, paid) => {
+  const finish = (responseData, paid, amount = null) => {
     const ticket = {
       eventId,
       ticket_id: responseData.ticket_id,
       name: responseData.full_name || values.name,
       email: responseData.email || values.email,
       paid,
-      amount: paid ? Number(responseData.pay_amount) || 0 : 0,
+      amount: paid ? (amount ?? (Number(responseData.pay_amount) || 0)) : 0,
       account: submittedAs.current,
     };
     busy.current = false;
     setPhase("idle");
     clearDraft(eventId);
-    setDone(ticket);
-    const rest = new URLSearchParams(location.search);
-    rest.delete("step");
-    const search = rest.toString();
-    navigate({ pathname: location.pathname, search: search ? `?${search}` : "" }, { replace: true, state: { rgDone: ticket } });
-    try {
-      window.scrollTo(0, 0);
-    } catch {
-      /* not in a browser */
-    }
+    // The step leaves the address; the page shows the ticket from here on.
+    window.history.replaceState(null, "", hrefFor(null));
+    onDone(ticket);
+    scrollTop();
   };
 
   const showError = (error) => {
     const p = describeRegisterError(error, questions.map((q) => q.key));
+    if (p.kind === "soldout") {
+      const next = applyStockRefusal(shelf, picks, p);
+      setItems(next.items);
+      setPicks(next.picks);
+      const onShelf = steps.some((s) => s.id === "addons") && shelf.some((i) => String(i.id) === p.itemId);
+      setProblem({ ...p, step: onShelf ? "addons" : "review" });
+      if (onShelf) goTo("addons", { edit: true });
+      return;
+    }
     if (p.kind !== "fields") {
       setProblem(p);
       return;
@@ -558,6 +695,8 @@ function Flow({ event, club }) {
     goTo(target.id, { edit: true });
   };
 
+  const paymentProblem = (outcome, error = null) => ({ kind: "payment", ...describePayment(outcome, error, { email: values.email }) });
+
   const submit = async () => {
     if (busy.current) return;
     if (firstBad !== -1) {
@@ -574,48 +713,40 @@ function Flow({ event, club }) {
     };
     const payload = buildPayload({ values, questions, answers, ref: currentRef(), items: shelf, picks });
     let stage = "register";
+    let responseData = null;
     try {
-      const responseData = await eventsApi.registerForEvent(eventId, payload);
-      if (responseData && responseData.ticket_id) {
-        if (responseData.pay_amount > 0) {
-          // Payment required
-          stage = "payment";
-          setPhase("paying");
-          const paymentData = await paymentsApi.createPaymentOrder(eventId, responseData.event_registration_id);
-          if (paymentData) {
-            Promise.resolve(
-              processPayment({
-                paymentData,
-                userDetails: {
-                  name: values.name,
-                  email: values.email,
-                  phone: values.phone,
-                },
-                onSuccess: () => finish(responseData, true),
-                onFailure: (reason) => {
-                  setProblem(paymentProblem(reason));
-                  release();
-                },
-              })
-            ).catch(() => {
-              setProblem(paymentProblem("load"));
-              release();
-            });
-          } else {
-            setProblem(paymentProblem("start"));
-            release();
-          }
-        } else {
-          // No payment needed: the ticket is ready.
-          finish(responseData, false);
-        }
-      } else {
+      responseData = await eventsApi.registerForEvent(eventId, payload);
+      if (!responseData || !responseData.ticket_id) {
         setProblem({ kind: "message", message: "The registration didn't go through — no ticket came back. Try again." });
         release();
+        return;
       }
+      if (!(responseData.pay_amount > 0)) {
+        // No payment needed: the ticket is ready.
+        finish(responseData, false);
+        return;
+      }
+      stage = "payment";
+      setPhase("paying");
+      const order = await paymentsApi.createPaymentOrder(eventId, responseData.event_registration_id);
+      if (!order) {
+        setProblem(paymentProblem("start"));
+        release();
+        return;
+      }
+      const result = await payOrder(order, { name: values.name, email: values.email, phone: values.phone });
+      if (result.outcome === "paid") {
+        finish(responseData, true);
+        return;
+      }
+      setProblem(paymentProblem(result.outcome, result.error));
+      release();
     } catch (error) {
-      if (stage === "payment") setProblem(paymentProblem("start", error?.message || null));
-      else showError(error);
+      if (stage !== "payment") showError(error);
+      // Paid already (a second tap, the app), or nothing left to pay: the ticket is good.
+      else if (error?.code === "ALREADY_PAID") return finish(responseData, true);
+      else if (error?.code === "NOTHING_TO_PAY") return finish(responseData, false);
+      else setProblem(paymentProblem("refused", error));
       release();
     }
   };
@@ -635,14 +766,10 @@ function Flow({ event, club }) {
     }
     const allGood = steps.every((s) => Object.keys(errorsOf(s.id)).length === 0);
     if (editing && allGood) goTo("review");
-    else goTo(steps[index + 1].id, editing ? { edit: true } : undefined);
+    else goTo(steps[index + 1].id, { edit: editing });
   };
 
   /* ---------- what is shown ---------- */
-
-  if (done) {
-    return <Success event={event} club={club} ticket={done} />;
-  }
 
   const summary = <Summary event={event} club={club} lines={lines} total={total} picked={addOns > 0 || lines.length > 1} />;
 
@@ -654,7 +781,7 @@ function Flow({ event, club }) {
           <ErrorState
             title="The form didn't load"
             message="We couldn't load this event's registration form. Check your connection and try again."
-            onRetry={() => setAttempt((a) => a + 1)}
+            onRetry={info.retry}
           />
         </div>
       </div>
@@ -804,7 +931,7 @@ function Flow({ event, club }) {
             </div>
           ) : null}
 
-          {step.id === "addons" ? <MerchPicker items={shelf} picks={picks} onChange={setPicks} /> : null}
+          {step.id === "addons" ? <MerchPicker items={shelf} picks={picks} onChange={setShelfPicks} /> : null}
 
           {isReview ? (
             <div className="rg-review">
@@ -872,11 +999,24 @@ function Flow({ event, club }) {
           {problemHere ? (
             <Problem
               problem={problem}
-              email={values.email}
+              event={event}
               signedIn={Boolean(accountEmail)}
               onRetry={submit}
               onChangeEmail={changeEmail}
               onSignIn={auth.enabled ? () => auth.openSignIn({ reason: "register" }) : null}
+              onPaid={(r) =>
+                r.ticketId
+                  ? onDone({
+                      eventId,
+                      ticket_id: r.ticketId,
+                      name: values.name,
+                      email: values.email,
+                      paid: r.outcome === "paid",
+                      amount: r.amount || 0,
+                      account: accountEmail,
+                    })
+                  : info.retry()
+              }
             />
           ) : null}
 
@@ -919,20 +1059,66 @@ function Flow({ event, club }) {
 
 /* ---------- the page ---------- */
 
+/** Leaving the page forgets its ticket; a reload (no unmount) keeps it. Deferred, so a remount (React's dev checks) keeps it too. */
+const forgetting = new Map();
+
 export default function Register({ event, club = null }) {
-  const location = useLocation();
-  usePageMeta(`Register · ${event.name} · MyOtherApp`, `Register for ${event.name}${club?.name ? `, by ${club.name},` : ""} on MyOtherApp.`);
+  const eventId = String(event.id);
+  const auth = useAuth();
   const gate = registerState(event);
-  const finished = location.state?.rgDone?.eventId === String(event.id);
-  const open = finished || gate.kind === "open" || (gate.kind === "live" && event.registration_open);
+  const [done, setDone] = useState(null);
+
+  useEffect(() => {
+    clearTimeout(forgetting.get(eventId));
+    const kept = loadDone(eventId);
+    if (kept) setDone(kept);
+    return () => forgetting.set(eventId, setTimeout(() => forgetDone(eventId), 0));
+  }, [eventId]);
+
+  const finished = useCallback(
+    (ticket) => {
+      keepDone(eventId, ticket);
+      setDone(ticket);
+    },
+    [eventId],
+  );
+
+  const signedIn = auth.ready && auth.status === "signed-in";
+  const who = signedIn ? auth.user?.email || "account" : "";
+  const open = gate.kind === "open" || (gate.kind === "live" && event.registration_open);
+  const ended = gate.kind === "ended";
+  // The form needs its questions; signed in, the person's own registration matters even when the form is closed.
+  const info = useEventInfo(eventId, auth.ready && !done && (open || (signedIn && !ended)), who);
+  const mine = signedIn && info.who === who ? myRegistration(info.data) : null;
+
+  // Paid from the panel: the ticket, as the form shows one.
+  const paidNow = (r, ticketId) =>
+    finished({
+      eventId,
+      ticket_id: ticketId,
+      name: auth.user?.name || "",
+      email: auth.user?.email || "",
+      paid: r.outcome === "paid",
+      amount: r.amount || 0,
+      account: auth.user?.email || null,
+    });
+
+  let body;
+  if (done) body = <Success event={event} club={club} ticket={done} />;
+  else if (mine?.state === "unpaid" && !ended)
+    body = <FinishPanel event={event} club={club} registration={mine} onPaid={(r) => (mine.ticketId ? paidNow(r, mine.ticketId) : info.retry())} />;
+  else if (mine?.state === "registered") body = <Registered event={event} club={club} ticketId={mine.ticketId} />;
+  else if (open) body = <Flow key={eventId} event={event} club={club} info={info} onDone={finished} />;
+  else body = <Closed event={event} club={club} gate={gate} />;
+
   return (
     <SitePage>
       <div className="dc-wrap rg">
-        <Link className="rg-back" to={eventPath(event)}>
+        <Link className="rg-back" href={eventPath(event)}>
           <Icon name="arrowLeft" size={16} />
           Back to event
         </Link>
-        {open ? <Flow key={event.id} event={event} club={club} /> : <Closed event={event} club={club} gate={gate} />}
+        {body}
       </div>
     </SitePage>
   );
