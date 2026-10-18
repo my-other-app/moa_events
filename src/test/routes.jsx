@@ -5,7 +5,6 @@
  * checked in src/app/routes.test.js.
  */
 import { Route, Routes } from "react-router-dom";
-import DiscoverHome from "@/components/discover/homepage";
 import FindEvents from "@/components/discover/eventspage";
 import FindClubs from "@/components/discover/clubspage";
 import AboutPage from "@/components/discover/aboutpage";
@@ -19,7 +18,6 @@ import NotFound from "@/components/notfound";
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<DiscoverHome />} />
       <Route path="/events" element={<FindEvents />} />
       <Route path="/clubs" element={<FindClubs />} />
       <Route path="/threads" element={<ThreadsPage />} />

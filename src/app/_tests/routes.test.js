@@ -138,7 +138,7 @@ describe("which file answers which address", () => {
 
 describe("what link-preview bots get", () => {
   it("is the real page for the server-rendered ones", async () => {
-    for (const url of ["/events/hack-night-04", "/clubs/circuit-society", "/123", "/register/123", "/123/live"]) {
+    for (const url of ["/events/hack-night-04", "/clubs/circuit-society", "/123", "/register/123", "/123/live", "/"]) {
       expect((await resolve(url, { ua: BOT })).share).toBeUndefined();
       expect((await resolve(url, { ua: WHATSAPP })).share).toBeUndefined();
     }

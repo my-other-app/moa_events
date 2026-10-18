@@ -1,3 +1,9 @@
+"use client";
+
+/*
+ * A client component for the same reason as the event card: much markup,
+ * little data. Its HTML is still made on the server.
+ */
 import { Link } from "@/lib/router";
 import { formatCount, formatDistance, imageUrl } from "@/utils/format";
 import { Avatar, Img } from "./bits";
