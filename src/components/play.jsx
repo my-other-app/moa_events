@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import "@/styles/live.css";
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 import { errorLine, liveApi } from "@/api/live";
 import { currentPlayer, forgetPlayer } from "@/utils/live";
@@ -9,17 +10,24 @@ const MARK = ["▲", "◆", "●", "■", "★", "✚"];
 
 /**
  * The quiz, played: the lobby while the host waits, each question with its
- * clock, the right answer once the clock is out, the board at the end.
+ * clock, the right answer once the clock is out, the board at the end. Its
+ * server half (src/app/play/[eventId]/page.jsx) hands over the event's id;
+ * who is playing is in this browser's storage, read once the page is up.
  */
-const Play = () => {
-  const { eventId } = useParams();
-  const [player, setPlayer] = useState(() => currentPlayer(eventId));
+const Play = ({ eventId }) => {
+  const [player, setPlayer] = useState(null);
+  const [looked, setLooked] = useState(false);
   const [state, setState] = useState(null);
   const [left, setLeft] = useState(0);
   const [flash, setFlash] = useState(null);
   const [error, setError] = useState(null);
   const [gone, setGone] = useState(false);
   const timer = useRef(null);
+
+  useEffect(() => {
+    setPlayer(currentPlayer(eventId));
+    setLooked(true);
+  }, [eventId]);
 
   const load = useCallback(async () => {
     if (!player) return;
@@ -66,16 +74,17 @@ const Play = () => {
     }
   };
 
+  if (!looked) return <div className="live-page" role="status" aria-label="Opening the quiz" />;
   if (!player) {
     return (
       <div className="live-page">
         <div className="live-top">
-          <Link to={`/${eventId}/live`}>← Live room</Link>
+          <Link href={`/${eventId}/live`}>← Live room</Link>
         </div>
         <section className="live-card">
           <h2>{gone ? "That quiz has moved on" : "You are not in a quiz"}</h2>
           <p className="live-sub">Join with the code on the screen from the live room.</p>
-          <Link className="live-btn" to={`/${eventId}/live`}>
+          <Link className="live-btn" href={`/${eventId}/live`}>
             Open the live room
           </Link>
         </section>
@@ -89,7 +98,7 @@ const Play = () => {
   return (
     <div className="live-page">
       <div className="live-top">
-        <Link to={`/${eventId}/live`}>← Live room</Link>
+        <Link href={`/${eventId}/live`}>← Live room</Link>
         <h1>{state.title}</h1>
         <span className="live-dot">{state.name}</span>
       </div>

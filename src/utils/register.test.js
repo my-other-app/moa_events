@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+  applyStockRefusal,
   buildPayload,
   describeRegisterError,
+  forgetDone,
+  keepDone,
+  loadDone,
+  myRegistration,
   orderLines,
   parseQuestions,
   questionControl,
@@ -170,5 +175,154 @@ describe("what an error from the register call means", () => {
     expect(describeRegisterError({ status: 400, data: { detail: "Event is full" } })).toEqual({ kind: "message", message: "Event is full" });
     expect(describeRegisterError({ status: 500, data: { message: "Internal Server Error" } }).kind).toBe("server");
     expect(describeRegisterError({ status: 0, data: null, network: true }).kind).toBe("network");
+  });
+});
+
+describe("the refusals the server names by code (backend#68), and the shapes before it", () => {
+  const keys = ["college", "track"];
+  const envelope = (message, error_code, errors = null) => ({ message, errors, error_code, track_id: null });
+
+  it("ALREADY_REGISTERED: 409 from the public form in its own words; 400 signed in, with where the ticket is", () => {
+    const said = "This email is already registered for this event. Your ticket was sent to it; sign in to the MyOtherApp app with this email to see it.";
+    expect(describeRegisterError({ status: 409, data: envelope(said, "ALREADY_REGISTERED") })).toEqual({ kind: "duplicate", message: said });
+    expect(describeRegisterError({ status: 400, data: envelope("Already registered for this event", "ALREADY_REGISTERED") })).toEqual({
+      kind: "duplicate",
+      message: "Your ticket is in My tickets, and in your email.",
+    });
+  });
+
+  it("REGISTRATION_AWAITING_PAYMENT (409) is not a duplicate: it offers Finish payment", () => {
+    expect(describeRegisterError({ status: 409, data: envelope("Waiting for payment.", "REGISTRATION_AWAITING_PAYMENT") }).kind).toBe("awaiting");
+  });
+
+  it("REGISTRATIONS_CLOSED: the deadline and the start say when; the 409 says nothing about why (never a plan)", () => {
+    const deadline = describeRegisterError({
+      status: 400,
+      data: envelope("Registration deadline has passed", "REGISTRATIONS_CLOSED", { closed_reason: "deadline_passed", closed_at: "2026-10-12T18:29:00+00:00" }),
+    });
+    expect(deadline).toEqual({
+      kind: "closed",
+      reason: "deadline_passed",
+      title: "Registration has closed",
+      message: "Registration closed on Mon, 12 Oct · 11:59 PM IST. The organisers aren't taking new registrations.",
+    });
+    const early = describeRegisterError({
+      status: 400,
+      data: envelope("Registration has not started yet", "REGISTRATIONS_CLOSED", { closed_reason: "not_started", opens_at: "2026-10-20T04:30:00+00:00" }),
+    });
+    expect(early).toEqual({ kind: "closed", reason: "not_started", title: "Registration hasn't opened yet", message: "It opens Tue, 20 Oct · 10:00 AM IST. Come back then." });
+    const capped = describeRegisterError({ status: 409, data: envelope("This event isn't taking more registrations right now.", "REGISTRATIONS_CLOSED") });
+    expect(capped).toMatchObject({ kind: "closed", reason: "paused", title: "Registration is closed for now" });
+    expect(`${capped.title} ${capped.message}`).not.toMatch(/plan|upgrade|limit|subscription/i);
+    // A 409 with a code is never taken for "already registered".
+    expect(capped.kind).not.toBe("duplicate");
+    // Without the times, still words.
+    expect(describeRegisterError({ status: 400, data: envelope("x", "REGISTRATIONS_CLOSED", { closed_reason: "deadline_passed" }) }).message).toBe(
+      "The organisers aren't taking new registrations.",
+    );
+  });
+
+  it("EVENT_FULL says how many seats there were", () => {
+    expect(describeRegisterError({ status: 400, data: envelope("Event is full", "EVENT_FULL", { max_participants: 60 }) })).toEqual({
+      kind: "full",
+      title: "This event is full",
+      message: "All 60 seats are taken. Keep an eye on the event page in case one opens up.",
+    });
+    expect(describeRegisterError({ status: 400, data: envelope("Event is full", "EVENT_FULL") }).message).toMatch(/^Every seat is taken\./);
+  });
+
+  it("SOLD_OUT names the add-on, its size and what is left; ITEM_UNAVAILABLE is none left", () => {
+    expect(
+      describeRegisterError({ status: 422, data: envelope("Hack Night tee M: only 2 left", "SOLD_OUT", { item_id: "tee", variant_id: "m", available: 2 }) }),
+    ).toEqual({ kind: "soldout", itemId: "tee", variantId: "m", available: 2, message: "Hack Night tee M: only 2 left." });
+    expect(describeRegisterError({ status: 422, data: envelope("Sticker sheet is sold out", "SOLD_OUT", { item_id: 7, variant_id: null, available: 0 }) })).toMatchObject({
+      kind: "soldout",
+      itemId: "7",
+      variantId: null,
+      available: 0,
+    });
+    expect(describeRegisterError({ status: 422, data: envelope("One of the items is no longer on sale", "ITEM_UNAVAILABLE", { item_id: "tee" }) })).toMatchObject({
+      kind: "soldout",
+      itemId: "tee",
+      available: 0,
+    });
+  });
+
+  it("INVALID_ANSWERS puts each answer's problem beside its question, with the server's line", () => {
+    expect(
+      describeRegisterError(
+        { status: 400, data: envelope("Check your answers: College, Pick a track.", "INVALID_ANSWERS", { college: "This field is required", track: "Invalid option selected" }) },
+        keys,
+      ),
+    ).toEqual({
+      kind: "fields",
+      fields: { "q:college": "This field is required", "q:track": "Invalid option selected" },
+      message: "Check your answers: College, Pick a track.",
+    });
+  });
+
+  it("CLUB_EMAIL and EMAIL_MISMATCH are about the email", () => {
+    expect(describeRegisterError({ status: 400, data: envelope("This email belongs to a club's account. Register with your own email.", "CLUB_EMAIL") }).fields).toEqual({
+      email: "This email belongs to a club's account. Register with your own email.",
+    });
+    expect(describeRegisterError({ status: 400, data: envelope("Email does not match with the logged in user email", "EMAIL_MISMATCH") }).fields.email).toMatch(
+      /isn't the email you're signed in with/,
+    );
+  });
+
+  it("an older server's 409 without a code is still the duplicate", () => {
+    expect(describeRegisterError({ status: 409, data: { message: "Already here." } }).kind).toBe("duplicate");
+  });
+});
+
+describe("the signed-in person's own registration (GET /events/info/{id})", () => {
+  it("reads is_paid and registration_id; an older server that says neither is unknown", () => {
+    expect(myRegistration(null)).toBeNull();
+    expect(myRegistration({ is_registered: false, is_paid: null, registration_id: null })).toEqual({ state: "none", registrationId: null, ticketId: null });
+    expect(myRegistration({ is_registered: true, is_paid: false, registration_id: "reg-9", ticket_id: "MOA-1" })).toEqual({ state: "unpaid", registrationId: "reg-9", ticketId: "MOA-1" });
+    expect(myRegistration({ is_registered: true, is_paid: true, registration_id: 12, ticket_id: "MOA-1" })).toEqual({ state: "registered", registrationId: "12", ticketId: "MOA-1" });
+    expect(myRegistration({ is_registered: true, ticket_id: "MOA-1" })).toEqual({ state: "unknown", registrationId: null, ticketId: "MOA-1" });
+    // Unpaid with no id to pay is the old way too.
+    expect(myRegistration({ is_registered: true, is_paid: false, registration_id: null }).state).toBe("unknown");
+  });
+});
+
+describe("an add-on that sold out meanwhile", () => {
+  const TEE = { id: "tee", name: "Tee", price: 450, left: null, variants: [{ id: "m", label: "M", left: 30 }, { id: "l", label: "L", left: 5 }] };
+  const STICKERS = { id: 7, name: "Stickers", price: 50, left: 20, variants: [] };
+
+  it("shows what is left of the size and cuts the pick to it, or drops it", () => {
+    const picks = { tee: { qty: 3, variant_id: "m" }, 7: { qty: 2, variant_id: null } };
+    const fewer = applyStockRefusal([TEE, STICKERS], picks, { itemId: "tee", variantId: "m", available: 2 });
+    expect(fewer.items[0].variants).toEqual([{ id: "m", label: "M", left: 2 }, { id: "l", label: "L", left: 5 }]);
+    expect(fewer.picks).toEqual({ tee: { qty: 2, variant_id: "m" }, 7: { qty: 2, variant_id: null } });
+    const none = applyStockRefusal([TEE, STICKERS], picks, { itemId: "tee", variantId: "m", available: 0 });
+    expect(none.picks.tee).toEqual({ qty: 0, variant_id: null });
+  });
+
+  it("marks an item without sizes, and an item no longer on sale at all", () => {
+    const picks = { tee: { qty: 1, variant_id: "l" }, 7: { qty: 4, variant_id: null } };
+    const out = applyStockRefusal([TEE, STICKERS], picks, { itemId: "7", variantId: null, available: 0 });
+    expect(out.items[1].left).toBe(0);
+    expect(out.picks[7]).toEqual({ qty: 0, variant_id: null });
+    const gone = applyStockRefusal([TEE, STICKERS], picks, { itemId: "tee", variantId: null, available: 0 });
+    expect(gone.items[0].variants.every((v) => v.left === 0)).toBe(true);
+    expect(gone.picks.tee).toEqual({ qty: 0, variant_id: null });
+    // Something the shelf doesn't have changes nothing.
+    expect(applyStockRefusal([TEE], picks, { itemId: "nope", available: 0 }).picks).toBe(picks);
+  });
+});
+
+describe("the ticket just made, kept for a reload", () => {
+  afterEach(() => sessionStorage.clear());
+  it("is kept per event for the tab, and forgotten", () => {
+    const ticket = { eventId: "124", ticket_id: "MOA77", name: "Asha", email: "a@example.org", paid: false, amount: 0, account: null };
+    keepDone("124", ticket);
+    expect(loadDone("124")).toEqual(ticket);
+    expect(loadDone("125")).toBeNull();
+    forgetDone("124");
+    expect(loadDone("124")).toBeNull();
+    sessionStorage.setItem("moa.register.done.124", "{not json");
+    expect(loadDone("124")).toBeNull();
   });
 });

@@ -1,11 +1,17 @@
-import { Link } from "react-router-dom";
+"use client";
+
+/*
+ * A client component on purpose: a card is a lot of markup and a little
+ * data, so a server-rendered page sends its HTML and the card's data,
+ * rather than its HTML and the same markup again as React's payload. Its
+ * HTML is still made on the server; nothing here reads the browser.
+ */
+import { Link } from "@/lib/router";
 import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, statusPill } from "@/utils/format";
-import { eventHref, seatsInfo } from "@/utils/cover";
+import { coverFields, eventHref, seatsInfo } from "@/utils/cover";
 import { Avatar, Img } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
 
 /** The pill for the poster: what is most pressing, and a quiet "Free" beside it while there are places. */
 function Pills({ event }) {
@@ -79,7 +85,7 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
         <Img
           src={imageUrl(event.poster, "medium")}
           alt={`Poster for ${event.name}`}
-          fallback={<EventCover event={event} />}
+          fallback={<EventCover event={coverFields(event)} />}
           extra={row ? null : <DateBadge iso={event.starts_at} />}
         />
         {row ? null : <Pills event={event} />}
@@ -164,6 +170,17 @@ export function EventRailSkeleton({ count = 4, grid = false }) {
     <div className={grid ? "dc-grid dc-grid--4" : "dc-rail dc-rail--cards"} role="status" aria-label="Loading events">
       {Array.from({ length: count }, (_, i) => (
         <EventCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+/** A row of events: it scrolls sideways on a phone and is a one-row grid on a desk ("See all" has the rest). */
+export function EventRail({ events, limit = 8 }) {
+  return (
+    <div className="dc-rail dc-rail--cards dc-rail--clip">
+      {events.slice(0, limit).map((e) => (
+        <EventCard key={e.id} event={e} />
       ))}
     </div>
   );

@@ -1,8 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { parseHome } from "@/api/discover";
 import { HomeHero } from "./hero";
+import { NearYou } from "./homeislands";
+
+/* The hero is rendered on the server from the home data; its search (and the place in it) is an island inside <NearYou>. */
+let where;
+beforeEach(() => {
+  where = { source: "none" };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ where, near: [], clubs: [] }))));
+});
+afterEach(() => vi.unstubAllGlobals());
 
 const event = (id, over = {}) => ({
   id,
@@ -25,14 +34,22 @@ const show = (props) =>
   render(
     <MemoryRouter initialEntries={["/"]}>
       <Routes>
-        <Route path="/" element={<HomeHero {...props} />} />
+        <Route
+          path="/"
+          element={
+            <NearYou>
+              <HomeHero {...props} />
+            </NearYou>
+          }
+        />
         <Route path="*" element={<Where />} />
       </Routes>
     </MemoryRouter>
   );
 
 describe("the home hero", () => {
-  it("fans out real events coming up, live first, and each one opens its page", () => {
+  it("fans out real events coming up, live first, and each one opens its page", async () => {
+    where = { city: "Pune", source: "ip", lat: 18.5, lng: 73.8 };
     const data = parseHome({
       where: { city: "Pune", source: "ip" },
       this_week: [event(1), event(2, { status: "live", poster: "https://cdn.example/p2.jpg" }), event(3, { status: "ended" })],
@@ -46,7 +63,7 @@ describe("the home hero", () => {
     });
     // The API is adding slugs; a card links by one when it is there.
     data.popular[1] = { ...data.popular[1], slug: "event-four" };
-    show({ data, where: data.where });
+    show({ data });
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Find your people. Show up.");
     const fan = screen.getByRole("list", { name: "Coming up" });
@@ -72,7 +89,9 @@ describe("the home hero", () => {
 
     expect(screen.getByText("upcoming events", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("cities")).toBeInTheDocument();
-    expect(screen.getByText("Near Pune")).toBeInTheDocument();
+    // The place is the visitor's, filled in by the island.
+    expect(screen.getByText("Anywhere")).toBeInTheDocument();
+    expect(await screen.findByText("Near Pune")).toBeInTheDocument();
   });
 
   it("still sells the place when there is nothing on yet", () => {
@@ -93,10 +112,8 @@ describe("the home hero", () => {
     expect(box).toHaveAccessibleName("Search events");
   });
 
-  it("shows placeholders while loading, then searches into find-events", async () => {
-    show({ data: null, loading: true });
-    expect(document.querySelector(".dc-fan .dc-skel")).not.toBeNull();
-    expect(screen.queryByRole("list", { name: "Coming up" })).toBeNull();
+  it("searches into find-events", async () => {
+    show({ data: parseHome({}) });
     const box = screen.getByPlaceholderText("Search events or topics");
     fireEvent.change(box, { target: { value: "robots" } });
     fireEvent.submit(box.closest("form"));

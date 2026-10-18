@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { useCalendarCounts } from "@/utils/eventcalendar";
 import {
@@ -17,7 +19,6 @@ import {
 } from "@/utils/days";
 import { Dialog } from "./bits";
 import Icon from "./icons";
-import "@/styles/calendar.css";
 
 /* ---------- the month grid ---------- */
 

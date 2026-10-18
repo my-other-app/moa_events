@@ -2,7 +2,7 @@
  * Sign in with Google, through Google Identity Services (google.accounts.id).
  *
  * The client id is the public OAuth web client id, set as
- * VITE_GOOGLE_CLIENT_ID at build time; it must be the same one the API checks
+ * NEXT_PUBLIC_GOOGLE_CLIENT_ID at build time; it must be the same one the API checks
  * tokens against (its GOOGLE_WEB_CLIENT_ID). Without it the site has no
  * sign-in at all and works exactly as it did before.
  *
@@ -16,7 +16,7 @@ import { jwtClaims } from "./jwt";
 export const GSI_SRC = "https://accounts.google.com/gsi/client";
 
 export function googleClientId() {
-  const id = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const id = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   return typeof id === "string" && id.trim() ? id.trim() : null;
 }
 

@@ -1,4 +1,5 @@
 import { CONTACT_EMAIL } from "@/config";
+import { SIGN_IN_REFUSALS } from "./context";
 
 /**
  * Signing in with an email and password: the other way into the same account
@@ -56,7 +57,9 @@ export function clock(seconds) {
 const RESET_KEY = "moa.pwreset";
 const session = () => {
   try {
-    return typeof sessionStorage === "undefined" ? null : sessionStorage;
+    // Only in a browser: on the server there is none (newer Node has a sessionStorage global that isn't one).
+    if (typeof window === "undefined" || typeof sessionStorage === "undefined" || typeof sessionStorage?.getItem !== "function") return null;
+    return sessionStorage;
   } catch {
     return null;
   }
@@ -157,7 +160,8 @@ export function describeAuthError(error, flow) {
     // The rate limiter's own refusal ({error: "Rate limit exceeded: …"}) says nothing a person needs.
     return { kind: "busy", message: BUSY };
   }
-  if (code === "TOTP_REQUIRED") return { kind: "totp", message: said || "Enter the code from your authenticator app." };
+  if (code === "ACCOUNT_SUSPENDED" || code === "CLUB_NOT_VERIFIED") return refusedHere(said, code);
+  if (code === "TOTP_REQUIRED") return { ...SIGN_IN_REFUSALS.TOTP_REQUIRED };
   if (code === "TOTP_INVALID") return { kind: "fields", fields: { totp: said || "That code is not valid." }, message: said };
   if (code === "CODE_INVALID" || code === "CODE_LOCKED" || code === "CODE_EXPIRED") {
     return { kind: "code", code, message: said || "That code isn't right.", attemptsLeft: num(errors.attempts_left) };
@@ -176,18 +180,13 @@ export function describeAuthError(error, flow) {
 
 /**
  * The password was right but the account isn't one this site signs in: the
- * profile is refused (403) for a club's dashboard login, and for a suspended
- * account.
+ * profile is refused (403) for a club's dashboard login (CLUB_NOT_VERIFIED,
+ * or an older server's plain 403), and for a suspended account
+ * (ACCOUNT_SUSPENDED; an older server only said so in words).
  */
-export function refusedHere(said) {
-  if (/suspend/i.test(String(said || ""))) {
-    return { kind: "refused", message: `This account has been suspended. If you think that's a mistake, write to ${CONTACT_EMAIL}.` };
-  }
-  return {
-    kind: "refused",
-    message: "This email signs in to a club's dashboard, not to a MyOtherApp account. Use the clubs dashboard for it, or sign in here with your own account.",
-    club: true,
-  };
+export function refusedHere(said, code = null) {
+  if (code === "ACCOUNT_SUSPENDED" || (code !== "CLUB_NOT_VERIFIED" && /suspend/i.test(String(said || "")))) return { ...SIGN_IN_REFUSALS.ACCOUNT_SUSPENDED };
+  return { ...SIGN_IN_REFUSALS.CLUB_NOT_VERIFIED };
 }
 
 /** What a resend countdown starts from: the server's `retry_after` when it gave one. */

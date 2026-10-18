@@ -1,5 +1,8 @@
+"use client";
+
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
+import { usePlans } from "@/utils/plans";
 import { CLUBS_URL, CONTACT_EMAIL } from "@/config";
 import {
   addedFeatures,
@@ -15,7 +18,6 @@ import {
   yearlyOffer,
 } from "@/utils/pricing";
 import Icon from "./icons";
-import "@/styles/pricing.css";
 
 /** A card lists everything its plan adds up to this many, and otherwise five and "and N more". */
 const ADDS_ALL = 6;
@@ -323,27 +325,32 @@ function Unavailable({ onRetry }) {
  * The plans: a monthly/yearly switch, a card for each plan (the featured
  * one marked "Most popular") and, with `compare="table"`, the full
  * comparison under them; otherwise a link to it, and on a phone the cards
- * keep to their limits (the rest is a tap away). `plans` is what
- * usePlans() returns. Prices only ever come from the API.
+ * keep to their limits (the rest is a tap away). Prices only ever come from
+ * the API.
+ *
+ * `data` is parsePlans' result as the server read it: the whole block is
+ * rendered on the server, and this island only switches the cycle. Null
+ * when the server couldn't read them: the browser asks itself.
  */
-export function Pricing({ plans, compare = "table", moreHref = "#compare", compareHref = "/pricing#compare" }) {
+export function Pricing({ data = null, compare = "table", moreHref = "#compare", compareHref = "/pricing#compare" }) {
+  const plans = usePlans(data);
   const [cycle, setCycle] = useState("monthly");
   if (plans.status === "loading") return <Loading />;
   if (plans.status !== "ready" || !plans.data) return <Unavailable onRetry={plans.retry} />;
-  const { data } = plans;
-  const offer = yearlyOffer(data.yearlyMonthsFree);
-  const hasYearly = data.plans.some((p) => p.yearly > 0 && p.monthly > 0);
+  const shown = plans.data;
+  const offer = yearlyOffer(shown.yearlyMonthsFree);
+  const hasYearly = shown.plans.some((p) => p.yearly > 0 && p.monthly > 0);
   return (
     <div className={`pr-pricing${compare === "table" ? "" : " pr-pricing--brief"}`}>
       {hasYearly ? <CycleSwitch cycle={cycle} onChange={setCycle} offer={offer} /> : null}
-      <ul className={`pr-plans pr-plans--${data.plans.length}`}>
-        {data.plans.map((p, i) => (
-          <PlanCard key={p.key} plans={data.plans} index={i} cycle={cycle} currency={data.currency} moreHref={compare === "table" ? moreHref : compareHref} />
+      <ul className={`pr-plans pr-plans--${shown.plans.length}`}>
+        {shown.plans.map((p, i) => (
+          <PlanCard key={p.key} plans={shown.plans} index={i} cycle={cycle} currency={shown.currency} moreHref={compare === "table" ? moreHref : compareHref} />
         ))}
       </ul>
-      {data.currency === "INR" ? <p className="pr-fineprint">Prices are in Indian rupees.</p> : null}
+      {shown.currency === "INR" ? <p className="pr-fineprint">Prices are in Indian rupees.</p> : null}
       {compare === "table" ? (
-        <CompareTable data={data} cycle={cycle} />
+        <CompareTable data={shown} cycle={cycle} />
       ) : (
         <p className="pr-compare-link">
           <Link className="dc-btn dc-btn--ghost" to={compareHref}>

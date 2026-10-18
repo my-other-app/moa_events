@@ -1,24 +1,26 @@
+"use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { accountApi } from "@/api/account";
 import { useAuth } from "@/auth/context";
 import { eventPath, whenLine } from "@/utils/eventpage";
 import { imageUrl } from "@/utils/format";
-import { useNoIndex, usePageMeta } from "@/utils/meta";
 import { VerifyBanner } from "../auth/verifyemail";
 import { SitePage } from "../discover/chrome";
 import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
 import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
 import { EventCover } from "../discover/cover";
 import Icon from "../discover/icons";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
+import { FinishPaymentButton } from "../register/finishpayment";
 
 /**
- * The signed-in person's own pages: /me/tickets and /me/following. Kept out
- * of search results. Signed out, each asks to sign in; in a build without
- * sign-in, each points to the app, where these have always lived.
+ * The signed-in person's own pages: /me/tickets and /me/following. Their
+ * server halves (src/app/me/...) set the head (never indexed); these render
+ * the same neutral first paint on the server and in the browser, then, once
+ * the browser has read who is signed in: the list, or the way in. In a build
+ * without sign-in, each points to the app, where these have always lived.
  */
 
 const TICKETS_PAGE = 20;
@@ -38,7 +40,7 @@ function useAccountList(load, pageSize, key) {
 
   useEffect(() => {
     const id = ++seq.current;
-    setState({ status: "loading", items: [], more: false });
+    setState((s) => (s.status === "ready" && attempt > 0 ? s : { status: "loading", items: [], more: false }));
     setExtra({ busy: false, error: false });
     loader.current(0).then(
       (p) => {
@@ -64,6 +66,7 @@ function useAccountList(load, pageSize, key) {
     );
   }, [pageSize]);
 
+  // Asked again in place: a list already shown stays until the new one comes.
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
   return { ...state, extra, loadMore, retry };
 }
@@ -79,17 +82,27 @@ function ShowMore({ list, label }) {
   );
 }
 
+/** A tab that knows it is the page being read. */
+function Tab({ href, children }) {
+  const current = usePathname() === href;
+  return (
+    <Link href={href} className={current ? "active" : undefined} aria-current={current ? "page" : undefined}>
+      {children}
+    </Link>
+  );
+}
+
 function MeTabs() {
   return (
     <nav className="me-tabs" aria-label="Your things">
-      <NavLink to="/me/tickets">
+      <Tab href="/me/tickets">
         <Icon name="ticket" size={16} />
         My tickets
-      </NavLink>
-      <NavLink to="/me/following">
+      </Tab>
+      <Tab href="/me/following">
         <Icon name="users" size={16} />
         Following
-      </NavLink>
+      </Tab>
     </nav>
   );
 }
@@ -108,7 +121,7 @@ function SignInPrompt({ icon, title, text, reason }) {
         <button type="button" className="dc-btn" onClick={() => auth.openSignIn({ reason })}>
           Sign in
         </button>
-        <Link className="dc-btn dc-btn--ghost" to="/events">
+        <Link className="dc-btn dc-btn--ghost" href="/events">
           Find events
         </Link>
       </div>
@@ -132,6 +145,17 @@ function InTheApp({ icon, title, text }) {
   );
 }
 
+/** Before the browser has read who is signed in (the server's paint, and the first in the browser). */
+function Reading({ label }) {
+  return (
+    <div className="me-tickets" role="status" aria-label={label}>
+      {[0, 1].map((i) => (
+        <span key={i} className="dc-skel me-skel" />
+      ))}
+    </div>
+  );
+}
+
 /* ---------- /me/tickets ---------- */
 
 function Thumb({ event }) {
@@ -142,8 +166,14 @@ function Thumb({ event }) {
   );
 }
 
-/** One ticket: the event (a link to its page) on the left, the stub with the code and the ticket's own page on the right. */
-function TicketRow({ item, past }) {
+/**
+ * One ticket: the event (a link to its page) on the left, the stub with the
+ * code and the ticket's own page on the right. A registration waiting for
+ * payment is paid right here (Finish payment); on a server that can't say
+ * which registration it is, the event's form takes over, as it always did.
+ */
+function TicketRow({ item, past, onPaid }) {
+  const router = useRouter();
   const e = item.event;
   const when = whenLine(e.starts_at);
   const where = e.is_online ? "Online" : e.location_name || "Venue to be announced";
@@ -159,7 +189,7 @@ function TicketRow({ item, past }) {
             </p>
           ) : null}
           <h3 className="me-ticket-name">
-            <Link to={eventPath(e)}>{e.name}</Link>
+            <Link href={eventPath(e)}>{e.name}</Link>
           </h3>
           <p className="me-ticket-meta">
             {e.club?.name ? <span>by {e.club.name}</span> : null}
@@ -187,17 +217,21 @@ function TicketRow({ item, past }) {
         <div className="me-ticket-actions">
           {item.awaitingPayment ? (
             past ? null : (
-              <Link className="dc-btn dc-btn--sm" to={`${eventPath(e)}/register`} aria-label={`Finish payment for ${e.name}`}>
-                Finish payment
-              </Link>
+              <FinishPaymentButton
+                eventId={e.id}
+                className="dc-btn dc-btn--sm"
+                label={`Finish payment for ${e.name}`}
+                onPaid={() => onPaid(e)}
+                onOldServer={() => router.push(eventPath(e, "register"))}
+              />
             )
           ) : (
-            <Link className="dc-btn dc-btn--sm" to={ticketPath} aria-label={`View ticket for ${e.name}`}>
+            <Link className="dc-btn dc-btn--sm" href={ticketPath} aria-label={`View ticket for ${e.name}`}>
               View ticket
             </Link>
           )}
           {item.certificate ? (
-            <Link className="me-cert" to={`/certificates/${encodeURIComponent(item.ticket_id)}`} aria-label={`Certificate for ${e.name}`}>
+            <Link className="me-cert" href={`/certificates/${encodeURIComponent(item.ticket_id)}`} aria-label={`Certificate for ${e.name}`}>
               <Icon name="award" size={15} />
               Certificate
             </Link>
@@ -209,18 +243,20 @@ function TicketRow({ item, past }) {
 }
 
 function TicketsSkeleton() {
-  return (
-    <div className="me-tickets" role="status" aria-label="Loading your tickets">
-      {[0, 1, 2].map((i) => (
-        <span key={i} className="dc-skel me-skel" />
-      ))}
-    </div>
-  );
+  return <Reading label="Loading your tickets" />;
 }
 
 function Tickets({ email }) {
   const upcoming = useAccountList((offset) => accountApi.myEvents({ ended: false, offset, limit: TICKETS_PAGE }), TICKETS_PAGE, email);
   const past = useAccountList((offset) => accountApi.myEvents({ ended: true, offset, limit: TICKETS_PAGE }), TICKETS_PAGE, email);
+  const [paid, setPaid] = useState(null);
+
+  // Paid from a row: say so, and read the lists again (the row becomes a ticket).
+  const onPaid = (event) => {
+    setPaid(event.name);
+    upcoming.retry();
+    past.retry();
+  };
 
   let body;
   if (upcoming.status === "error" || past.status === "error") {
@@ -238,10 +274,10 @@ function Tickets({ email }) {
   } else if (!upcoming.items.length && !past.items.length) {
     body = (
       <EmptyState title="No tickets yet" message="When you register for an event — here or in the app — your ticket shows up here.">
-        <Link className="dc-btn" to="/events">
+        <Link className="dc-btn" href="/events">
           Find events
         </Link>
-        <Link className="dc-btn dc-btn--ghost" to="/clubs">
+        <Link className="dc-btn dc-btn--ghost" href="/clubs">
           Browse clubs
         </Link>
       </EmptyState>
@@ -257,7 +293,7 @@ function Tickets({ email }) {
             <>
               <ul className="me-tickets">
                 {upcoming.items.map((t) => (
-                  <TicketRow key={t.ticket_id} item={t} />
+                  <TicketRow key={t.ticket_id} item={t} onPaid={onPaid} />
                 ))}
               </ul>
               <ShowMore list={upcoming} label="Show more" />
@@ -265,7 +301,7 @@ function Tickets({ email }) {
           ) : (
             <p className="dc-section-sub">
               Nothing coming up.{" "}
-              <Link className="dc-link" to="/events">
+              <Link className="dc-link" href="/events">
                 Find your next event
               </Link>
             </p>
@@ -278,7 +314,7 @@ function Tickets({ email }) {
             </h2>
             <ul className="me-tickets">
               {past.items.map((t) => (
-                <TicketRow key={t.ticket_id} item={t} past />
+                <TicketRow key={t.ticket_id} item={t} past onPaid={onPaid} />
               ))}
             </ul>
             <ShowMore list={past} label="Show older" />
@@ -287,16 +323,26 @@ function Tickets({ email }) {
       </>
     );
   }
-  return body;
+  return (
+    <>
+      {paid ? (
+        <p className="me-notice" role="status">
+          <Icon name="check" size={16} />
+          Payment received — your ticket for {paid} is ready.
+        </p>
+      ) : null}
+      {body}
+    </>
+  );
 }
 
 export function MyTicketsPage() {
   const auth = useAuth();
-  useNoIndex();
-  usePageMeta("My tickets · MyOtherApp", "Your tickets on MyOtherApp, on the web and in the app.");
   let content;
   if (!auth.enabled) {
     content = <InTheApp icon="ticket" title="Your tickets are in the app" text="Every ticket you get is in the MyOtherApp app, and in your email." />;
+  } else if (!auth.ready) {
+    content = <Reading label="Loading your tickets" />;
   } else if (auth.status !== "signed-in") {
     content = (
       <SignInPrompt
@@ -350,7 +396,7 @@ function FollowedClubs({ email }) {
   if (!clubs.items.length) {
     return (
       <EmptyState title="You're not following any clubs yet" message="Follow a club to hear the moment it announces an event or posts something new.">
-        <Link className="dc-btn" to="/clubs">
+        <Link className="dc-btn" href="/clubs">
           Browse clubs
         </Link>
       </EmptyState>
@@ -370,11 +416,11 @@ function FollowedClubs({ email }) {
 
 export function FollowingPage() {
   const auth = useAuth();
-  useNoIndex();
-  usePageMeta("Following · MyOtherApp", "The clubs you follow on MyOtherApp.");
   let content;
   if (!auth.enabled) {
     content = <InTheApp icon="users" title="Follow clubs in the app" text="Follow clubs in the MyOtherApp app to hear the moment they announce an event." />;
+  } else if (!auth.ready) {
+    content = <Reading label="Loading the clubs you follow" />;
   } else if (auth.status !== "signed-in") {
     content = (
       <SignInPrompt

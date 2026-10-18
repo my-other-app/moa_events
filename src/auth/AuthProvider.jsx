@@ -1,14 +1,36 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accountApi } from "@/api/account";
-import SignInSheet from "@/components/auth/signinsheet";
 import { AuthContext, describeSignInError, userFromSession } from "./context";
 import { cleanEmail, markPasswordResetMissing } from "./email";
 import { cancelOneTap, credentialClaims, forgetGoogleChoice, googleEnabled, promptOneTap, setCredentialHandler } from "./google";
 import { jwtClaims } from "./jwt";
-import { clearSession, forgetGuestTokens, getSession, setSession, subscribe, updateSession } from "./session";
+import { clearSession, dismissNotice, forgetGuestTokens, getNotice, getSession, sessionKey, setSession, subscribe, updateSession } from "./session";
+import SignedOutNotice from "@/components/auth/signedout";
+
+// The sheet and its forms load the first time someone opens it, not with every page.
+const SignInSheet = lazy(() => import("@/components/auth/signinsheet"));
 
 const IDLE = { status: "idle", error: null };
 const SHUT = { open: false, reason: null, view: "start", email: "", n: 0 };
+
+/*
+ * The session and whether it has been read yet, as one snapshot, so the two
+ * change together. The server (and the first render in the browser, which
+ * must match it) knows nobody and hasn't looked: `ready` is false. Straight
+ * after, the browser reads localStorage and both arrive at once.
+ */
+const UNREAD = Object.freeze({ ready: false, session: null });
+let lastRead = { ready: true, session: undefined };
+function readSession() {
+  const session = getSession();
+  if (lastRead.session !== session) lastRead = { ready: true, session };
+  return lastRead;
+}
+const unread = () => UNREAD;
+const noNotice = () => null;
+
+/** The API says a club's account isn't one this site signs in, whichever way it came. */
+const clubRefusal = (error) => error?.response?.status === 403 && error?.response?.data?.error_code === "CLUB_NOT_VERIFIED";
 
 /** Ends a session on the server too, sent with the token it ends, so its refresh token is dead everywhere. */
 function endOnServer(was) {
@@ -39,12 +61,16 @@ const noteMissingReset = (error) => {
  * into the account; the guest token stays put (it is never sent while signed
  * in) until the address is verified.
  *
- * Without VITE_GOOGLE_CLIENT_ID it provides nothing new: nobody is signed in
+ * Without NEXT_PUBLIC_GOOGLE_CLIENT_ID it provides nothing new: nobody is signed in
  * and no page offers it.
  */
 export function AuthProvider({ children }) {
   const enabled = googleEnabled();
-  const session = useSyncExternalStore(subscribe, getSession, getSession);
+  // The server (and the first render in the browser, which must match it)
+  // knows nobody: the session is in localStorage. It shows straight after.
+  const { ready, session } = useSyncExternalStore(subscribe, readSession, unread);
+  // Why the last session ended (auth/session.js), when the person should be told; the server knows none.
+  const notice = useSyncExternalStore(subscribe, getNotice, noNotice);
   const [sheet, setSheet] = useState(SHUT);
   const [attempt, setAttempt] = useState(IDLE);
   const after = useRef(null);
@@ -53,14 +79,16 @@ export function AuthProvider({ children }) {
   const user = useMemo(() => userFromSession(session), [session]);
 
   // The profile, fresh once per page load: names change, and asking also
-  // folds any website guest tickets into the account on the server.
+  // folds any website guest tickets into the account on the server. Once per
+  // sign-in, not per token: the refresh token changes on every refresh.
   useEffect(() => {
     if (!enabled || !session) {
       profiled.current = null;
       return;
     }
-    if (profiled.current === session.refresh_token) return;
-    profiled.current = session.refresh_token;
+    const key = sessionKey(session);
+    if (profiled.current === key) return;
+    profiled.current = key;
     accountApi.profile().then(
       (profile) => updateSession({ profile }),
       () => {
@@ -92,9 +120,10 @@ export function AuthProvider({ children }) {
     try {
       profile = await accountApi.profileWith(tokens.access_token);
     } catch (error) {
-      if (password && error?.response?.status === 403) {
+      if ((password && error?.response?.status === 403) || clubRefusal(error)) {
         // The password was right, but the profile is refused: a club's
-        // dashboard login, or a suspended account. Not signed in here.
+        // dashboard login (CLUB_NOT_VERIFIED, or an older server's plain 403),
+        // or a suspended account. Not signed in here.
         endOnServer(tokens);
         throw Object.assign(error, { refusedHere: true });
       }
@@ -103,7 +132,7 @@ export function AuthProvider({ children }) {
     // Google vouched for the address, and so has a verified password account:
     // the guest's tickets are the account's now, and only its token goes from here on.
     if (!password || profile?.email_verified) forgetGuestTokens();
-    profiled.current = profile ? tokens.refresh_token : null;
+    profiled.current = profile ? sessionKey({ ...tokens, profile }) : null;
     welcome.current = after.current;
     after.current = null;
     setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, profile, claims });
@@ -255,6 +284,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       enabled,
+      ready,
       status: enabled && session ? "signed-in" : "signed-out",
       user: enabled ? user : null,
       attempt,
@@ -273,6 +303,7 @@ export function AuthProvider({ children }) {
     }),
     [
       enabled,
+      ready,
       session,
       user,
       attempt,
@@ -291,20 +322,25 @@ export function AuthProvider({ children }) {
     ],
   );
 
+  const signInAgain = useCallback(() => openSignIn(), [openSignIn]);
+
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {enabled ? (
-        <SignInSheet
-          key={sheet.n}
-          open={sheet.open}
-          reason={sheet.reason}
-          start={sheet.view}
-          email={sheet.email}
-          attempt={attempt}
-          onClose={closeSignIn}
-          onFail={failSignIn}
-        />
+      {enabled && notice && !session ? <SignedOutNotice reason={notice.reason} onSignIn={signInAgain} onDismiss={dismissNotice} /> : null}
+      {enabled && sheet.n > 0 ? (
+        <Suspense fallback={null}>
+          <SignInSheet
+            key={sheet.n}
+            open={sheet.open}
+            reason={sheet.reason}
+            start={sheet.view}
+            email={sheet.email}
+            attempt={attempt}
+            onClose={closeSignIn}
+            onFail={failSignIn}
+          />
+        </Suspense>
       ) : null}
     </AuthContext.Provider>
   );

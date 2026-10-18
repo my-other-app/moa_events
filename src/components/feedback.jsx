@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import "@/styles/live.css";
+"use client";
+
+import { useEffect, useState } from "react";
 
 import { errorLine, liveApi } from "@/api/live";
 
-/** The feedback survey a guest's email links to: a few taps, one send. */
-const Feedback = () => {
-  const { eventId, registrationId } = useParams();
-  const [params] = useSearchParams();
-  const k = params.get("k") || "";
+/**
+ * The feedback survey a guest's email links to: a few taps, one send. Its
+ * server half (src/app/feedback/...) hands over the event, the registration
+ * and the link's key (`?k=`).
+ */
+const Feedback = ({ eventId, registrationId, k = "" }) => {
   const [survey, setSurvey] = useState(null);
   const [answers, setAnswers] = useState({});
   const [error, setError] = useState(null);

@@ -1,22 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
-import { discoverApi } from "@/api/discover";
-import { SITE_URL } from "@/config";
-import NotFound from "@/components/notfound";
-import { eventJsonLd } from "@/utils/eventld";
-import { dateTile, eventPath, eventUrl, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
-import { formatCount, formatPrice, formatWhen, imageUrl, plural } from "@/utils/format";
-import { useJsonLd, usePageMeta, useShareMeta } from "@/utils/meta";
+import { Link } from "@/lib/router";
+import { dateTile, eventUrl, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
+import { formatCount, formatPrice, plural } from "@/utils/format";
 import { Agenda } from "./agenda";
-import { Avatar, ErrorState, Section } from "./bits";
-import { SitePage } from "./chrome";
+import { Avatar, Section } from "./bits";
 import { EventCard } from "./eventcard";
 import {
+  About,
   CalendarButton,
   Contact,
   EpIcon,
   EpSection,
-  EventSkeleton,
   LiveStrips,
   Poster,
   Prizes,
@@ -29,38 +22,21 @@ import {
   Venue,
 } from "./eventparts";
 import Icon from "./icons";
-import "@/styles/event-page.css";
 
-const DEFAULT_IMAGE = `${SITE_URL}/og-default.png`;
 const rupees = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
-/** What a link preview and a search engine are told about the event. */
-function headOf(page) {
-  if (!page) return {};
-  const { event, club, speakers } = page;
-  const url = eventUrl(event);
-  const poster = imageUrl(event.poster, "original");
-  const where = event.is_online ? "Online" : event.location_name;
-  const when = formatWhen(event.starts_at);
-  const description =
-    summary(event.about) ||
-    summary([when, where].filter(Boolean).join(" · ") + (club ? `. Hosted by ${club.name} on MyOtherApp.` : ". On MyOtherApp."));
-  return {
-    title: `${event.name} · MyOtherApp`,
-    description,
-    image: poster || DEFAULT_IMAGE,
-    url,
-    jsonLd: eventJsonLd({
-      event,
-      club,
-      speakers,
-      image: poster,
-      url,
-      clubUrl: club?.slug ? `${SITE_URL}/clubs/${encodeURIComponent(club.slug)}` : null,
-      description: summary(event.about, 500) || null,
-    }),
-  };
-}
+/** What "Add to calendar" needs, and no more (the button works its links out in the browser). */
+const calendarEvent = (e) => ({
+  id: e.id,
+  slug: e.slug,
+  name: e.name,
+  starts_at: e.starts_at,
+  ends_at: e.ends_at,
+  duration_hours: e.duration_hours,
+  is_online: e.is_online,
+  location_name: e.location_name,
+  about: summary(e.about, 600),
+});
 
 function ClubRow({ club }) {
   const inner = (
@@ -136,29 +112,14 @@ function Facts({ event, venueLink }) {
   );
 }
 
-const LONG_ABOUT = 900;
-
-/** The about, folded after a screenful when it runs long. */
-function About({ text }) {
-  const long = text.length > LONG_ABOUT;
-  const [open, setOpen] = useState(false);
-  const id = "ep-about-text";
-  return (
-    <>
-      <div id={id}>
-        <RichText text={text} className={`ep-about${long && !open ? " is-clamped" : ""}`} />
-      </div>
-      {long ? (
-        <button type="button" className="ep-more-btn" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>
-          {open ? "Show less" : "Read more"}
-        </button>
-      ) : null}
-    </>
-  );
-}
-
-/** The event, laid out: hero and card, the sections that have something, then more to go to. */
-function EventView({ page }) {
+/**
+ * An event, laid out: hero and card, the sections that have something,
+ * then more to go to. `page` is GET /discover/events/{ref} as parseEventPage
+ * reads it. No state of its own: the server renders it whole (the page at
+ * src/app/events/[slug]/page.jsx), and only the islands (eventislands.jsx)
+ * run in the browser.
+ */
+export function EventView({ page }) {
   const { event, club, speakers, agenda, team, team_source: teamSource, more_from_club: more, similar } = page;
   const url = eventUrl(event);
   const prize = event.has_prize && event.prize_amount > 0 ? event.prize_amount : null;
@@ -183,7 +144,7 @@ function EventView({ page }) {
   return (
     <article className="ep" aria-labelledby="ep-title">
       <div className="dc-wrap">
-        <LiveStrips event={event} />
+        <LiveStrips event={{ id: event.id, slug: event.slug, status: event.status }} />
       </div>
       <div className="dc-wrap ep-layout">
         <header className="ep-intro">
@@ -204,12 +165,12 @@ function EventView({ page }) {
           <Facts event={event} venueLink={hasVenue && !event.is_online} />
           <div className="ep-actions">
             <ShareButton title={event.name} text={club ? `${event.name} — ${club.name}` : event.name} url={url} />
-            <CalendarButton event={event} url={url} />
+            <CalendarButton event={calendarEvent(event)} url={url} />
           </div>
         </header>
 
         <div className="ep-side">
-          <Poster event={event} club={club} />
+          <Poster event={event} />
           <RegisterCard event={event} />
         </div>
 
@@ -268,62 +229,5 @@ function EventView({ page }) {
         </div>
       ) : null}
     </article>
-  );
-}
-
-/**
- * An event's page at /events/{slug}. A numeric id or an old slug finds the
- * event too, and the address is then put right. Not public → the 404 page.
- */
-export default function EventPage() {
-  const { slug } = useParams();
-  const { search, hash } = useLocation();
-  const [state, setState] = useState({ status: "loading", data: null, ref: slug });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let alive = true;
-    setState((s) => (s.ref === slug && s.status === "ready" ? s : { status: "loading", data: null, ref: slug }));
-    discoverApi.event(slug, { fresh: attempt > 0 }).then(
-      (data) => alive && setState({ status: "ready", data, ref: slug }),
-      (e) => alive && setState({ status: e?.notFound ? "missing" : "error", data: null, ref: slug })
-    );
-    return () => {
-      alive = false;
-    };
-  }, [slug, attempt]);
-
-  const page = state.status === "ready" && state.ref === slug ? state.data : null;
-  const head = useMemo(() => headOf(page), [page]);
-  usePageMeta(head.title || (state.status === "missing" ? "Event not found · MyOtherApp" : null), head.description);
-  useShareMeta({ title: head.title, description: head.description, image: head.image, url: head.url, type: "website" });
-  useJsonLd(head.jsonLd);
-
-  if (state.status === "missing") return <NotFound />;
-  if (state.status === "error") {
-    return (
-      <SitePage>
-        <div className="dc-wrap">
-          <div className="dc-section">
-            <ErrorState message="We couldn't load this event right now. Check your connection and try again." onRetry={() => setAttempt((a) => a + 1)} />
-          </div>
-        </div>
-      </SitePage>
-    );
-  }
-  if (!page) {
-    return (
-      <SitePage>
-        <EventSkeleton />
-      </SitePage>
-    );
-  }
-  if (page.event.slug && page.event.slug !== slug) {
-    return <Navigate replace to={{ pathname: eventPath(page.event), search, hash }} />;
-  }
-  return (
-    <SitePage>
-      <EventView page={page} />
-    </SitePage>
   );
 }

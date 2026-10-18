@@ -1,11 +1,19 @@
+import { formatWhen } from "./format";
 import { picksToPayload } from "./picks";
 
 /**
  * What the registration flow works out without touching the page: which
  * steps an event's form has, how each organiser question is typed in,
- * what counts as a valid answer, the payload the API is sent, and what an
- * error from it means.
+ * what counts as a valid answer, the payload the API is sent, what an
+ * error from it means, and where the signed-in person's own registration
+ * stands.
  */
+
+/** "Hack Night tee M is sold out" → "Hack Night tee M is sold out." */
+const sentence = (s) => {
+  const t = String(s || "").trim();
+  return t && !/[.!?]$/.test(t) ? `${t}.` : t;
+};
 
 /* ---------- questions ---------- */
 
@@ -252,14 +260,53 @@ function detailList(detail) {
 
 const ALREADY = /already\s+registered/i;
 
+const when = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? formatWhen(iso) : null;
+};
+
 /**
- * Sorts an error from the register call into what the page shows:
- *   duplicate  409 ALREADY_REGISTERED (or any "already registered"): the
- *              server's words, and the app
- *   awaiting   409 REGISTRATION_AWAITING_PAYMENT: an unpaid registration under
- *              this address; the server says when to come back, or the app
- *   fields     the server named fields (or CLUB_EMAIL, which is about the
- *              email): shown beside them
+ * Why registration is closed (REGISTRATIONS_CLOSED), in words. Never why the
+ * server stopped taking registrations when it doesn't say it was the dates:
+ * that is the organiser's business, not the reader's.
+ */
+function closedCopy(errors, status) {
+  const reason = typeof errors?.closed_reason === "string" ? errors.closed_reason : null;
+  if (reason === "deadline_passed") {
+    const at = when(errors.closed_at);
+    return { reason, title: "Registration has closed", message: at ? `Registration closed on ${at} IST. The organisers aren't taking new registrations.` : "The organisers aren't taking new registrations." };
+  }
+  if (reason === "not_started") {
+    const at = when(errors.opens_at);
+    return { reason, title: "Registration hasn't opened yet", message: at ? `It opens ${at} IST. Come back then.` : "Come back once it opens." };
+  }
+  return {
+    reason: status === 409 ? "paused" : "closed",
+    title: "Registration is closed for now",
+    message: "This event isn't taking more registrations right now. Keep an eye on the event page in case that changes.",
+  };
+}
+
+/**
+ * Sorts an error from the register call into what the page shows. The
+ * server names each refusal with an `error_code`, its sentence in `message`
+ * (always a string now) and field errors in `errors`; an older server's
+ * shapes (a 409 with no code, `message` as an object of fields, FastAPI's
+ * 422 list) are still read.
+ *
+ *   duplicate  ALREADY_REGISTERED (409 from the public form, 400 signed in),
+ *              or a code-less 409 / "already registered": the app, My tickets
+ *   awaiting   REGISTRATION_AWAITING_PAYMENT (409): this address has a
+ *              registration waiting for payment: Finish payment
+ *   closed     REGISTRATIONS_CLOSED: 400 with errors.closed_reason
+ *              ("deadline_passed" + closed_at, "not_started" + opens_at), or
+ *              409 when the event takes no more right now. {reason, title, message}
+ *   full       EVENT_FULL (400, errors.max_participants)
+ *   soldout    SOLD_OUT / ITEM_UNAVAILABLE (422, errors {item_id, variant_id,
+ *              available}): the add-on is marked on the form
+ *   fields     fields the server named, shown beside them: INVALID_ANSWERS
+ *              (errors {question_key: message}), CLUB_EMAIL and EMAIL_MISMATCH
+ *              (the email), the older shapes
  *   network    no answer at all: try again
  *   auth       signed in, but the sign-in ran out and couldn't be renewed:
  *              nothing was sent as a guest; sign in again, or go on as one
@@ -275,6 +322,7 @@ export function describeRegisterError(error, questionKeys = []) {
       : typeof data?.detail === "string" && data.detail.trim()
         ? data.detail.trim()
         : null;
+  const errors = data?.errors && typeof data.errors === "object" && !Array.isArray(data.errors) ? data.errors : null;
 
   if (error?.authExpired) {
     return { kind: "auth", message: "Your sign-in expired before we could register you. Sign in again to keep this ticket in your account, or register with your email." };
@@ -286,11 +334,34 @@ export function describeRegisterError(error, questionKeys = []) {
   if (code === "REGISTRATION_AWAITING_PAYMENT") {
     return { kind: "awaiting", message: said || "This email already has a registration for this event that is waiting for payment." };
   }
+  if (code === "REGISTRATIONS_CLOSED") return { kind: "closed", ...closedCopy(errors, status) };
+  if (code === "EVENT_FULL") {
+    const n = Number(errors?.max_participants);
+    return {
+      kind: "full",
+      title: "This event is full",
+      message: `${n > 0 ? `All ${n} seats are taken.` : "Every seat is taken."} Keep an eye on the event page in case one opens up.`,
+    };
+  }
+  if ((code === "SOLD_OUT" || code === "ITEM_UNAVAILABLE") && errors?.item_id !== undefined && errors?.item_id !== null) {
+    return {
+      kind: "soldout",
+      itemId: String(errors.item_id),
+      variantId: errors.variant_id !== undefined && errors.variant_id !== null ? String(errors.variant_id) : null,
+      available: code === "SOLD_OUT" ? Math.max(0, Number(errors.available) || 0) : 0,
+      message: said ? sentence(said) : "Something in your order has sold out.",
+    };
+  }
   if (code === "CLUB_EMAIL") {
     return { kind: "fields", fields: { email: said || "This email belongs to a club's account. Register with your own email." }, message: null };
   }
-  if (code === "ALREADY_REGISTERED" || status === 409 || (said && ALREADY.test(said))) {
-    return { kind: "duplicate", message: said || "This email is already registered for this event." };
+  if (code === "EMAIL_MISMATCH") {
+    return { kind: "fields", fields: { email: "This isn't the email you're signed in with. Sign out to register with another one." }, message: null };
+  }
+  if (code === "ALREADY_REGISTERED" || (!code && status === 409) || (said && ALREADY.test(said))) {
+    // Signed in, the server says only "Already registered for this event" (400): where the ticket is says more.
+    const mine = status === 400 && (!said || /^already registered for this event\.?$/i.test(said));
+    return { kind: "duplicate", message: mine ? "Your ticket is in My tickets, and in your email." : said || "This email is already registered for this event." };
   }
   const fields = {};
   if (data && typeof data.message === "object") fieldErrors(data.message, questionKeys, fields);
@@ -337,6 +408,97 @@ export function clearDraft(eventId) {
   } catch {
     /* nothing kept */
   }
+}
+
+/* ---------- the ticket just made, kept for a reload ---------- */
+
+const doneKey = (eventId) => `moa.register.done.${eventId}`;
+
+/**
+ * The ticket the form just made, so reloading the page shows it again
+ * rather than an empty form. Kept for this tab while the page is open: the
+ * page forgets it when it is left (registering a friend next starts afresh).
+ */
+export function keepDone(eventId, ticket) {
+  try {
+    sessionStorage.setItem(doneKey(eventId), JSON.stringify(ticket));
+  } catch {
+    /* private mode: a reload shows the form */
+  }
+}
+
+export function loadDone(eventId) {
+  try {
+    const t = JSON.parse(sessionStorage.getItem(doneKey(eventId)) || "null");
+    return t && typeof t === "object" && String(t.eventId) === String(eventId) && t.ticket_id ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+export function forgetDone(eventId) {
+  try {
+    sessionStorage.removeItem(doneKey(eventId));
+  } catch {
+    /* nothing kept */
+  }
+}
+
+/* ---------- the signed-in person's own registration ---------- */
+
+/**
+ * The signed-in person's registration for an event, from GET
+ * /events/info/{id} sent with their token:
+ *
+ *   {state: "none"}                               not registered
+ *   {state: "unpaid", registrationId, ticketId}   registered, waiting for payment:
+ *                                                 Finish payment pays registrationId
+ *   {state: "registered", ticketId}               registered and good at the door
+ *                                                 (paid, or a free event)
+ *   {state: "unknown", ticketId}                  registered, but the server didn't
+ *                                                 say whether it is paid (an older
+ *                                                 one): the form's old path
+ *
+ * null when there is no answer to read.
+ */
+export function myRegistration(info) {
+  if (!info || typeof info !== "object") return null;
+  if (!info.is_registered) return { state: "none", registrationId: null, ticketId: null };
+  const ticketId = typeof info.ticket_id === "string" && info.ticket_id ? info.ticket_id : null;
+  const id = info.registration_id;
+  const registrationId = id !== null && id !== undefined && id !== "" ? String(id) : null;
+  if (info.is_paid === false && registrationId) return { state: "unpaid", registrationId, ticketId };
+  if (info.is_paid === true) return { state: "registered", registrationId, ticketId };
+  return { state: "unknown", registrationId, ticketId };
+}
+
+/* ---------- an add-on that sold out meanwhile ---------- */
+
+/**
+ * The shelf and the picks after the server said an add-on ran out between
+ * the shelf loading and the registration (422 SOLD_OUT with what is left, or
+ * ITEM_UNAVAILABLE: none at all). The item (or the size) shows what is left,
+ * and the pick is cut to fit: to nothing, size and all, when none is.
+ */
+export function applyStockRefusal(items, picks, { itemId, variantId = null, available = 0 }) {
+  const id = String(itemId);
+  const left = Math.max(0, Number(available) || 0);
+  const item = items.find((i) => String(i.id) === id);
+  if (!item) return { items, picks };
+  const sized = item.variants.length > 0;
+  const variant = sized && variantId !== null ? String(variantId) : null;
+  const nextItem = !sized
+    ? { ...item, left }
+    : { ...item, variants: item.variants.map((v) => (variant === null || String(v.id) === variant ? { ...v, left: variant === null ? 0 : left } : v)) };
+  const nextItems = items.map((i) => (i === item ? nextItem : i));
+
+  const p = picks[item.id];
+  if (!p || !p.qty) return { items: nextItems, picks };
+  let pick = p;
+  if (!sized) pick = { ...p, qty: Math.min(p.qty, left) };
+  else if (variant === null) pick = { qty: 0, variant_id: null };
+  else if (String(p.variant_id) === variant) pick = left > 0 ? { ...p, qty: Math.min(p.qty, left) } : { qty: 0, variant_id: null };
+  return { items: nextItems, picks: { ...picks, [item.id]: pick } };
 }
 
 /* ---------- the order ---------- */

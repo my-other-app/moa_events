@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * Where the visitor is, for "near you". Nothing is stored until they ask
@@ -80,21 +80,42 @@ export function locateBrowser({ timeout = 10000 } = {}) {
   });
 }
 
+let lastRaw;
+let lastValue = null;
+
+/** The stored point, the same object until the stored text changes (what useSyncExternalStore needs). */
+function storedSnapshot() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(WHERE_KEY);
+  } catch {
+    raw = null;
+  }
+  if (raw !== lastRaw) {
+    lastRaw = raw;
+    lastValue = readWhere();
+  }
+  return lastValue;
+}
+
+function subscribe(notify) {
+  window.addEventListener(EVENT, notify);
+  window.addEventListener("storage", notify);
+  return () => {
+    window.removeEventListener(EVENT, notify);
+    window.removeEventListener("storage", notify);
+  };
+}
+
 /**
  * The stored point and a setter; every page using it hears a change made
- * anywhere (another tab included). `null` means "let the server guess".
+ * anywhere (another tab included). `null` means "nothing stored"; while a
+ * server-rendered page hydrates it is `undefined` (the server can't know),
+ * and becomes the stored point a moment later, so the first paint always
+ * matches the server's HTML.
  */
 export function useWhere() {
-  const [where, setWhere] = useState(readWhere);
-  useEffect(() => {
-    const sync = () => setWhere(readWhere());
-    window.addEventListener(EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
+  const where = useSyncExternalStore(subscribe, storedSnapshot, () => undefined);
   const update = useCallback((next) => (next ? saveWhere(next) : clearWhere()), []);
   return [where, update];
 }

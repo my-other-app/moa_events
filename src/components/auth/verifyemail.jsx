@@ -1,14 +1,12 @@
+"use client";
+
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { useAuth } from "@/auth/context";
 import { useCountdown } from "@/auth/countdown";
 import { CODE_LENGTH, RESEND_AFTER_S, clock, describeAuthError, emptyCode, waitFrom } from "@/auth/email";
 import Icon from "../discover/icons";
 import { CodeBoxes, ErrorText, FormNote, Submit } from "./emailfields";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
-import "@/styles/signin-email.css";
 
 /**
  * "Check your email": the six-digit code that shows a password account owns
@@ -205,7 +203,7 @@ export function Verified({ result, onDone }) {
         {text}
       </p>
       {moved > 0 ? (
-        <Link ref={action} className="dc-btn dc-btn--block" to="/me/tickets" onClick={onDone} data-autofocus="">
+        <Link ref={action} className="dc-btn dc-btn--block" href="/me/tickets" onClick={onDone} data-autofocus="">
           See my tickets
         </Link>
       ) : (

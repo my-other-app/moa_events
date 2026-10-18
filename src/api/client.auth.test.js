@@ -80,7 +80,7 @@ describe("which token goes", () => {
 });
 
 function resetAuthEnvOnly() {
-  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "");
+  vi.stubEnv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "");
 }
 
 describe("registering while signed in", () => {
@@ -123,7 +123,7 @@ describe("refreshing the account's token", () => {
     on("post", "/api/v1/auth/refresh", (c, auth, body) => {
       expect(auth).toBeUndefined();
       expect(body).toBe("token=refresh-1");
-      return reply(c, 200, { access_token: "access-2", refresh_token: "refresh-1", token_type: "Bearer" });
+      return reply(c, 200, { access_token: "access-2", refresh_token: "refresh-2", token_type: "Bearer" });
     });
     // Two at once still make one refresh.
     const [a, b] = await Promise.all([apiClient.get("/api/v1/user/profile/me"), apiClient.get("/api/v1/user/profile/me")]);
@@ -131,17 +131,43 @@ describe("refreshing the account's token", () => {
     expect(b.data.id).toBe(7);
     expect(seen.filter((r) => r.url === "/api/v1/auth/refresh")).toHaveLength(1);
     expect(getSession().access_token).toBe("access-2");
-    expect(getSession().refresh_token).toBe("refresh-1");
+    // The refresh token rotates: the one sent is spent, the one that came back is kept.
+    expect(getSession().refresh_token).toBe("refresh-2");
+  });
+
+  it("stores the rotated refresh token, in memory and in storage, and sends it next time", async () => {
+    signInAs({ access: "access-1", refresh: "refresh-1" });
+    let n = 1;
+    on("post", "/api/v1/auth/refresh", (c, auth, body) => {
+      expect(body).toBe(`token=refresh-${n}`);
+      n += 1;
+      return reply(c, 200, { access_token: `access-${n}`, refresh_token: `refresh-${n}`, token_type: "Bearer" });
+    });
+    await expect(refreshAccess()).resolves.toBe("access-2");
+    expect(getSession()).toMatchObject({ access_token: "access-2", refresh_token: "refresh-2" });
+    expect(JSON.parse(localStorage.getItem("moa.session"))).toMatchObject({ access_token: "access-2", refresh_token: "refresh-2" });
+    // The next refresh goes with the new token, never the spent one.
+    await expect(refreshAccess()).resolves.toBe("access-3");
+    expect(seen.filter((r) => r.url === "/api/v1/auth/refresh").map((r) => r.body)).toEqual(["token=refresh-1", "token=refresh-2"]);
+    expect(getSession().refresh_token).toBe("refresh-3");
+  });
+
+  it("keeps the refresh token it has when an older server sends none back", async () => {
+    signInAs({ access: "access-1", refresh: "refresh-1" });
+    on("post", "/api/v1/auth/refresh", (c) => reply(c, 200, { access_token: "access-2", token_type: "Bearer" }));
+    await refreshAccess();
+    expect(getSession()).toMatchObject({ access_token: "access-2", refresh_token: "refresh-1" });
   });
 
   it("refreshes before sending when the token has already expired", async () => {
     const stale = accessToken({ exp: Math.floor(Date.now() / 1000) - 60 });
     signInAs({ access: stale, refresh: "refresh-1" });
-    on("post", "/api/v1/auth/refresh", (c) => reply(c, 200, { access_token: "access-2", refresh_token: "refresh-1" }));
+    on("post", "/api/v1/auth/refresh", (c) => reply(c, 200, { access_token: "access-2", refresh_token: "refresh-2" }));
     on("get", "/api/v1/user/following", (c) => reply(c, 200, { items: [] }));
     await apiClient.get("/api/v1/user/following");
     expect(seen.map((r) => r.url)).toEqual(["/api/v1/auth/refresh", "/api/v1/user/following"]);
     expect(seen[1].auth).toBe("Bearer access-2");
+    expect(getSession().refresh_token).toBe("refresh-2");
   });
 
   it("signs out when the refresh is refused, and a public read goes on as a visitor", async () => {

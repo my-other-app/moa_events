@@ -1,0 +1,43 @@
+import { notFound, permanentRedirect } from "next/navigation";
+import { SitePage } from "@/components/discover/chrome";
+import { ClubView } from "@/components/discover/clubpage";
+import { clubMetadata } from "@/seo/metadata";
+import { JsonLd } from "@/seo/JsonLd";
+import { stableClubPage } from "@/seo/stabilize";
+import { clubStructuredData } from "@/seo/structured";
+import { getClubPage } from "@/server/discover";
+
+/*
+ * /clubs/{slug}: a club's page. SERVER-RENDERED, statically regenerated
+ * (ISR, every minute at most): who they are, their upcoming and past
+ * events, posts, team and partners are in the HTML, with the club's
+ * Organization (its upcoming events inside) and BreadcrumbList structured
+ * data, and its own RSS feed advertised. Follow, the visit count and "Show
+ * more" are client islands. Unknown → ./not-found.jsx (a real 404).
+ */
+export const revalidate = 60;
+export const dynamicParams = true;
+
+export function generateStaticParams() {
+  return [];
+}
+
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const data = await getClubPage(slug);
+  if (!data) return { title: "Club not found", robots: { index: false, follow: true } };
+  return clubMetadata(data);
+}
+
+export default async function ClubRoute({ params }) {
+  const { slug } = await params;
+  const data = await getClubPage(slug);
+  if (!data) notFound();
+  if (data.club.slug && data.club.slug !== slug) permanentRedirect(`/clubs/${encodeURIComponent(data.club.slug)}`);
+  return (
+    <SitePage>
+      <JsonLd data={clubStructuredData(data)} />
+      <ClubView data={stableClubPage(data)} />
+    </SitePage>
+  );
+}

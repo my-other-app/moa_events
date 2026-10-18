@@ -3,7 +3,6 @@ import { clubFaq } from "@/content/forclubs";
 import { contactUrl, loginUrl, signupUrl } from "@/utils/pricing";
 import { Inline } from "./legalpage";
 import Icon from "./icons";
-import "@/styles/forclubs.css";
 
 /** Where "Start free" goes. */
 const START_FREE_URL = signupUrl(CLUBS_URL, "free", "monthly");

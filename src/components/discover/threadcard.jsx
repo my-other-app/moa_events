@@ -1,10 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { imageUrl, plural, timeAgo } from "@/utils/format";
 import { Avatar, Img } from "./bits";
 import Icon from "./icons";
 
 /** A poll's results as share bars; with `onVote(option)`, each option is a button. */
-function Poll({ poll, onVote }) {
+export function Poll({ poll, onVote = null }) {
   const lead = Math.max(0, ...poll.options.map((o) => o.share));
   return (
     <div className="dc-poll">
@@ -45,11 +45,12 @@ function Poll({ poll, onVote }) {
 
 /**
  * A club's post. In a list it is a card that opens the post; on the post's
- * own page (`full`) it shows everything and its buttons call
- * `onAction(kind, optionId)` ("like" | "vote" | "comment"): the page likes
- * and votes for a signed-in reader, and otherwise says "do this in the app".
+ * own page (`full`) it shows everything, and the page puts its islands in
+ * the slots: `poll` (the poll you can vote in), `likes` (the count that
+ * moves with your like) and `actions` (Like, Comment). Without them it is
+ * the plain card, rendered on the server or in the browser alike.
  */
-export function ThreadCard({ thread, full = false, onAction, headingLevel = 3 }) {
+export function ThreadCard({ thread, full = false, headingLevel = 3, poll = null, likes = null, actions = null }) {
   const t = thread;
   const club = t.club;
   const ago = timeAgo(t.created_at);
@@ -83,25 +84,18 @@ export function ThreadCard({ thread, full = false, onAction, headingLevel = 3 })
           <Img src={image} alt={`Picture posted by ${club.name}`} />
         </div>
       ) : null}
-      {t.poll ? <Poll poll={t.poll} onVote={onAction ? (o) => onAction("vote", o.id) : null} /> : null}
+      {t.poll ? poll || <Poll poll={t.poll} /> : null}
       <div className="dc-tcard-foot">
-        <span className="dc-tcard-stat">
-          <Icon name="heart" size={16} /> {plural(t.likes, "like")}
-        </span>
+        {likes || (
+          <span className="dc-tcard-stat">
+            <Icon name="heart" size={16} /> {plural(t.likes, "like")}
+          </span>
+        )}
         <span className="dc-tcard-stat">
           <Icon name="comment" size={16} /> {plural(t.comments, "comment")}
         </span>
       </div>
-      {onAction ? (
-        <div className="dc-tcard-actions">
-          <button type="button" className="dc-tcard-action" aria-pressed={t.liked} onClick={() => onAction("like")}>
-            <Icon name="heart" size={16} /> {t.liked ? "Liked" : "Like"}
-          </button>
-          <button type="button" className="dc-tcard-action" onClick={() => onAction("comment")}>
-            <Icon name="comment" size={16} /> Comment
-          </button>
-        </div>
-      ) : null}
+      {actions}
     </article>
   );
 }

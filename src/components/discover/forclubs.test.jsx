@@ -1,44 +1,62 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { plansResponse } from "@/test/plansFixture";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
-const { AppRoutes } = await import("@/App.jsx");
+const { parseHome } = await import("@/api/parse");
+const { parsePlans } = await import("@/utils/pricing");
+const { SitePage } = await import("./chrome");
+const { ForClubsView } = await import("./forclubspage");
+const { PricingView } = await import("./pricingpage");
 
+/*
+ * /for-clubs and /pricing as the server renders them (src/app/for-clubs,
+ * src/app/pricing): the plans and the numbers it read are in the HTML.
+ * Their heads and structured data: src/app/_tests/static-routes.test.js.
+ */
 const SIGNUP = "https://clubs-next.myotherapp.in/signup";
 const LOGIN = "https://clubs-next.myotherapp.in/login";
-const head = (selector) => document.head.querySelector(selector);
-const jsonLd = () => [...document.head.querySelectorAll('script[type="application/ld+json"]')].map((s) => JSON.parse(s.textContent));
+const PLANS = () => parsePlans(plansResponse());
+const HOME = () => parseHome({ stats: { upcoming_events: 128, clubs: 42, cities: 3 } });
 
 function Where() {
   const l = useLocation();
   return <output data-testid="where">{`${l.pathname}${l.hash}`}</output>;
 }
 
-const at = (path) =>
+/** The two pages at their addresses, as the server would render each (`plans: null`: it couldn't read them). */
+const at = (path, { plans = PLANS(), home = HOME() } = {}) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
+      <Routes>
+        <Route
+          path="/for-clubs"
+          element={
+            <SitePage>
+              <ForClubsView plans={plans} home={home} />
+            </SitePage>
+          }
+        />
+        <Route
+          path="/pricing"
+          element={
+            <SitePage>
+              <PricingView plans={plans} />
+            </SitePage>
+          }
+        />
+        <Route path="*" element={<SitePage>{null}</SitePage>} />
+      </Routes>
       <Where />
     </MemoryRouter>
   );
 
-/** The API: plans and the home numbers; with `plans: false`, /plans isn't there yet. */
-function api({ plans = true } = {}) {
-  get.mockImplementation(async (url) => {
-    if (url === "/api/v1/plans" && plans) return { data: plansResponse() };
-    if (url === "/api/v1/discover/home") return { data: { stats: { upcoming_events: 128, clubs: 42, cities: 3 } } };
-    throw Object.assign(new Error("404"), { response: { status: 404 } });
-  });
-}
-
 beforeEach(() => {
   get.mockReset();
   window.scrollTo = vi.fn();
-  api();
 });
 
 describe("/for-clubs", () => {
@@ -76,10 +94,11 @@ describe("/for-clubs", () => {
     const how = screen.getByRole("region", { name: "Apply, get verified, go live." });
     expect(within(how).getAllByRole("listitem").map((li) => li.querySelector("h3").textContent)).toEqual(["Apply", "We verify your club", "Go live"]);
 
-    // The plans arrive, from the API.
-    const pricing = await screen.findByRole("region", { name: "Plans that grow with your club" });
+    // The plans, as the server read them: nothing asked from the browser.
+    const pricing = screen.getByRole("region", { name: "Plans that grow with your club" });
     expect(pricing).toHaveAttribute("id", "pricing");
-    expect(await within(pricing).findByText("Most popular")).toBeInTheDocument();
+    expect(within(pricing).getByText("Most popular")).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
     expect(within(pricing).getByRole("link", { name: "Compare every plan in detail" })).toHaveAttribute("href", "/pricing#compare");
     expect(within(pricing).queryByRole("table")).toBeNull();
     expect(main.getByText("Paid plans from ₹299 a month")).toBeInTheDocument();
@@ -87,7 +106,7 @@ describe("/for-clubs", () => {
     expect(main.getByText(/Pay yearly and get 2 months free/)).toBeInTheDocument();
 
     // The live numbers.
-    expect(await main.findByText("on MyOtherApp right now", { exact: false })).toBeInTheDocument();
+    expect(main.getByText("on MyOtherApp right now", { exact: false })).toBeInTheDocument();
     expect(main.getByText("42").closest("p")).toHaveTextContent("42 clubs128 upcoming events");
 
     // Questions open in place, and point at the policy.
@@ -106,42 +125,29 @@ describe("/for-clubs", () => {
     expect(screen.getByRole("main").textContent).not.toMatch(/coupon|ticket types|custom domain|SLA/i);
   });
 
-  it("carries its own title, canonical address and the plans as structured data", async () => {
-    at("/for-clubs");
-    await screen.findByText("Most popular");
-    await waitFor(() => expect(document.title).toBe("MyOtherApp for clubs · Run your club's events from one place"));
-    expect(head('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/for-clubs");
-    expect(head('meta[property="og:url"]')).toHaveAttribute("content", "https://myotherapp.in/for-clubs");
-    expect(head('meta[name="description"]').getAttribute("content")).toMatch(/^Registrations with your own questions/);
-    expect(head('meta[name="robots"]')).toBeNull();
-    const [ld] = jsonLd();
-    expect(ld).toMatchObject({ "@type": "SoftwareApplication", url: "https://myotherapp.in/for-clubs" });
-    expect(ld.offers.find((o) => o.name === "Growth, yearly")).toMatchObject({ price: 6990, priceCurrency: "INR" });
-  });
-
-  it("still sells, with a calm word about the plans, when /plans isn't there", async () => {
-    api({ plans: false });
-    at("/for-clubs");
+  it("still sells, with a calm word about the plans, when the server couldn't read them", async () => {
+    get.mockRejectedValueOnce(Object.assign(new Error("404"), { response: { status: 404 } }));
+    at("/for-clubs", { plans: null, home: null });
     const pricing = screen.getByRole("region", { name: "Plans that grow with your club" });
     expect(await within(pricing).findByRole("heading", { name: "Pricing is loading…" })).toBeInTheDocument();
     expect(within(pricing).getByRole("link", { name: "See plans in the dashboard" })).toHaveAttribute("href", SIGNUP);
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /^Start free/ })[0]).toHaveAttribute("href", `${SIGNUP}?plan=free&cycle=monthly`);
     expect(screen.queryByText(/Paid plans from/)).toBeNull();
-    expect(jsonLd()).toEqual([]);
+    expect(screen.queryByText("on MyOtherApp right now", { exact: false })).toBeNull();
 
     // Trying again once the API answers.
-    api();
+    get.mockResolvedValueOnce({ data: plansResponse() });
     fireEvent.click(within(pricing).getByRole("button", { name: "Try again" }));
     expect(await within(pricing).findByText("Most popular")).toBeInTheDocument();
   });
 });
 
 describe("/pricing", () => {
-  it("is the plans on their own: a heading, the switch, the cards, the full comparison, the questions", async () => {
+  it("is the plans on their own: a heading, the switch, the cards, the full comparison, the questions", () => {
     at("/pricing");
     expect(screen.getByRole("heading", { level: 1, name: "Plans for every club." })).toBeInTheDocument();
-    const table = await screen.findByRole("table");
+    const table = screen.getByRole("table");
     expect(within(table).getByRole("rowheader", { name: "Events a month" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Billing period" })).toBeInTheDocument();
     expect(screen.getByText("Every plan comes with").nextElementSibling.textContent).toBe(
@@ -149,35 +155,15 @@ describe("/pricing", () => {
     );
     expect(screen.getByRole("link", { name: /See everything clubs get/ })).toHaveAttribute("href", "/for-clubs");
     expect(screen.getByRole("region", { name: "Questions, answered" })).toBeInTheDocument();
-
-    await waitFor(() => expect(document.title).toBe("Pricing · MyOtherApp for clubs"));
-    expect(head('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/pricing");
-    expect(jsonLd()[0]).toMatchObject({ "@type": "SoftwareApplication", url: "https://myotherapp.in/pricing" });
-    expect(jsonLd()[0].offers).toHaveLength(9);
   });
 
-  it("lands on the comparison from /pricing#compare once the plans are in", async () => {
-    const scrolled = vi.fn();
-    Element.prototype.scrollIntoView = scrolled;
+  it("has the comparison in the page for /pricing#compare to land on", () => {
     at("/pricing#compare");
-    await screen.findByRole("table");
-    await waitFor(() => expect(scrolled).toHaveBeenCalled());
-    expect(scrolled.mock.contexts[0].id).toBe("compare");
-    delete Element.prototype.scrollIntoView;
+    expect(screen.getByRole("table").closest("section")).toHaveAttribute("id", "compare");
   });
 });
 
 describe("routes and links", () => {
-  it("serves /for-clubs and /pricing at their fixed words, never as an old event address", async () => {
-    at("/for-clubs");
-    await screen.findByText("Most popular");
-    at("/pricing");
-    await screen.findAllByRole("table");
-    expect(get).not.toHaveBeenCalledWith("/api/v1/discover/events/for-clubs", expect.anything());
-    expect(get).not.toHaveBeenCalledWith("/api/v1/discover/events/pricing", expect.anything());
-    expect(get).toHaveBeenCalledWith("/api/v1/plans", { skipAuth: true });
-  });
-
   it("puts For clubs in the header (lit on /pricing too) and For clubs and Pricing in the footer, all on this site", async () => {
     at("/pricing");
     const nav = screen.getByRole("navigation", { name: "Discover" });
@@ -193,7 +179,7 @@ describe("routes and links", () => {
     fireEvent.click(forClubs);
     expect(screen.getByTestId("where").textContent).toBe("/for-clubs");
     expect(within(screen.getByRole("navigation", { name: "Discover" })).getByRole("link", { name: "For clubs" })).toHaveAttribute("aria-current", "page");
-    await screen.findByText("Most popular");
+    expect(screen.getByText("Most popular")).toBeInTheDocument();
   });
 
   it("keeps /clubs as the club directory", () => {

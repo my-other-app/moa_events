@@ -1,13 +1,10 @@
-import { useId, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { formatCount, formatWhen, imageUrl } from "@/utils/format";
-import { eventHref, heroPicks } from "@/utils/cover";
+import { coverFields, eventHref, heroPicks } from "@/utils/cover";
 import { Avatar, Img } from "./bits";
 import { DateBadge, EventCover } from "./cover";
-import { LocationPill } from "./locationpill";
+import { HeroSearch } from "./homeislands";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
 
 const CHIPS = 8;
 
@@ -18,7 +15,7 @@ function FanTile({ event }) {
   return (
     <Link className="dc-fan-tile" to={eventHref(event)} aria-label={`${event.name}${when ? `, ${when}` : ""}`}>
       <span className="dc-fan-media">
-        <Img src={imageUrl(event.poster, "medium")} alt="" loading="eager" fallback={<EventCover event={event} />} extra={<DateBadge iso={event.starts_at} />} />
+        <Img src={imageUrl(event.poster, "medium")} alt="" loading="eager" fallback={<EventCover event={coverFields(event)} />} extra={<DateBadge iso={event.starts_at} />} />
         {live ? <span className="dc-pill dc-pill--live">Live now</span> : null}
       </span>
       <span className="dc-fan-caption">
@@ -41,23 +38,7 @@ const IDLE = [
   { id: 4, label: "Meetups" },
 ];
 
-function Fan({ events, loading }) {
-  if (loading) {
-    return (
-      <div className="dc-fan dc-fan--3" aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <span key={i} className={`dc-fan-slot dc-fan-slot--${i + 1}`}>
-            <span className="dc-fan-tile">
-              <span className="dc-fan-media dc-skel" />
-              <span className="dc-fan-caption">
-                <span className="dc-skel dc-skel-line" style={{ width: "80%", marginTop: 0 }} />
-              </span>
-            </span>
-          </span>
-        ))}
-      </div>
-    );
-  }
+function Fan({ events }) {
   if (!events.length) {
     return (
       <div className="dc-fan dc-fan--3 dc-fan--idle" aria-hidden="true">
@@ -115,22 +96,14 @@ function Stats({ stats, clubs }) {
 /**
  * The front of the site: what this is in one line, a search for what and
  * where, the categories one tap away, and a fan of real events coming up
- * that open straight into their pages.
+ * that open straight into their pages. Rendered on the server from the
+ * home page's data; the search (and its place) is the island.
  */
-export function HomeHero({ data = null, loading = false, where = null, stored = null, onWhereChange }) {
-  const navigate = useNavigate();
-  const [q, setQ] = useState("");
-  const searchId = useId();
+export function HomeHero({ data = null }) {
   const events = heroPicks(data, 3);
   const live = events.find((e) => e.status === "live");
   const categories = [...(data?.categories || [])].sort((a, b) => b.upcoming - a.upcoming);
   const shown = categories.slice(0, CHIPS);
-
-  const search = (e) => {
-    e.preventDefault();
-    const term = q.trim();
-    navigate(term ? `/events?q=${encodeURIComponent(term)}` : "/events");
-  };
 
   return (
     <section className="dc-hero2" aria-labelledby="dc-hero-title">
@@ -148,22 +121,7 @@ export function HomeHero({ data = null, loading = false, where = null, stored = 
         </h1>
         <p className="dc-hero2-lede">Hackathons, workshops and meetups from the student clubs around you — find one this week and grab a spot in a tap.</p>
 
-        <form className="dc-hero2-search" role="search" onSubmit={search}>
-          <div className="dc-hero2-field dc-hero2-what">
-            <Icon name="search" size={20} />
-            <label className="dc-sr" htmlFor={searchId}>
-              Search events
-            </label>
-            <input id={searchId} type="search" placeholder="Search events or topics" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" autoComplete="off" />
-          </div>
-          <div className="dc-hero2-field dc-hero2-where">
-            <LocationPill className="dc-where--bare" where={where} stored={stored} onChange={onWhereChange} />
-          </div>
-          <button type="submit" className="dc-btn dc-hero2-go">
-            <Icon name="search" size={18} />
-            <span>Search</span>
-          </button>
-        </form>
+        <HeroSearch />
 
         {shown.length ? (
           <nav className="dc-hero2-cats" aria-label="Browse by category">
@@ -194,7 +152,7 @@ export function HomeHero({ data = null, loading = false, where = null, stored = 
         <span className="dc-hero2-sun" aria-hidden="true" />
         <span className="dc-hero2-dots" aria-hidden="true" />
         <CoverSpark />
-        <Fan events={events} loading={loading && !data} />
+        <Fan events={events} />
       </div>
     </section>
   );

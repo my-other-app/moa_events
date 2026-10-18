@@ -1,7 +1,7 @@
 /* Base for every page (the event page's old stylesheet used to set this for all of them). */
 body {
   margin: 0;
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-dm-sans), "DM Sans", sans-serif;
   line-height: 1.5;
   color: #333;
   background-color: #fff;

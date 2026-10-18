@@ -1,4 +1,7 @@
+"use client";
+
 import { useId, useState } from "react";
+import { formatTotal } from "@/utils/format";
 import { Dialog } from "./bits";
 import Icon from "./icons";
 
@@ -124,24 +127,23 @@ export function FilterSheet({ open, onClose, onClear, doneLabel = "Show results"
 
 /**
  * "Load more", with how far along the list is, and a retry when a page
- * fails. A `total` of null means "more, but we don't know how many".
+ * fails. A `total` of null means "more, but we don't know how many";
+ * `capped`, that the API stopped counting at `total` (1,000+): more may
+ * come past it, so the list goes on until a page comes back short.
  */
-export function LoadMore({ shown, total, busy, error, onMore, noun, label = "Load more", className = "" }) {
+export function LoadMore({ shown, total, capped = false, busy, error, onMore, noun, label = "Load more", className = "" }) {
   if (!shown) return null;
-  if (total !== null && shown >= total && !error) {
+  if (total !== null && !capped && shown >= total && !error) {
     return <p className={`dc-more ${className}`}>{shown > 6 ? `That's all ${shown} ${noun}.` : null}</p>;
   }
+  const where = total === null ? null : capped && shown >= total ? `Showing ${formatTotal(shown, true).slice(0, -1)}` : `Showing ${shown} of ${capped ? formatTotal(total, true) : total}`;
   return (
     <div className={`dc-more ${className}`}>
       {error ? <p role="alert">Couldn't load more just now.</p> : null}
       <button type="button" className="dc-btn dc-btn--ghost" onClick={onMore} disabled={busy}>
         {busy ? "Loading…" : error ? "Try again" : label}
       </button>
-      {total !== null ? (
-        <span>
-          Showing {shown} of {total}
-        </span>
-      ) : null}
+      {where ? <span>{where}</span> : null}
     </div>
   );
 }

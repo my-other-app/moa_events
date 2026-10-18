@@ -6,14 +6,28 @@ const DEFAULT_DESCRIPTION_SELECTOR = 'meta[name="description"]';
 
 /**
  * Sets the tab title and the meta description while a page is open, and
- * puts back what was there when it closes. A null title leaves both alone
+ * puts back what was there when it closes (unless the next page has set its
+ * own meanwhile). The client pages still use these; a server-rendered page
+ * sets its head with Next's metadata instead. A null title leaves both alone
  * (a page still loading has nothing better to say yet).
  */
+/**
+ * Changes the tab's title in the <title> element's own text, the node React
+ * (Next's metadata) keeps: setting document.title swaps that node for a new
+ * one, and React's next title would then go to the old, detached node.
+ */
+function setTitle(text) {
+  const el = document.head.querySelector("title");
+  const node = el && el.childNodes.length === 1 && el.firstChild.nodeType === 3 ? el.firstChild : null;
+  if (node) node.nodeValue = text;
+  else document.title = text;
+}
+
 export function usePageMeta(title, description) {
   useEffect(() => {
     if (!title) return undefined;
     const prevTitle = document.title;
-    document.title = title;
+    setTitle(title);
     let tag = document.head.querySelector(DEFAULT_DESCRIPTION_SELECTOR);
     if (!tag) {
       tag = document.createElement("meta");
@@ -21,11 +35,16 @@ export function usePageMeta(title, description) {
       document.head.appendChild(tag);
     }
     const prevDescription = tag.getAttribute("content");
-    if (description) tag.setAttribute("content", description.slice(0, 160));
+    const set = description ? description.slice(0, 160) : prevDescription;
+    if (description) tag.setAttribute("content", set);
     return () => {
-      document.title = prevTitle;
-      if (prevDescription === null) tag.removeAttribute("content");
-      else tag.setAttribute("content", prevDescription);
+      // Put back only what is still ours: after a navigation the next page's
+      // head (Next renders it on the server) is already there, and must stay.
+      if (document.title === title) setTitle(prevTitle);
+      if (tag.isConnected && tag.getAttribute("content") === set) {
+        if (prevDescription === null) tag.removeAttribute("content");
+        else tag.setAttribute("content", prevDescription);
+      }
     };
   }, [title, description]);
 }
@@ -45,6 +64,8 @@ function setHeadTag(tagName, keyAttr, key, valueAttr, value) {
   el.setAttribute(valueAttr, value);
   return () => {
     if (!el0) el.remove();
+    // A tag the next page has set since is the next page's: left alone.
+    else if (!el.isConnected || el.getAttribute(valueAttr) !== value) return;
     else if (prev === null) el.removeAttribute(valueAttr);
     else el.setAttribute(valueAttr, prev);
   };

@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { locateBrowser, whereLabel } from "@/utils/where";
 import Icon from "./icons";
@@ -5,9 +7,10 @@ import Icon from "./icons";
 /**
  * "Near Pune · Change". Change offers the browser's location; if that is
  * refused or fails, the area the server guessed stays. A shared location
- * can be dropped again for the guess.
+ * can be dropped again for the guess. A list about a place (its ?near=)
+ * passes `onAnywhere`, to offer every event instead.
  */
-export function LocationPill({ where, stored, onChange, className = "" }) {
+export function LocationPill({ where, stored, onChange, onAnywhere = null, className = "" }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
@@ -50,11 +53,19 @@ export function LocationPill({ where, stored, onChange, className = "" }) {
     setOpen(false);
   };
 
+  const showAnywhere = () => {
+    onAnywhere();
+    setNote("");
+    setOpen(false);
+  };
+
   const explain = stored
     ? "Showing what is near the location you shared."
     : where?.source === "ip" && where?.city
       ? `We guessed ${where.city} from your connection.`
-      : "We don't know where you are yet, so you're seeing everything.";
+      : where && where.lat !== null && where.lat !== undefined
+        ? `Showing what is near ${where.city || "the place in this link"}.`
+        : "We don't know where you are yet, so you're seeing everything.";
 
   return (
     <div className={`dc-where ${className}`} ref={box}>
@@ -80,6 +91,10 @@ export function LocationPill({ where, stored, onChange, className = "" }) {
           {stored ? (
             <button type="button" className="dc-btn dc-btn--sm dc-btn--ghost dc-btn--block" onClick={forgetLocation}>
               Forget my location
+            </button>
+          ) : onAnywhere ? (
+            <button type="button" className="dc-btn dc-btn--sm dc-btn--ghost dc-btn--block" onClick={showAnywhere}>
+              Show everywhere
             </button>
           ) : null}
           {note ? (

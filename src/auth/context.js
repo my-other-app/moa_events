@@ -1,10 +1,15 @@
 import { createContext, useContext } from "react";
+import { CONTACT_EMAIL } from "@/config";
 import { imageUrl } from "@/utils/format";
 
 /**
  * What every page knows about signing in:
  *
- *   enabled    sign-in is switched on for this build (VITE_GOOGLE_CLIENT_ID set)
+ *   enabled    sign-in is switched on for this build (NEXT_PUBLIC_GOOGLE_CLIENT_ID set)
+ *   ready      the browser has read who is signed in. False on the server and
+ *              in the first paint (which must match it), when `status` is
+ *              always "signed-out": a page that differs by who is reading
+ *              shows a neutral state until it is true
  *   status     "signed-in" | "signed-out"
  *   user       {id, name, firstName, email, phone, picture, provider, emailVerified} while signed in;
  *              emailVerified is null until the profile has said
@@ -32,6 +37,7 @@ const nothing = async () => null;
 /** Outside the provider (and in builds without sign-in): nobody is signed in and nothing offers it. */
 const OFF = Object.freeze({
   enabled: false,
+  ready: true,
   status: "signed-out",
   user: null,
   attempt: { status: "idle", error: null },
@@ -76,6 +82,30 @@ export function userFromSession(session) {
   };
 }
 
+/**
+ * The API's sign-in refusals that have a code, in plain words. Shared by
+ * Google's sign-in (below) and the email forms (auth/email.js).
+ */
+export const SIGN_IN_REFUSALS = {
+  // An account an admin has suspended: refused at the door, and on every request after.
+  ACCOUNT_SUSPENDED: { kind: "refused", message: `This account has been suspended. If you think that's a mistake, write to ${CONTACT_EMAIL}.` },
+  // Google's token was malformed, expired or not for this site.
+  INVALID_GOOGLE_TOKEN: { kind: "rejected", message: "Google's sign-in didn't go through — it may have timed out. Try again." },
+  // A Google account whose own address Google hasn't verified.
+  EMAIL_NOT_VERIFIED: {
+    kind: "rejected",
+    message: "Google hasn't verified this account's email address yet. Verify it with Google first, or use another Google account.",
+  },
+  // A password account with two-step verification on: the form asks for the code.
+  TOTP_REQUIRED: { kind: "totp", message: "This account has two-step verification on. Enter the 6-digit code from your authenticator app, or a recovery code." },
+  // A club's account (403): clubs sign in on their dashboard, never here as an attendee.
+  CLUB_NOT_VERIFIED: {
+    kind: "refused",
+    message: "This email signs in to a club's dashboard, not to a MyOtherApp account. Use the clubs dashboard for it, or sign in here with your own account.",
+    club: true,
+  },
+};
+
 /** What went wrong signing in, said plainly: {kind, message}. */
 export function describeSignInError(error) {
   if (error?.kind === "load") {
@@ -92,6 +122,8 @@ export function describeSignInError(error) {
   const status = res.status;
   const data = res.data;
   const said = s(typeof data?.message === "string" ? data.message : typeof data?.detail === "string" ? data.detail : null);
+  const known = SIGN_IN_REFUSALS[typeof data?.error_code === "string" ? data.error_code : ""];
+  if (known) return { ...known };
   if (status === 429) return { kind: "server", message: "Too many tries just now. Wait a minute, then try again." };
   if (status >= 500 || !status) return { kind: "server", message: "Something went wrong on our side. Try again in a moment." };
   const line = said ? (/[.!?]$/.test(said) ? said : `${said}.`) : "Google sign-in didn't go through.";

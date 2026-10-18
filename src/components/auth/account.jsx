@@ -1,11 +1,10 @@
+"use client";
+
 import { useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { useAuth } from "@/auth/context";
 import { initials } from "@/utils/cover";
 import Icon from "../discover/icons";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
 
 /** The signed-in person's face: their photo, or their initials on the site's yellow. */
 export function UserAvatar({ user, size = 32 }) {
@@ -80,13 +79,13 @@ function AccountMenu({ user, onSignOut }) {
           </div>
           <ul className="ac-menu-list">
             <li>
-              <Link to="/me/tickets" onClick={close}>
+              <Link href="/me/tickets" onClick={close}>
                 <Icon name="ticket" size={18} />
                 My tickets
               </Link>
             </li>
             <li>
-              <Link to="/me/following" onClick={close}>
+              <Link href="/me/following" onClick={close}>
                 <Icon name="users" size={18} />
                 Following
               </Link>

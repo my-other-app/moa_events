@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
-const { ThreadPage, ThreadsPage } = await import("./threadspage.jsx");
+const { parseComment, parseThread, parseThreadsPage } = await import("@/api/parse");
+const { ThreadMissing, ThreadView, ThreadsView } = await import("./threadspage.jsx");
+
+/*
+ * The posts as the server renders them (src/app/threads, src/app/threads/[id]):
+ * the list and a post, read as nobody; "Load more" and every action are
+ * islands. Signed in, a post is liked and voted on here: threads.signedin.test.jsx.
+ */
 
 const club = { id: 3, name: "Circuit Society", slug: "circuit-society", logo: { thumbnail: "https://cdn.example/t.png" } };
 const post = { id: "t1", club, body: "Kits are in! Pick yours up at Lab 3B.", image: { medium: "https://cdn.example/kit-m.jpg", original: "https://cdn.example/kit.jpg" }, kind: "post", poll: null, pinned: true, likes: 12, comments: 2, views: 300, liked: false, created_at: "2026-10-15T10:00:00Z" };
@@ -20,15 +27,11 @@ const poll = {
   created_at: "2026-10-16T08:00:00Z",
 };
 
-const show = (path) =>
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/threads" element={<ThreadsPage />} />
-        <Route path="/threads/:id" element={<ThreadPage />} />
-      </Routes>
-    </MemoryRouter>
-  );
+const show = (element) => render(<MemoryRouter>{element}</MemoryRouter>);
+const COMMENTS = [
+  { id: "c1", body: "Friday please", author: { id: 7, name: "Rohan P.", is_club: false }, created_at: "2026-10-16T09:00:00Z" },
+  { id: "c2", body: "Noted!", author: { id: null, name: "Circuit Society", is_club: true }, created_at: "2026-10-16T09:30:00Z" },
+].map(parseComment);
 
 beforeEach(() => {
   get.mockReset();
@@ -37,10 +40,10 @@ beforeEach(() => {
 
 describe("the threads page", () => {
   it("lists the clubs' latest posts with their counts, polls as share bars", async () => {
-    get.mockResolvedValue({ data: { items: [post, poll], total: 2, offset: 0, limit: 12 } });
-    show("/threads");
-    expect(await screen.findByText("Kits are in! Pick yours up at Lab 3B.")).toBeInTheDocument();
-    expect(get).toHaveBeenCalledWith("/api/v1/discover/threads", { params: { offset: 0, limit: 12 }, skipAuth: true });
+    show(<ThreadsView page={parseThreadsPage({ items: [post, poll], total: 2, offset: 0, limit: 12 })} />);
+    expect(screen.getByText("Kits are in! Pick yours up at Lab 3B.")).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
+    expect(screen.getByText(/Like, vote and comment in the app/)).toBeInTheDocument();
     expect(screen.getByText("Pinned")).toBeInTheDocument();
     expect(screen.getByText("12 likes")).toBeInTheDocument();
     expect(screen.getByText("2 comments")).toBeInTheDocument();
@@ -54,29 +57,28 @@ describe("the threads page", () => {
     expect(screen.getAllByRole("link", { name: "Circuit Society" })[0]).toHaveAttribute("href", "/clubs/circuit-society");
   });
 
-  it("says so when there are no posts", async () => {
-    get.mockResolvedValue({ data: { items: [], total: 0 } });
-    show("/threads");
-    expect(await screen.findByRole("heading", { name: "No posts yet" })).toBeInTheDocument();
+  it("reads later posts in the browser", async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ ...post, id: `p${i}`, body: `Post ${i}` }));
+    get.mockResolvedValueOnce({ data: { items: [{ ...post, id: "p12", body: "Post 12" }], total: 13 } });
+    show(<ThreadsView page={parseThreadsPage({ items: many, total: 13 })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    expect(await screen.findByText("Post 12")).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith("/api/v1/discover/threads", { params: { offset: 12, limit: 12 }, skipAuth: true });
+  });
+
+  it("says so when there are no posts", () => {
+    show(<ThreadsView page={parseThreadsPage({ items: [], total: 0 })} />);
+    expect(screen.getByRole("heading", { name: "No posts yet" })).toBeInTheDocument();
   });
 });
 
 describe("one post", () => {
   it("shows the post and its comments, and sends every action to the app", async () => {
-    get.mockImplementation(async (url) => {
-      if (url === "/api/v1/threads/t2") return { data: poll };
-      if (url === "/api/v1/threads/t2/comments")
-        return {
-          data: [
-            { id: "c1", body: "Friday please", author: { id: 7, name: "Rohan P.", is_club: false }, created_at: "2026-10-16T09:00:00Z" },
-            { id: "c2", body: "Noted!", author: { id: null, name: "Circuit Society", is_club: true }, created_at: "2026-10-16T09:30:00Z" },
-          ],
-        };
-      throw new Error(`unexpected ${url}`);
-    });
-    show("/threads/t2");
-    expect(await screen.findByText("Which night for the next build?")).toBeInTheDocument();
-    expect(await screen.findByText("Friday please")).toBeInTheDocument();
+    show(<ThreadView thread={parseThread(poll)} comments={COMMENTS} />);
+    expect(screen.getByText("Which night for the next build?")).toBeInTheDocument();
+    expect(screen.getByText("Friday please")).toBeInTheDocument();
+    // Signed out, nothing more is read: the post is as the server read it.
+    expect(get).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Comments (2)" })).toBeInTheDocument();
     expect(screen.getByText("Club")).toBeInTheDocument();
 
@@ -95,9 +97,17 @@ describe("one post", () => {
     expect(within(screen.getByRole("dialog")).getByText(/Comments are written in the MyOtherApp app/)).toBeInTheDocument();
   });
 
-  it("says when a post is gone", async () => {
-    get.mockRejectedValue(Object.assign(new Error("404"), { response: { status: 404 } }));
-    show("/threads/missing");
-    expect(await screen.findByRole("heading", { name: "This post is gone" })).toBeInTheDocument();
+  it("still shows the post when its comments couldn't be read", () => {
+    show(<ThreadView thread={parseThread(post)} comments={null} />);
+    expect(screen.getByText("Kits are in! Pick yours up at Lab 3B.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Comments (2)" })).toBeInTheDocument();
+    expect(screen.getByText("Comments couldn’t load just now.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /All posts/ })).toHaveAttribute("href", "/threads");
+  });
+
+  it("says when a post is gone", () => {
+    show(<ThreadMissing />);
+    expect(screen.getByRole("heading", { level: 1, name: "This post is gone" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the latest posts" })).toHaveAttribute("href", "/threads");
   });
 });

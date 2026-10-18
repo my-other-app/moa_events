@@ -1,13 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 
 const get = vi.fn();
 const post = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post, delete: vi.fn(() => Promise.resolve({ data: {} })) } }));
 
 const { AuthProvider } = await import("@/auth/AuthProvider");
-const { ThreadPage } = await import("./threadspage.jsx");
+const { parseThread } = await import("@/api/parse");
+const { ThreadView } = await import("./threadspage.jsx");
+const { hydrate } = await import("@/test/hydrate");
 const { PROFILE, accessToken, enableSignIn, resetAuth, signInAs, stubGoogle } = await import("@/test/auth");
 
 const club = { id: 3, name: "Circuit Society", slug: "circuit-society", logo: null };
@@ -62,16 +64,15 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-const show = (id = "t1") =>
-  render(
-    <MemoryRouter initialEntries={[`/threads/${id}`]}>
-      <AuthProvider>
-        <Routes>
-          <Route path="/threads/:id" element={<ThreadPage />} />
-        </Routes>
-      </AuthProvider>
-    </MemoryRouter>,
-  );
+/** The post as the server rendered it (read as nobody: not liked, no vote), in the site's providers. */
+const page = (id = "t1") => (
+  <MemoryRouter initialEntries={[`/threads/${id}`]}>
+    <AuthProvider>
+      <ThreadView thread={parseThread({ ...(id === "t2" ? poll : post1), liked: false })} comments={[]} />
+    </AuthProvider>
+  </MemoryRouter>
+);
+const show = (id) => render(page(id));
 
 describe("a post, signed in", () => {
   beforeEach(() => {
@@ -132,6 +133,18 @@ describe("a post, signed in", () => {
   });
 });
 
+describe("a post, signed in, from the server's HTML", () => {
+  it("hydrates as nobody's post, then shows the reader's own like", async () => {
+    enableSignIn();
+    thread = { ...post1, liked: true, likes: 13 };
+    const { problems, container, unmount } = await hydrate(page("t1"), { inBrowser: () => signInAs() });
+    expect(problems.filter((p) => /hydrat|did not match|mismatch/i.test(p))).toEqual([]);
+    await waitFor(() => expect(within(container).getByRole("button", { name: "Liked" })).toHaveAttribute("aria-pressed", "true"));
+    expect(within(container).getByText("13 likes")).toBeInTheDocument();
+    unmount();
+  });
+});
+
 describe("a post, signed out", () => {
   it("offers signing in beside the app, and likes once signed in (unless already liked)", async () => {
     enableSignIn();
@@ -151,8 +164,8 @@ describe("a post, signed out", () => {
 
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/threads/t1/like"));
     expect(await screen.findByRole("button", { name: "Liked" })).toHaveAttribute("aria-pressed", "true");
-    // Read again as the new reader before liking, so an earlier like isn't undone.
-    expect(get.mock.calls.filter(([url]) => url === "/api/v1/threads/t1")).toHaveLength(2);
+    // Read as the new reader before liking, so an earlier like isn't undone.
+    expect(get.mock.calls.filter(([url]) => url === "/api/v1/threads/t1")).toHaveLength(1);
     expect(post.mock.calls.filter(([url]) => url === "/api/v1/threads/t1/like")).toHaveLength(1);
   });
 

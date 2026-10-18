@@ -79,6 +79,11 @@ export function formatDistance(km) {
 
 export const plural = (n, one, many = `${one}s`) => `${formatCount(n)} ${Number(n) === 1 ? one : many}`;
 
+const whole = new Intl.NumberFormat("en-IN");
+
+/** A list's size: "38", "1.2k"; "1,000+" when the API stopped counting (`capped`). */
+export const formatTotal = (n, capped = false) => (capped ? `${whole.format(Number(n) || 0)}+` : formatCount(n));
+
 /**
  * The pill on an event's poster: what is most worth knowing at a glance.
  * Live beats closing soon beats full; a free event says so when nothing

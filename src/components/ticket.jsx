@@ -1,14 +1,19 @@
-import { useParams } from "react-router-dom";
+"use client";
+
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { eventsApi } from "@/api/events";
 import { competitionApi } from "@/api/competition";
-import { Link } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import "@/styles/ticket.css";
 import Download from "@/components/download";
 
-const Ticket = () => {
-  const { ticketid } = useParams();
+/**
+ * A ticket, from the link in its email or My tickets. Its server half
+ * (src/app/tickets/[ticketid]/page.jsx) hands over the id; the ticket itself
+ * is read in the browser, with the token that may open it (the account's, or
+ * the guest token the registration left).
+ */
+const Ticket = ({ ticketid }) => {
   const [competition, setCompetition] = useState(null);
   const [ticketData, setTicketData] = useState(null);
   const [error, setError] = useState(false);
@@ -124,7 +129,7 @@ const Ticket = () => {
       </div>
 
       {competition?.enabled && ticketData.event?.id ? (
-        <Link to={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>
+        <Link href={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>
           Your team and submission
         </Link>
       ) : null}
