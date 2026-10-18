@@ -74,19 +74,24 @@ describe("the site's own pages", () => {
     at("/privacy");
     const main = screen.getByRole("main");
     expect(within(main).getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeInTheDocument();
-    expect(within(main).getByText("Last updated", { exact: false })).toHaveTextContent("Last updated 20 May 2025");
-    expect(main.querySelector("time")).toHaveAttribute("dateTime", "2025-05-20");
+    expect(within(main).getByText("Last updated", { exact: false })).toHaveTextContent("Last updated 18 October 2026");
+    expect(main.querySelector("time")).toHaveAttribute("dateTime", "2026-10-18");
     const sections = within(main).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(sections).toEqual(expect.arrayContaining(PRIVACY.sections.map((s) => s.heading)));
     const collect = within(main).getByRole("region", { name: "1. What We Collect" });
-    expect(within(collect).getAllByRole("listitem")).toHaveLength(4);
-    expect(within(collect).getByText("Basic Info:")).toContainHTML("Basic Info:");
+    expect(within(collect).getAllByRole("listitem")).toHaveLength(PRIVACY.sections[0].blocks[1][1].length);
+    expect(within(collect).getByText("Account details:")).toContainHTML("Account details:");
+    // What the app sends and what people post are named, not waved at.
+    for (const t of ["push-notification token", "Firebase Crashlytics", "Firebase Analytics", "answers to the organiser's questions", "Reports and blocks:"])
+      expect(collect.textContent).toContain(t);
     expect(within(main).getAllByRole("link", { name: "support@myotherapp.in" })[0]).toHaveAttribute("href", "mailto:support@myotherapp.in");
     // The section list jumps to each part.
-    expect(within(screen.getByRole("navigation", { name: "On this page" })).getByRole("link", { name: "6. Cookies & Tracking" })).toHaveAttribute(
+    expect(within(screen.getByRole("navigation", { name: "On this page" })).getByRole("link", { name: "8. Cookies & Tracking" })).toHaveAttribute(
       "href",
       "#cookies-and-tracking"
     );
+    // The app's old claims are gone: it asks for no location, and has no Mixpanel.
+    expect(main.textContent).not.toMatch(/Mixpanel|college ID|because it's a mobile app/);
     // The old name is gone.
     expect(main.textContent).not.toMatch(/Finnet/i);
     expect(main.textContent).toContain("Welcome to MyOtherApp! We care about your privacy");
@@ -97,7 +102,37 @@ describe("the site's own pages", () => {
     expect(head('meta[name="robots"]')).toBeNull();
   });
 
-  it("serves the Terms with every part of the app's text, and links across to the policy", async () => {
+  it("opens /privacy#delete-account, the page Google Play links to, on how to delete an account", async () => {
+    const scrolled = vi.fn();
+    const had = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function () {
+      scrolled(this.id);
+    };
+    try {
+      at("/privacy#delete-account");
+      const section = screen.getByRole("region", { name: "6. Deleting Your Account" });
+      expect(section).toHaveAttribute("id", "delete-account");
+      // After the page starts at the top, it moves to the section.
+      await waitFor(() => expect(scrolled).toHaveBeenCalledWith("delete-account"));
+      // The steps in the app, in order.
+      const steps = within(section).getByRole("heading", { level: 3, name: "In the app" }).nextElementSibling;
+      expect(steps.tagName).toBe("OL");
+      expect([...steps.children].map((li) => li.textContent)).toEqual([
+        "Open the Profile tab and tap Settings.",
+        "Scroll to the bottom and tap Delete Account.",
+        "Tap DELETE to confirm. You're signed out straight away.",
+      ]);
+      // The way by email, and what goes and what stays.
+      expect(within(section).getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
+      for (const h of ["By email", "What is deleted", "What is kept"]) expect(within(section).getByRole("heading", { level: 3, name: h })).toBeInTheDocument();
+      expect(section.textContent).toContain("Payment records:");
+      expect(section.textContent).toContain("not erased straight away");
+    } finally {
+      Element.prototype.scrollIntoView = had;
+    }
+  });
+
+  it("serves the Terms with every part of their text, the rules for posts and how to report, and links across to the policy", async () => {
     at("/terms");
     const main = screen.getByRole("main");
     expect(within(main).getByRole("heading", { level: 1, name: "Terms and Conditions" })).toBeInTheDocument();
@@ -111,6 +146,22 @@ describe("the site's own pages", () => {
       for (const [kind, body] of s.blocks) for (const line of kind === "ul" || kind === "ol" ? body : [body]) expect(text).toContain(plainText(line));
     expect(text).not.toMatch(/Myotherapp/);
     expect(within(main.querySelector(".dc-prose")).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+    // What the stores ask of an app with people's posts in it: rules, a way to report and block, and a promise to act.
+    const rules = within(main).getByRole("region", { name: "Acceptable Use" });
+    expect(rules).toHaveTextContent("zero tolerance for objectionable content and abusive users");
+    for (const t of ["Spam:", "Harassment:", "Hate:", "Sexual content:", "Violence:", "Misinformation:", "Illegal content:", "Impersonation:"])
+      expect(within(rules).getByText(t)).toBeInTheDocument();
+    const reporting = within(main).getByRole("region", { name: "Reporting and Blocking" });
+    expect(reporting).toHaveTextContent(
+      "We review reports and act within 24 hours, which may include removing content and suspending or terminating accounts."
+    );
+    expect(reporting).toHaveTextContent("Report comment");
+    expect(reporting).toHaveTextContent("Settings → Blocked Users");
+    expect(within(reporting).getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
+    expect(text).not.toMatch(/do not actively monitor/i);
+    // No fee the checkout doesn't charge.
+    expect(text).not.toMatch(/2% processing fee/);
+    expect(within(main).getAllByRole("link", { name: /delete your account/i })[0]).toHaveAttribute("href", "/privacy#delete-account");
     await waitFor(() => expect(head('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/terms"));
     cleanup();
   });

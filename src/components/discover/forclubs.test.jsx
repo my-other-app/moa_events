@@ -97,7 +97,9 @@ describe("/for-clubs", () => {
     fireEvent.click(within(faq).getByText("How much do we save by paying yearly?"));
     expect(within(faq).getByText(/twelve months for the price of 10/)).toBeInTheDocument();
     expect(within(faq).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
-    expect(within(faq).getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
+    // No fee is added at checkout: the answer says so instead of pointing at fees in the Terms.
+    expect(within(faq).getByText(/attendees pay exactly that/)).toBeInTheDocument();
+    expect(within(faq).getByText(/Connect your own Razorpay account under Payments/)).toBeInTheDocument();
     for (const a of within(faq).getAllByRole("link", { name: "write to us" })) expect(a).toHaveAttribute("href", "mailto:support@myotherapp.in");
 
     // Nothing promised that isn't in the product.

@@ -123,15 +123,21 @@ describe("the preview page", () => {
     expect(privacy.status).toBe(200);
     expect(canonical(privacy.html)).toBe("https://myotherapp.in/privacy");
     expect(privacy.html).toContain("<title>Privacy Policy · MyOtherApp</title>");
-    expect(privacy.html).toContain("<p>Last updated 20 May 2025</p>");
+    expect(privacy.html).toContain("<p>Last updated 18 October 2026</p>");
     expect(privacy.html).toContain('<h2 id="what-we-collect">1. What We Collect</h2>');
-    expect(privacy.html).toContain("<li><strong>Basic Info:</strong> Your name, email, college ID, and profile photo.</li>");
+    expect(privacy.html).toContain("<li><strong>Account details:</strong> your name, email address and username.");
+    // The account-deletion section keeps its anchor for crawlers too.
+    expect(privacy.html).toContain('<h2 id="delete-account">6. Deleting Your Account</h2>');
     expect(privacy.html).not.toContain("Finnet");
 
     const terms = await shareDocument("/terms", { fetch });
     expect(canonical(terms.html)).toBe("https://myotherapp.in/terms");
     expect(terms.html).toContain('<a href="https://myotherapp.in/privacy">Privacy Policy</a>');
-    expect(terms.html).toContain("A fixed 2% processing fee applied to all transactions.");
+    expect(terms.html).toContain(
+      "<p><strong>We review reports and act within 24 hours, which may include removing content and suspending or terminating accounts.</strong>"
+    );
+    expect(terms.html).toContain('<a href="https://myotherapp.in/privacy#delete-account">Deleting your account</a>');
+    expect(terms.html).not.toContain("2% processing fee");
 
     const about = await shareDocument("/about", { fetch });
     expect(canonical(about.html)).toBe("https://myotherapp.in/about");
