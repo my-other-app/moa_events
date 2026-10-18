@@ -8,6 +8,7 @@ import { ClubActions, ClubFollow, FollowerCount, FollowHint, MoreEvents, Upcomin
 import { ClubCover } from "./cover";
 import { ThreadCard } from "./threadcard";
 import Icon from "./icons";
+import { TopicChips } from "./topicbits";
 
 const SOCIALS = [
   ["instagram", "Instagram", "instagram"],
@@ -143,6 +144,7 @@ export function ClubView({ data }) {
             <div className="dc-club-titles">
               <h1>{club.name}</h1>
               {club.tagline ? <p className="dc-club-tagline">{club.tagline}</p> : null}
+              <TopicChips topics={club.topics} className="tp-chips dc-club-topics" />
               <p className="dc-club-meta">
                 {club.location_name ? (
                   <span>

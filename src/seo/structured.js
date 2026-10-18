@@ -15,11 +15,17 @@ export function eventImages(page) {
   return [absoluteUrl(page.event.poster ? media.eventPoster(ref) : media.eventCover(ref)), absoluteUrl(ogImage.event(ref, eventOgVersion(page)))];
 }
 
-/** [Event, BreadcrumbList] for an event's page. `page` is the raw parsed page (before stabilising). */
+/**
+ * [Event, BreadcrumbList] for an event's page. `page` is the raw parsed page
+ * (before stabilising). An event with topics is about them (each its
+ * page), and its trail goes through its first: Home › Topic › Event;
+ * without, Home › Events › Event.
+ */
 export function eventStructuredData(page) {
   const { event, club, speakers } = page;
   const ref = eventRefOf(event);
   const url = eventUrl(event);
+  const topics = (event.topics || []).map((t) => ({ name: t.name, url: absoluteUrl(topicPagePath(t)) }));
   const ld = eventJsonLd({
     event,
     club,
@@ -30,12 +36,9 @@ export function eventStructuredData(page) {
     clubLogo: club?.logo && club.slug ? absoluteUrl(media.clubLogo(club.slug, "medium")) : null,
     description: summary(event.about, 500) || eventFactsLine(event, club),
     speakerImage: (s, i) => (s.photo ? absoluteUrl(media.eventSpeaker(ref, s.id ?? `i${i}`)) : null),
+    topics,
   });
-  const crumbs = breadcrumbJsonLd([
-    ["Home", `${SITE_URL}/`],
-    ["Events", `${SITE_URL}/events`],
-    [event.name, url],
-  ]);
+  const crumbs = breadcrumbJsonLd([["Home", `${SITE_URL}/`], topics.length ? [topics[0].name, topics[0].url] : ["Events", `${SITE_URL}/events`], [event.name, url]]);
   return [ld, crumbs];
 }
 

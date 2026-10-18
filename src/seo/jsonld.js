@@ -108,11 +108,13 @@ function offer(event, url) {
  *   clubUrl, clubLogo       absolute, or null
  *   description             plain text
  *   speakerImage(s, i)      an absolute photo address for a speaker, or null
+ *   topics                  [{name, url}]: what it is about (its topics' pages, absolute)
  */
-export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, description = null, speakerImage = () => null }) {
+export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, description = null, speakerImage = () => null, topics = [] }) {
   if (!event) return null;
   const fee = event.has_fee ? positive(event.fee) : 0;
   const pictures = [...(image ? [image] : []), ...images].filter(isHttp);
+  const words = [...new Set([...topics.map((t) => t.name), ...(Array.isArray(event.interests) ? event.interests : [])].filter(Boolean))];
   return clean({
     "@context": "https://schema.org",
     "@type": "Event",
@@ -126,7 +128,8 @@ export function eventJsonLd({ event, club = null, speakers = [], url, images = [
     image: [...new Set(pictures)],
     url,
     isAccessibleForFree: fee === 0 ? true : null,
-    keywords: Array.isArray(event.interests) && event.interests.length ? event.interests.join(", ") : null,
+    about: topics.map((t) => ({ "@type": "Thing", name: t.name, url: isHttp(t.url) ? t.url : null })),
+    keywords: words.length ? words.join(", ") : null,
     organizer: club ? { "@type": "Organization", name: club.name, url: clubUrl, logo: isHttp(clubLogo) ? clubLogo : null } : null,
     performer: speakers
       .filter((s) => s && s.name)
@@ -181,10 +184,12 @@ const SOCIAL_KEYS = ["instagram", "linkedin", "youtube", "x", "website"];
  *   data      parseClubPage's result
  *   url       the club page (absolute); logo, image: absolute or null
  *   events    [{card, url, image}] for the upcoming events
+ * What it knows about: its topics' names (when the API sends them), then its interests.
  */
 export function clubJsonLd({ club, url, logo = null, image = null, description = null, events = [] }) {
   if (!club) return null;
   const sameAs = [...SOCIAL_KEYS.map((k) => club.socials?.[k]), club.website_url].filter(isHttp);
+  const knows = [...new Set([...(club.topics || []).map((t) => t.name), ...(club.interests || [])].filter(Boolean))];
   const organizer = { "@type": "Organization", name: club.name, url };
   return clean({
     "@context": "https://schema.org",
@@ -198,7 +203,7 @@ export function clubJsonLd({ club, url, logo = null, image = null, description =
     slogan: club.tagline || null,
     email: club.contact_email || null,
     address: club.location_name ? { "@type": "PostalAddress", addressLocality: club.location_name, addressCountry: "IN" } : null,
-    knowsAbout: club.interests?.length ? club.interests : null,
+    knowsAbout: knows.length ? knows : null,
     sameAs: [...new Set(sameAs)],
     event: events.map((e) => eventCardJsonLd(e.card, { url: e.url, image: e.image, organizer })),
   });
