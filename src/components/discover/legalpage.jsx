@@ -1,5 +1,5 @@
-import { Fragment } from "react";
-import { Link } from "react-router-dom";
+import { Fragment, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { CONTACT_EMAIL } from "@/config";
 import { LEGAL, inline, updatedLabel } from "@/content/legal";
 import { usePageSeo } from "@/utils/meta";
@@ -51,10 +51,25 @@ function Block({ block }) {
 /**
  * A legal text as a page to read: the title and when it last changed, a
  * list of its sections (beside it on a desk), then the text itself.
+ * /privacy#delete-account, the account-deletion address given to Google
+ * Play, opens on that section: SitePage starts every page at the top, so
+ * the jump to a section named in the address happens after it.
  */
 export function LegalPage({ doc }) {
   usePageSeo({ title: `${doc.title} · MyOtherApp`, description: doc.description, path: doc.path, noindex: false });
   const other = doc.key === "privacy" ? LEGAL.terms : LEGAL.privacy;
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (hash.length < 2) return;
+    let id;
+    try {
+      id = decodeURIComponent(hash.slice(1));
+    } catch {
+      return;
+    }
+    document.getElementById(id)?.scrollIntoView?.();
+  }, [doc.key, hash]);
   return (
     <SitePage>
       <div className="dc-wrap">
