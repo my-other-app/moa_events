@@ -46,7 +46,7 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | `/robots.txt` | Metadata route | `robots.js` | |
 | `/media/...` | Route handler | `media/[...path]/route.jsx` | stable image addresses (307) and the drawn cover (PNG) |
 | `/og/events/{slug}`, `/og/clubs/{slug}` | Route handler | `og/…/route.jsx` | 1200×630 share pictures, `?v=` changes with what they show |
-| `/api/share?path=…` | Route handler | `api/share/route.js` | the preview page bots get for client pages (below) |
+| `/api/share/{path}` (or `?path=`) | Route handler | `api/share/[...path]/route.js` | the preview page bots get for client pages (below) |
 | `/api/revalidate` | Route handler | `api/revalidate/route.js` | `POST`, `Bearer REVALIDATE_SECRET`: `{events, clubs, sitemap}` |
 | anything else | 404 | `not-found.jsx` | the old 404 page; clubs have their own (`clubs/[slug]/not-found.jsx`) |
 
@@ -74,7 +74,7 @@ The site's own words (`events`, `clubs`, `about`, …) have their own routes, wh
 
 ## Link-preview bots
 
-WhatsApp, Telegram, Slack, X, LinkedIn, Facebook, Discord and search engines read the HTML they are sent. Server-rendered pages need no help. For **client pages**, next.config.mjs rewrites a bot's request (by user agent) to `/api/share`, which answers with the page's title, description, picture and words. The list is `BOT_PAGES` in `src/seo/bots.js`. **When you port a page, delete its line there.** When the last one goes, delete `src/server/share`, `src/app/api/share` and `src/seo/bots.js`.
+WhatsApp, Telegram, Slack, X, LinkedIn, Facebook, Discord and search engines read the HTML they are sent. Server-rendered pages need no help. For **client pages**, next.config.mjs rewrites a bot's request (by user agent) to `/api/share/{the same path}`, which answers with the page's title, description, picture and words. The list is `BOT_PAGES` in `src/seo/bots.js`. **When you port a page, delete its line there.** When the last one goes, delete `src/server/share`, `src/app/api/share` and `src/seo/bots.js`.
 
 ## Porting a page: the one pattern
 
