@@ -70,10 +70,62 @@ describe("paymentsApi.createPaymentOrder", () => {
     expect(error.webUrl).toBe("https://myotherapp.in/events/quiet-evening");
   });
 
-  it("keeps the server's message for any other refusal", async () => {
+  it("keeps the server's message and its code for any other refusal", async () => {
     serve((config) => reply(config, 503, { message: "Payments are down for a moment.", error_code: "GATEWAY_UNAVAILABLE" }));
     const error = await paymentsApi.createPaymentOrder("62", "reg-1").catch((e) => e);
     expect(error.message).toBe("Payments are down for a moment.");
-    expect(error.code).toBeUndefined();
+    expect(error).toMatchObject({ code: "GATEWAY_UNAVAILABLE", status: 503, stage: "order", network: false });
+  });
+
+  it.each([
+    [409, "ALREADY_PAID", "This registration is already paid for.", { event_registration_id: "already paid" }],
+    [422, "NOTHING_TO_PAY", "There is nothing to pay for this registration.", { event_registration_id: "nothing to pay" }],
+    [409, "EVENT_ENDED", "This event is over; it can no longer be paid for.", null],
+    [400, "EVENT_FULL", "Event is full", { max_participants: 60 }],
+    [404, "REGISTRATION_NOT_FOUND", "Registration not found", { event_registration_id: "event_registration_id is invalid" }],
+    [404, "EVENT_NOT_FOUND", "Event not found", { event_id: "event_id is invalid" }],
+  ])("reads a %i %s refusal by its code", async (status, code, message, errors) => {
+    serve((config) => reply(config, status, { message, errors, error_code: code, track_id: null }));
+    const error = await paymentsApi.createPaymentOrder("62", "reg-1").catch((e) => e);
+    expect(error).toMatchObject({ code, status, message, stage: "order", errors });
+    // Finishing a payment asks with checkout=2 too.
+    expect(seen[0].params).toEqual({ checkout: 2 });
+  });
+
+  it("says when nothing answered at all", async () => {
+    apiClient.defaults.adapter = vi.fn(async (config) => {
+      const error = new Error("Network Error");
+      error.config = config;
+      throw error;
+    });
+    const error = await paymentsApi.createPaymentOrder("62", "reg-1").catch((e) => e);
+    expect(error).toMatchObject({ code: null, status: 0, network: true, message: "Failed to create payment order" });
+  });
+});
+
+describe("paymentsApi.verifyPayment", () => {
+  it("sends the order and the payment, and returns what the server says", async () => {
+    serve((config) => reply(config, 200, { payment_status: "captured" }));
+    expect(await paymentsApi.verifyPayment("order_1", "pay_1")).toEqual({ payment_status: "captured" });
+    expect(seen[0]).toMatchObject({ method: "post", url: "/api/v1/payments/verify" });
+    expect(JSON.parse(seen[0].data)).toEqual({ razorpay_order_id: "order_1", razorpay_payment_id: "pay_1" });
+  });
+
+  it.each([
+    [404, "ORDER_NOT_FOUND", "Payment order not found"],
+    [409, "ALREADY_PAID", "This order is already paid."],
+    [400, "PAYMENT_ORDER_MISMATCH", "This payment does not belong to the specified order."],
+    [400, "UNSUPPORTED_PAYMENT_METHOD", "This payment method is not supported."],
+    [404, "PAYMENT_NOT_FOUND", "Payment not found"],
+  ])("reads a %i %s refusal by its code", async (status, code, message) => {
+    serve((config) => reply(config, status, { message, errors: null, error_code: code }));
+    const error = await paymentsApi.verifyPayment("order_1", "pay_1").catch((e) => e);
+    expect(error).toMatchObject({ code, status, message, stage: "verify" });
+  });
+
+  it("reads an older server's {detail} too", async () => {
+    serve((config) => reply(config, 404, { detail: "Payment not found" }));
+    const error = await paymentsApi.verifyPayment("order_1", "pay_1").catch((e) => e);
+    expect(error).toMatchObject({ code: null, status: 404, message: "Payment not found" });
   });
 });

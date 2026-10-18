@@ -10,8 +10,22 @@ import { clearSession, forgetGuestTokens, getSession, setSession, subscribe, upd
 const SignInSheet = lazy(() => import("@/components/auth/signinsheet"));
 
 const IDLE = { status: "idle", error: null };
-const noSession = () => null;
 const SHUT = { open: false, reason: null, view: "start", email: "", n: 0 };
+
+/*
+ * The session and whether it has been read yet, as one snapshot, so the two
+ * change together. The server (and the first render in the browser, which
+ * must match it) knows nobody and hasn't looked: `ready` is false. Straight
+ * after, the browser reads localStorage and both arrive at once.
+ */
+const UNREAD = Object.freeze({ ready: false, session: null });
+let lastRead = { ready: true, session: undefined };
+function readSession() {
+  const session = getSession();
+  if (lastRead.session !== session) lastRead = { ready: true, session };
+  return lastRead;
+}
+const unread = () => UNREAD;
 
 /** Ends a session on the server too, sent with the token it ends, so its refresh token is dead everywhere. */
 function endOnServer(was) {
@@ -49,7 +63,7 @@ export function AuthProvider({ children }) {
   const enabled = googleEnabled();
   // The server (and the first render in the browser, which must match it)
   // knows nobody: the session is in localStorage. It shows straight after.
-  const session = useSyncExternalStore(subscribe, getSession, noSession);
+  const { ready, session } = useSyncExternalStore(subscribe, readSession, unread);
   const [sheet, setSheet] = useState(SHUT);
   const [attempt, setAttempt] = useState(IDLE);
   const after = useRef(null);
@@ -260,6 +274,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       enabled,
+      ready,
       status: enabled && session ? "signed-in" : "signed-out",
       user: enabled ? user : null,
       attempt,
@@ -278,6 +293,7 @@ export function AuthProvider({ children }) {
     }),
     [
       enabled,
+      ready,
       session,
       user,
       attempt,

@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useAuth } from "@/auth/context";
 import { useCountdown } from "@/auth/countdown";
@@ -96,7 +98,7 @@ export function SignInForm({ draft, setDraft, resetOffered, notice, onForgot, on
       try {
         await auth.passwordSignIn({ email: draft.email, password: draft.password });
       } catch (error) {
-        const p = error?.refusedHere ? refusedHere(error?.response?.data?.message) : describeAuthError(error, "signin");
+        const p = error?.refusedHere ? refusedHere(error?.response?.data?.message, error?.response?.data?.error_code) : describeAuthError(error, "signin");
         if (p.kind === "totp") return onTotp(p.message);
         if (p.kind === "fields") {
           setErrors(p.fields);
@@ -188,7 +190,7 @@ export function TotpForm({ draft }) {
       try {
         await auth.passwordSignIn({ email: draft.email, password: draft.password, totpCode: typed });
       } catch (err) {
-        const p = err?.refusedHere ? refusedHere(err?.response?.data?.message) : describeAuthError(err, "totp");
+        const p = err?.refusedHere ? refusedHere(err?.response?.data?.message, err?.response?.data?.error_code) : describeAuthError(err, "totp");
         if (p.kind === "fields" && p.fields.totp) {
           setError(p.fields.totp);
           focusSoon(box.current);

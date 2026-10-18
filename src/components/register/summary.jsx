@@ -1,3 +1,5 @@
+"use client";
+
 import { useId, useState } from "react";
 import { dateTile, scheduleLines, seatsLeft, whenLine } from "@/utils/eventpage";
 import { imageUrl } from "@/utils/format";

@@ -5,14 +5,11 @@
  * checked in src/app/routes.test.js.
  */
 import { Route, Routes } from "react-router-dom";
-import { FollowingPage, MyTicketsPage } from "@/components/me/mepages";
 import NotFound from "@/components/notfound";
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/me/tickets" element={<MyTicketsPage />} />
-      <Route path="/me/following" element={<FollowingPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

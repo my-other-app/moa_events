@@ -1,3 +1,5 @@
+"use client";
+
 import { forwardRef, useId, useImperativeHandle, useRef, useState } from "react";
 import { CODE_LENGTH, PASSWORD_RULES, digitsOf } from "@/auth/email";
 import Icon from "../discover/icons";

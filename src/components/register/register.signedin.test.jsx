@@ -189,6 +189,115 @@ describe("registering signed in", () => {
   });
 });
 
+describe("signed in, with a registration already there", () => {
+  beforeEach(() => {
+    enableSignIn();
+    stubGoogle();
+    signInAs();
+  });
+
+  /** GET /events/info/{id} for the signed-in person (backend#68). */
+  const mine = (over = {}) => ({ id: 123, additional_details: [], reg_fee: 250, is_registered: true, is_paid: false, registration_id: "reg-9", ticket_id: "MOA9", ...over });
+  const coded = (code, status, message) => Object.assign(new Error(message), { code, status, stage: "order", errors: null, network: false });
+
+  function showMine(page, data) {
+    eventsApi.fetchEvent.mockResolvedValue(data);
+    eventsApi.fetchStoreCatalog.mockResolvedValue({ enabled: false, items: [] });
+    return render(
+      <MemoryRouter initialEntries={[`/events/${page.event.slug}/register`]}>
+        <AuthProvider>
+          <Routes>
+            <Route path="/events/:slug/register" element={<Register event={page.event} club={page.club} />} />
+            <Route path="/me/tickets" element={<p>my tickets page</p>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("pays one waiting for payment as it stands: no form, the order for its id, Razorpay with the order's key, the check, the ticket", async () => {
+    paymentsApi.createPaymentOrder.mockResolvedValue({ amount: 25000, razorpay_order_id: "order_9", key_id: "rzp_test_club_not_real" });
+    paymentsApi.verifyPayment.mockResolvedValue({ payment_status: "captured" });
+    showMine(paid, mine());
+    expect(await heading("Finish your payment")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Full name/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Finish payment" }));
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    expect(paymentsApi.createPaymentOrder).toHaveBeenCalledWith("123", "reg-9");
+    expect(razorpay).toMatchObject({ key: "rzp_test_club_not_real", order_id: "order_9", prefill: { name: "Asha Rao", email: "asha@example.org" } });
+    await act(() => razorpay.handler({ razorpay_order_id: "order_9", razorpay_payment_id: "pay_9" }));
+    expect(paymentsApi.verifyPayment).toHaveBeenCalledWith("order_9", "pay_9");
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+    expect(screen.getByText("MOA9")).toBeInTheDocument();
+    expect(screen.getByText(/your payment of ₹250 went through/)).toBeInTheDocument();
+    expect(eventsApi.registerForEvent).not.toHaveBeenCalled();
+  });
+
+  it("offers it past the registration deadline too (until the event ends), and counts ALREADY_PAID as paid", async () => {
+    const closed = parseEventPage(fullEvent({ event: { ...fullEvent().event, registration_open: false, reg_opens_at: null, reg_closes_at: "2026-10-01T23:59:00+05:30" } }));
+    paymentsApi.createPaymentOrder.mockRejectedValue(coded("ALREADY_PAID", 409, "This registration is already paid for."));
+    showMine(closed, mine());
+    expect(await heading("Finish your payment")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Finish payment" }));
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+    expect(window.Razorpay).not.toHaveBeenCalled();
+    expect(eventsApi.registerForEvent).not.toHaveBeenCalled();
+  });
+
+  it("says why when the order is refused (EVENT_ENDED), keeping the button", async () => {
+    paymentsApi.createPaymentOrder.mockRejectedValue(coded("EVENT_ENDED", 409, "This event is over; it can no longer be paid for."));
+    showMine(paid, mine());
+    fireEvent.click(await screen.findByRole("button", { name: "Finish payment" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("This event is over");
+    expect(screen.getByRole("button", { name: "Finish payment" })).not.toBeDisabled();
+  });
+
+  it("doesn't offer it once the event has ended", async () => {
+    const over = parseEventPage(fullEvent({ event: { ...fullEvent().event, status: "ended", registration_open: false } }));
+    showMine(over, mine());
+    expect(await heading("This event has ended")).toBeInTheDocument();
+    expect(eventsApi.fetchEvent).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Finish payment" })).toBeNull();
+  });
+
+  it("shows the ticket of one already paid for, instead of the form", async () => {
+    showMine(paid, mine({ is_paid: true }));
+    expect(await heading("You're registered")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View your ticket" })).toHaveAttribute("href", "/tickets/MOA9");
+    expect(screen.getByRole("link", { name: "My tickets" })).toHaveAttribute("href", "/me/tickets");
+    expect(screen.queryByLabelText(/^Full name/)).toBeNull();
+  });
+
+  it("keeps the form's old way on a server that doesn't say whether it is paid", async () => {
+    showMine(paid, { id: 123, additional_details: [], reg_fee: 250, is_registered: true, ticket_id: "MOA9" });
+    expect(await heading(/Your details/)).toBeInTheDocument();
+    expect(screen.queryByText("Finish your payment")).toBeNull();
+  });
+
+  it("finishes the payment from the 'waiting for payment' refusal too", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(
+      Object.assign(new Error("Waiting"), { status: 409, data: { message: "This email already has a registration for this event that is waiting for payment.", error_code: "REGISTRATION_AWAITING_PAYMENT" } }),
+    );
+    paymentsApi.createPaymentOrder.mockResolvedValue({ amount: 25000, razorpay_order_id: "order_9" });
+    paymentsApi.verifyPayment.mockResolvedValue({ payment_status: "captured" });
+    showMine(paid, { id: 123, additional_details: [], reg_fee: 250, is_registered: false });
+    await heading(/Your details/);
+    go();
+    await heading(/Review and pay/);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Your registration is waiting for payment")).toBeInTheDocument();
+    eventsApi.fetchEvent.mockResolvedValue(mine());
+    fireEvent.click(within(alert).getByRole("button", { name: "Finish payment" }));
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    expect(paymentsApi.createPaymentOrder).toHaveBeenCalledWith("123", "reg-9");
+    await act(() => razorpay.handler({ razorpay_order_id: "order_9", razorpay_payment_id: "pay_9" }));
+    expect(await heading(/You.re in/)).toBeInTheDocument();
+    expect(screen.getByText("MOA9")).toBeInTheDocument();
+  });
+});
+
 describe("registering signed out, with sign-in on", () => {
   beforeEach(() => {
     enableSignIn();
@@ -293,6 +402,26 @@ describe("registering signed out, with sign-in on", () => {
       additional_details: {},
     });
     expect(screen.getByText("It’s in your MyOtherApp app")).toBeInTheDocument();
+  });
+
+  it("offers signing in to finish a registration waiting for payment", async () => {
+    stubGoogle();
+    eventsApi.registerForEvent.mockRejectedValue(
+      Object.assign(new Error("Waiting"), { status: 409, data: { message: "This email already has a registration for this event that is waiting for payment.", error_code: "REGISTRATION_AWAITING_PAYMENT" } }),
+    );
+    show(paid);
+    await heading(/Your details/);
+    fireEvent.change(field(/^Full name/), { target: { value: "Asha Rao" } });
+    fireEvent.change(field(/^Email/), { target: { value: "asha@example.org" } });
+    fireEvent.change(field(/^Phone number/), { target: { value: "98765 43210" } });
+    go();
+    await heading(/Review and pay/);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByRole("link", { name: /Google Play/ })).toBeInTheDocument();
+    fireEvent.click(within(alert).getByRole("button", { name: "Sign in to finish payment" }));
+    expect(await screen.findByRole("dialog", { name: "Sign in to register" })).toBeInTheDocument();
+    expect(paymentsApi.createPaymentOrder).not.toHaveBeenCalled();
   });
 
   it("offers Google's One Tap once, on a desk, on the details step", async () => {

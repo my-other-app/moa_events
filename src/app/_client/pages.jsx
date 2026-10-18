@@ -25,15 +25,6 @@ export function Holding() {
 }
 
 const PAGES = {
-  "me-tickets": dynamic(() => import("@/components/me/mepages").then((m) => m.MyTicketsPage), { ssr: false, loading: Holding }),
-  "me-following": dynamic(() => import("@/components/me/mepages").then((m) => m.FollowingPage), { ssr: false, loading: Holding }),
-  register: dynamic(() => import("@/components/register/register"), { ssr: false, loading: Holding }),
-  live: dynamic(() => import("@/components/live"), { ssr: false, loading: Holding }),
-  compete: dynamic(() => import("@/components/compete"), { ssr: false, loading: Holding }),
-  play: dynamic(() => import("@/components/play"), { ssr: false, loading: Holding }),
-  feedback: dynamic(() => import("@/components/feedback"), { ssr: false, loading: Holding }),
-  ticket: dynamic(() => import("@/components/ticket"), { ssr: false, loading: Holding }),
-  certificate: dynamic(() => import("@/components/certificate"), { ssr: false, loading: Holding }),
 };
 
 export const CLIENT_PAGES = Object.keys(PAGES);

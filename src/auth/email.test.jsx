@@ -198,6 +198,17 @@ describe("signing in with email", () => {
     await waitFor(() => expect(within(sheet).getByRole("alert")).toHaveTextContent("Too many wrong passwords. Try again in 14 min."));
   });
 
+  it("says plainly when the account has been suspended (403 ACCOUNT_SUSPENDED), and signs nobody in", async () => {
+    on("post", "/api/v1/auth/token", refused(403, "This account has been suspended", "ACCOUNT_SUSPENDED"));
+    show();
+    const sheet = await openEmail();
+    type(sheet, "Email", "ravi@example.org");
+    type(sheet, "Password", "hunter22");
+    fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent("This account has been suspended. If you think that's a mistake, write to support@myotherapp.in.");
+    expect(status()).toBe("signed-out");
+  });
+
   it("won't sign in a club's dashboard login here, and ends the session it was handed", async () => {
     const access = accessToken({ sid: "sess-club" });
     on("post", "/api/v1/auth/token", (c) => reply(c, 200, { access_token: access, refresh_token: "refresh-club", token_type: "Bearer" }));
@@ -236,7 +247,7 @@ describe("an account with a second factor", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
     expect(await within(sheet).findByRole("heading", { name: "Two-step verification" })).toBeInTheDocument();
-    expect(within(sheet).getByText("Enter the code from your authenticator app.")).toBeInTheDocument();
+    expect(within(sheet).getByText("This account has two-step verification on. Enter the 6-digit code from your authenticator app, or a recovery code.")).toBeInTheDocument();
     const code = within(sheet).getByLabelText("Code");
     await waitFor(() => expect(code).toHaveFocus());
     expect(code).toHaveAttribute("autocomplete", "one-time-code");
