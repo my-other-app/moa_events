@@ -161,6 +161,7 @@ The root layout's read (`hasTopics`, at most 2.5 s, false on any failure) makes 
 - Import `JsonLd` as `@/seo/JsonLd.jsx`: on a case-blind disk (macOS) vitest resolves `@/seo/JsonLd` to `jsonld.js`.
 - Later pages of a list ("Load more"), the calendar's month and the date picker's dots are read by the browser from the API directly, as before (on localhost that needs the browser's CORS checks off).
 - Past 1,000 results the API stops counting (`total: 1000`, `total_capped: true`): the pages say "1,000+", and "Load more" goes on until a page comes back short.
+- Paging (`nextPage` in `@/api/parse`): an API that sends `next_cursor` on `/discover/events`, `/clubs` (and the calendar's month, the events feed's second page) is followed with `after=<cursor>` and no offset, until the cursor is null; that API refuses offsets past 1,000 (422). An API without cursors (today's) is paged by offset as before, but never past 1,000: "Load more" stops there and says to narrow the search. The posts' list has no such limit. The site has no `?page=N` addresses (later pages come by "Load more" in the browser), so every crawlable list address is page one.
 
 ## What the backend should add (for better search results)
 

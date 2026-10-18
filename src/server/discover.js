@@ -17,6 +17,7 @@ import {
   parseSitemapPage,
   parseThread,
   parseThreadsPage,
+  threadsQuery,
 } from "@/api/parse";
 import { parsePlans } from "@/utils/pricing";
 import { everyoneHome } from "@/utils/home";
@@ -110,10 +111,11 @@ export const placeFor = (where, visitor) => (where ? where : forwardsVisitor(vis
  * Events to find, with the list page's filters (see @/api/parse's
  * eventsQuery). `where`: a point, ANYWHERE, or null (see placeFor).
  * `visitor` when the read is made for one person (a dynamic page).
- * `sort` overrides the filters' order (the feeds' "newest").
+ * `sort` overrides the filters' order (the feeds' "newest"). A later page
+ * by `offset`, or by `after` (a page's cursor, see @/api/parse's nextPage).
  */
-export async function getEvents(filters = {}, { where = null, visitor = null, offset = 0, limit = 24, sort = null, revalidate = PAGE_REVALIDATE } = {}) {
-  const query = eventsQuery(filters, placeFor(where, visitor), { offset, limit });
+export async function getEvents(filters = {}, { where = null, visitor = null, offset = 0, after = null, limit = 24, sort = null, revalidate = PAGE_REVALIDATE } = {}) {
+  const query = eventsQuery(filters, placeFor(where, visitor), { offset, after, limit });
   if (sort) query.sort = sort;
   const { data } = await apiGet("/api/v1/discover/events", { query, revalidate, visitor, tags: [TAGS.lists] });
   return parseEventsPage(data);
@@ -134,8 +136,8 @@ export async function getNewestEvents(filters = {}, { where = null, offset = 0, 
 }
 
 /** Clubs to find, with the list page's filters; `where` and `visitor` as for getEvents. */
-export async function getClubs(filters = {}, { where = null, visitor = null, offset = 0, limit = PAGE_SIZE, revalidate = PAGE_REVALIDATE } = {}) {
-  const query = clubsQuery(filters, placeFor(where, visitor), { offset, limit });
+export async function getClubs(filters = {}, { where = null, visitor = null, offset = 0, after = null, limit = PAGE_SIZE, revalidate = PAGE_REVALIDATE } = {}) {
+  const query = clubsQuery(filters, placeFor(where, visitor), { offset, after, limit });
   const { data } = await apiGet("/api/v1/discover/clubs", { query, revalidate, visitor, tags: [TAGS.lists] });
   return parseClubsPage(data);
 }
@@ -174,8 +176,8 @@ export async function getNearHome(point, { visitor = null } = {}) {
 /* ---------- posts ---------- */
 
 /** The clubs' latest posts, a page at a time. */
-export async function getThreads({ offset = 0, limit = PAGE_SIZE, revalidate = PAGE_REVALIDATE } = {}) {
-  const { data } = await apiGet("/api/v1/discover/threads", { query: { offset, limit }, revalidate, tags: [TAGS.lists] });
+export async function getThreads({ offset = 0, after = null, limit = PAGE_SIZE, revalidate = PAGE_REVALIDATE } = {}) {
+  const { data } = await apiGet("/api/v1/discover/threads", { query: threadsQuery({ offset, after, limit }), revalidate, tags: [TAGS.lists] });
   return parseThreadsPage(data);
 }
 

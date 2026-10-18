@@ -19,7 +19,7 @@ export function ThreadsView({ page }) {
         <ThreadsLede />
       </header>
       {page.items.length ? (
-        <MoreResults kind="threads" ids={page.items.map((t) => t.id)} total={page.total} capped={page.capped} noun="posts" className="dc-threads">
+        <MoreResults kind="threads" ids={page.items.map((t) => t.id)} total={page.total} capped={page.capped} first={{ cursored: page.cursored, cursor: page.cursor }} noun="posts" className="dc-threads">
           {page.items.map((t) => (
             <ThreadCard key={t.id} thread={t} headingLevel={2} />
           ))}

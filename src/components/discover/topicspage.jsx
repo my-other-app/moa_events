@@ -145,7 +145,7 @@ export function TopicView({ data, others = [] }) {
           </div>
           <Results>
             {events.items.length ? (
-              <MoreResults key={topicPagePath(topic, interest?.id)} kind="events" ids={events.items.map((e) => e.id)} total={events.total} capped={events.capped} noun="events" headingLevel={3}>
+              <MoreResults key={topicPagePath(topic, interest?.id)} kind="events" ids={events.items.map((e) => e.id)} total={events.total} capped={events.capped} first={{ cursored: events.cursored, cursor: events.cursor }} noun="events" headingLevel={3}>
                 {events.items.map((e) => (
                   <EventCard key={e.id} event={e} headingLevel={3} />
                 ))}

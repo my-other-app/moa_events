@@ -16,6 +16,8 @@ import {
   parseThread,
   parseThreadsPage,
   parseWhere,
+  nextPage,
+  threadsQuery,
   PAGE_SIZE,
 } from "./parse";
 
@@ -99,15 +101,25 @@ export const discoverApi = {
   /**
    * Every event on in a month, for the calendar: pages of `pageSize` until
    * all are in or `maxPages` were asked for. Rejects only when the first
-   * page does; a later page that fails is left out.
+   * page does; a later page that fails is left out (and, with cursors, the
+   * pages after it). An API with cursors is followed page by page; one
+   * without is asked for the rest at once, by offset.
    */
   monthEvents: async (filters, where, month, { pageSize = 48, maxPages = 4 } = {}) => {
     const f = { ...filters, when: "", from: firstOfMonth(month), to: lastOfMonth(month), sort: "" };
     const first = await discoverApi.events(f, where, { offset: 0, limit: pageSize });
-    const pages = Math.min(maxPages, Math.ceil(first.total / pageSize));
-    const rest = await Promise.all(
-      Array.from({ length: Math.max(0, pages - 1) }, (_, i) => discoverApi.events(f, where, { offset: (i + 1) * pageSize, limit: pageSize }).catch(() => null))
-    );
+    let rest = [];
+    if (first.cursored) {
+      let at = first;
+      while (at?.cursor && rest.length < maxPages - 1) {
+        at = await discoverApi.events(f, where, { after: at.cursor, limit: pageSize }).catch(() => null);
+        if (at) rest.push(at);
+      }
+    } else {
+      const pages = Math.min(maxPages, Math.ceil(first.total / pageSize));
+      const offsets = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => (i + 1) * pageSize).filter((o) => nextPage(first, o));
+      rest = await Promise.all(offsets.map((offset) => discoverApi.events(f, where, { offset, limit: pageSize }).catch(() => null)));
+    }
     const seen = new Set();
     const items = [first, ...rest]
       .flatMap((p) => p?.items || [])
@@ -138,7 +150,7 @@ export const discoverApi = {
       tag
     ),
 
-  threads: ({ offset = 0, limit = PAGE_SIZE } = {}) => get("/api/v1/discover/threads", { offset, limit }).then(parseThreadsPage, tag),
+  threads: (paging = {}) => get("/api/v1/discover/threads", threadsQuery(paging)).then(parseThreadsPage, tag),
 
   thread: (id) =>
     getAsReader(`/api/v1/threads/${encodeURIComponent(id)}`).then((d) => {

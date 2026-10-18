@@ -1,5 +1,5 @@
 import { SITE_URL } from "@/config";
-import { ANYWHERE, filtersToSearch, findTopic, readEventFilters } from "@/api/parse";
+import { ANYWHERE, filtersToSearch, findTopic, nextPage, readEventFilters } from "@/api/parse";
 import { FEED_CACHE, FEED_LIMIT, FEED_TYPE, feedCity, feedTitle, feedWhere, rssFeed } from "@/seo/rss";
 import { ApiError } from "@/server/api";
 import { getEvents, getNewestEvents } from "@/server/discover";
@@ -18,7 +18,8 @@ import { feedItems } from "@/server/feeds";
  *
  * The newest-published first: an API that knows ?sort=newest is asked for
  * them in that order (one read); one that doesn't is asked for the next
- * 120 by date and the feed orders them itself. Each item's words are the
+ * 120 by date (its second page by cursor when the API gives one) and the
+ * feed orders them itself. Each item's words are the
  * card's `summary` where the API sends one, else its page's (read a few at
  * a time, src/server/feeds.js).
  *
@@ -38,8 +39,9 @@ export async function GET(request) {
     const newest = await getNewestEvents(query, { where: place, limit: PER_REQUEST, revalidate: 300 });
     const first = newest || (await getEvents(query, { where: place, offset: 0, limit: PER_REQUEST, revalidate: 300 }));
     let cards = first.items;
-    if (!newest && first.total > cards.length && cards.length >= PER_REQUEST) {
-      const second = await getEvents(query, { where: place, offset: PER_REQUEST, limit: PER_REQUEST, revalidate: 300 }).catch(() => null);
+    const more = nextPage(first, PER_REQUEST);
+    if (!newest && more && first.total > cards.length && cards.length >= PER_REQUEST) {
+      const second = await getEvents(query, { where: place, ...more, limit: PER_REQUEST, revalidate: 300 }).catch(() => null);
       if (second) cards = cards.concat(second.items);
     }
     cards = cards.filter((e) => e.status !== "ended").slice(0, MAX_CARDS);

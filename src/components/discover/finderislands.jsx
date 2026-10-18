@@ -26,6 +26,7 @@ import {
   filtersToSearch,
   nearParam,
   nearPoint,
+  nextPage,
 } from "@/api/discover";
 import { activeClubFilters, activeEventFilters } from "@/seo/listings";
 import { monthCount } from "@/utils/eventcalendar";
@@ -348,36 +349,52 @@ const keyOf = (item) => item?.id ?? item?.slug;
  * The browser reads the API itself for these (as "Show more" on a club's
  * page does). A list about nowhere shows no distances, like the server's.
  * `headingLevel`: the cards' headings, as the server's cards have them.
+ *
+ * Paging: `first` is the server's page ({cursored, cursor}); a later page is
+ * asked for after the last one's cursor when the API gives cursors, else by
+ * offset, never past MAX_OFFSET (the API refuses that): there the list
+ * stops, and says how to see the rest.
  */
-export function MoreResults({ kind, ids, total, capped = false, noun, className = "dc-grid dc-grid--4", headingLevel = 2, children }) {
+export function MoreResults({ kind, ids, total, capped = false, first = null, noun, className = "dc-grid dc-grid--4", headingLevel = 2, children }) {
   const finder = useFinder();
   const filters = finder?.filters || {};
   const point = nearPoint(filters.near);
-  const [s, setS] = useState({ items: [], total, capped, busy: false, error: false });
+  // The posts' list has no offset limit; events and clubs stop at MAX_OFFSET without cursors.
+  const max = kind === "threads" ? Infinity : undefined;
+  const start = nextPage(first, ids.length, max);
+  // A first page with a null cursor is the whole list.
+  const [s, setS] = useState(() => ({ items: [], total: start ? total : ids.length, capped: start ? capped : false, busy: false, error: false, stopped: !start && !first?.cursored }));
+  const next = useRef(start);
   const count = useRef(ids.length);
   const seen = useRef(new Set(ids.map(String)));
 
-  const load = (offset) => {
-    if (kind === "threads") return discoverApi.threads({ offset, limit: PAGE_SIZE });
-    if (kind === "clubs") return discoverApi.clubs(filters, point || ANYWHERE, { offset, limit: PAGE_SIZE });
-    return discoverApi.events(filters, point || ANYWHERE, { offset, limit: PAGE_SIZE });
+  const load = (from) => {
+    const paging = { ...from, limit: PAGE_SIZE };
+    if (kind === "threads") return discoverApi.threads(paging);
+    if (kind === "clubs") return discoverApi.clubs(filters, point || ANYWHERE, paging);
+    return discoverApi.events(filters, point || ANYWHERE, paging);
   };
 
   const loadMore = () => {
+    if (!next.current) return;
     setS((x) => ({ ...x, busy: true, error: false }));
-    load(count.current).then(
+    load(next.current).then(
       (page) => {
         count.current += page.items.length;
+        next.current = nextPage(page, count.current, max);
+        const stopped = !next.current && !page.cursored;
         const fresh = page.items.filter((i) => !seen.current.has(String(keyOf(i))));
         fresh.forEach((i) => seen.current.add(String(keyOf(i))));
         const items = point ? fresh : fresh.map((i) => (i.distance_km === null || i.distance_km === undefined ? i : { ...i, distance_km: null }));
         setS((x) => {
           const all = [...x.items, ...items];
           const shown = ids.length + all.length;
-          // An empty page is the end, whatever the total said; past a capped total, so is a short one.
-          const end = !page.items.length || ((page.capped || x.capped) && page.items.length < PAGE_SIZE);
-          if (end) return { items: all, busy: false, error: false, total: shown, capped: false };
-          return { items: all, busy: false, error: false, total: Math.max(page.total, page.capped ? 0 : shown), capped: page.capped };
+          // An empty page is the end, whatever the total said; so is a null cursor; past a capped total, so is a short one.
+          const end = !page.items.length || (page.cursored ? !page.cursor : (page.capped || x.capped) && page.items.length < PAGE_SIZE);
+          if (end) return { items: all, busy: false, error: false, total: shown, capped: false, stopped: false };
+          // More, but not by offset: as deep as an API without cursors goes.
+          if (stopped && (page.capped || shown < page.total)) return { items: all, busy: false, error: false, total: shown, capped: false, stopped: true };
+          return { items: all, busy: false, error: false, total: Math.max(page.total, page.capped ? 0 : shown), capped: page.capped, stopped: false };
         });
       },
       () => setS((x) => ({ ...x, busy: false, error: true }))
@@ -399,7 +416,7 @@ export function MoreResults({ kind, ids, total, capped = false, noun, className 
           )
         )}
       </div>
-      <LoadMore shown={shown} total={s.total} capped={s.capped} busy={s.busy} error={s.error} onMore={loadMore} noun={noun} />
+      <LoadMore shown={shown} total={s.total} capped={s.capped} stopped={s.stopped} busy={s.busy} error={s.error} onMore={loadMore} noun={noun} />
     </>
   );
 }

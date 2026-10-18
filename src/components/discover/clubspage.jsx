@@ -52,7 +52,7 @@ export function ClubsView({ state, page, heading, topics = null }) {
     );
   } else {
     results = (
-      <MoreResults key={hrefFor({})} kind="clubs" ids={page.items.map((c) => c.id ?? c.slug)} total={page.total} capped={page.capped} noun="clubs">
+      <MoreResults key={hrefFor({})} kind="clubs" ids={page.items.map((c) => c.id ?? c.slug)} total={page.total} capped={page.capped} first={{ cursored: page.cursored, cursor: page.cursor }} noun="clubs">
         {page.items.map((c) => (
           <ClubCard key={c.slug || c.id} club={c} headingLevel={2} />
         ))}

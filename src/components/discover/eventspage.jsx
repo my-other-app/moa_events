@@ -117,7 +117,7 @@ export function EventsView({ state, page, heading, topics = null }) {
     );
   } else {
     results = (
-      <MoreResults key={hrefFor({})} kind="events" ids={page.items.map((e) => e.id)} total={page.total} capped={page.capped} noun="events">
+      <MoreResults key={hrefFor({})} kind="events" ids={page.items.map((e) => e.id)} total={page.total} capped={page.capped} first={{ cursored: page.cursored, cursor: page.cursor }} noun="events">
         {page.items.map((e) => (
           <EventCard key={e.id} event={e} headingLevel={2} />
         ))}

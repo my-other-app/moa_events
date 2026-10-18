@@ -12,6 +12,32 @@ import { dayRange, isDay, isMonth } from "@/utils/days";
 
 export const PAGE_SIZE = 12;
 
+/**
+ * The deepest offset the API serves on its lists (/discover/events,
+ * /calendar, /clubs); past it, 422. Newer APIs page by cursor instead
+ * (`next_cursor` on each page, `after=` for the next): see nextPage.
+ */
+export const MAX_OFFSET = 1000;
+
+/**
+ * Paging: {offset, limit} or {after, limit}. With a cursor the offset is
+ * left out (the API ignores it then anyway).
+ */
+const pagingOf = ({ offset = 0, limit = PAGE_SIZE, after = null } = {}) => (after ? { after: String(after), limit } : { offset, limit });
+
+/**
+ * Where the next page of a list starts, from the page just read (parsed:
+ * `cursored`, `cursor`) and how many rows have been read so far:
+ *   {after}    the API said where (next_cursor)
+ *   {offset}   an API without cursors, while the offset is one it serves
+ *   null       no more: its cursor was null, or the next offset would pass `max`
+ * (MAX_OFFSET; the posts' list, which has no such limit, passes Infinity).
+ */
+export function nextPage(page, read, max = MAX_OFFSET) {
+  if (page?.cursored) return page.cursor ? { after: page.cursor } : null;
+  return read <= max ? { offset: read } : null;
+}
+
 export const WHEN_OPTIONS = [
   ["", "Any day"],
   ["today", "Today"],
@@ -184,7 +210,7 @@ const radiusFor = (filters, where) => (isAnywhere(where) ? 0 : radius(filters.ra
 const sortFor = (sort, where, near) => (isAnywhere(where) && sort === near ? "" : sort);
 
 /** The query for GET /discover/events: the filters, the point if any (or ANYWHERE), the page. Days, when picked, stand in for "when". */
-export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PAGE_SIZE } = {}) {
+export function eventsQuery(filters = {}, where = null, paging = {}) {
   const days = dayRange(filters.from, filters.to);
   return compact({
     q: text(filters.q),
@@ -198,8 +224,7 @@ export function eventsQuery(filters = {}, where = null, { offset = 0, limit = PA
     ...coords(where),
     radius_km: radiusFor(filters, where),
     sort: sortFor(pick(filters.sort, EVENT_SORTS), where, "distance"),
-    offset,
-    limit,
+    ...pagingOf(paging),
   });
 }
 
@@ -218,17 +243,19 @@ export function calendarQuery(filters = {}, where = null, month) {
 }
 
 /** The query for GET /discover/clubs. */
-export function clubsQuery(filters = {}, where = null, { offset = 0, limit = PAGE_SIZE } = {}) {
+export function clubsQuery(filters = {}, where = null, paging = {}) {
   return compact({
     q: text(filters.q),
     ...topicQuery(filters),
     ...coords(where),
     radius_km: radiusFor(filters, where),
     sort: sortFor(pick(filters.sort, CLUB_SORTS), where, "nearby"),
-    offset,
-    limit,
+    ...pagingOf(paging),
   });
 }
+
+/** The query for GET /discover/threads: a page, by offset or cursor. */
+export const threadsQuery = (paging = {}) => pagingOf(paging);
 
 /* ---------- reading the responses ---------- */
 
@@ -481,11 +508,21 @@ const parseInterest = (i) => {
 /**
  * A page of a list. `capped`: the API stopped counting (past 1,000 it says
  * total 1000 with total_capped), so `total` is a floor, and later pages
- * still come.
+ * still come. `cursored`: the API pages by cursor (it sent next_cursor);
+ * `cursor` is where the next page starts, null for the last page.
  */
 const page = (d, items) => {
   const o = obj(d) || {};
-  return { items, total: Math.max(items.length, n(o.total, items.length)), capped: o.total_capped === true, offset: n(o.offset), limit: n(o.limit, PAGE_SIZE) };
+  const cursored = Object.prototype.hasOwnProperty.call(o, "next_cursor");
+  return {
+    items,
+    total: Math.max(items.length, n(o.total, items.length)),
+    capped: o.total_capped === true,
+    offset: n(o.offset),
+    limit: n(o.limit, PAGE_SIZE),
+    cursored,
+    cursor: cursored && typeof o.next_cursor === "string" && o.next_cursor ? o.next_cursor : null,
+  };
 };
 
 export function parseHome(d) {

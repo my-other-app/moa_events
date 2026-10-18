@@ -313,6 +313,45 @@ describe("/topics/{slug}/rss.xml", () => {
     vi.stubGlobal("fetch", fakeFetch(() => ({ status: 500, body: {} })));
     const res = await feed("development");
     expect(res.status).toBe(503);
+  });
+});
+
+describe("/events/rss.xml's second page", () => {
+  const feed = async () => (await import("../events/rss.xml/route.js")).GET(new NextRequest("https://myotherapp.in/events/rss.xml"));
+  const full = (from) => Array.from({ length: 60 }, (_, i) => card(from + i));
+  const listing = (next) =>
+    fakeFetch((url) => {
+      if (url.pathname !== "/api/v1/discover/events") return missing;
+      if (url.searchParams.get("sort") === "newest") return { status: 422, body: {} };
+      const second = url.searchParams.has("after") || url.searchParams.get("offset") === "60";
+      return { body: { items: second ? [card(999)] : full(1), total: 200, ...next } };
+    });
+  const listReads = (f) => f.calls.map((c) => new URL(c.url)).filter((u) => u.pathname === "/api/v1/discover/events" && u.searchParams.get("sort") !== "newest");
+
+  it("is asked for after the first page's cursor, with no offset", async () => {
+    const f = listing({ next_cursor: "c60" });
+    vi.stubGlobal("fetch", f);
+    expect((await feed()).status).toBe(200);
+    const [, second] = listReads(f);
+    expect(second.searchParams.get("after")).toBe("c60");
+    expect(second.searchParams.has("offset")).toBe(false);
+  });
+
+  it("is asked for by offset from an API without cursors, and not at all after a null cursor", async () => {
+    let f = listing({});
+    vi.stubGlobal("fetch", f);
+    await feed();
+    expect(listReads(f)[1].searchParams.get("offset")).toBe("60");
+    f = listing({ next_cursor: null });
+    vi.stubGlobal("fetch", f);
+    await feed();
+    expect(listReads(f)).toHaveLength(1);
+  });
+
+  it("keeps the 503 when the API fails", async () => {
+    vi.stubGlobal("fetch", fakeFetch(() => ({ status: 500, body: {} })));
+    const res = await feed();
+    expect(res.status).toBe(503);
     expect(res.headers.get("retry-after")).toBe("120");
   });
 });
