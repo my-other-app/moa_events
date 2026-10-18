@@ -8,9 +8,9 @@ The public site moved from a Vite single-page app to Next.js 16 (App Router). St
 src/app/                    routes (Next's file routing)
   layout.jsx                <html>, fonts (next/font), every stylesheet once, <Providers> (sign-in, ?ref=)
   _client/pages.jsx         ClientPage: the not-yet-ported pages, mounted in the browser (ssr: false)
-  _client/event-scoped.js   the server half of /events/{slug}/register|live|compete
   _tests/                   route-level tests (private folder: not a route)
-src/server/                 server-only: reading the API (api.js, discover.js), old addresses, feeds, the bots' preview page
+src/server/                 server-only: reading the API (api.js, discover.js), old addresses, feeds, the bots' preview page,
+                            the server half of the signed-in flows (eventscoped.js, flows.js)
 src/seo/                    pure: addresses, metadata, JSON-LD, stable media, sitemap, robots, RSS, validators
 src/og/                     the share pictures (next/og): layouts, fonts, fetching images
 src/lib/router.jsx          react-router's API on Next's router (Link, NavLink, useNavigate, useSearchParams, ...)
@@ -24,7 +24,7 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 
 ## Every route
 
-**SSR + ISR** = rendered on the server, cached, regenerated in the background at most once a minute (`revalidate = 60`); a failed regeneration keeps serving the last good copy. **Dynamic** = rendered per request. **Client** = the page's component renders in the browser (`ClientPage`, `ssr: false`); its `<head>` (title, description, canonical, Open Graph) is still server-rendered.
+**SSR + ISR** = rendered on the server, cached, regenerated in the background at most once a minute (`revalidate = 60`); a failed regeneration keeps serving the last good copy. **Dynamic** = rendered per request. **Static** = rendered once at build. **Client** = the page's component renders in the browser (`ClientPage`, `ssr: false`); its `<head>` (title, description, canonical, Open Graph) is still server-rendered. **+ client component** = the page's interactive part is a `"use client"` component the server renders for the first paint and the browser hydrates (see "The signed-in flows" below).
 
 | Address | Kind | File | Notes |
 | --- | --- | --- | --- |
@@ -36,11 +36,11 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | `/threads`, `/threads/{id}` | Client | `threads/…` → `threadspage` | a post is read as the signed-in person |
 | `/about`, `/privacy`, `/terms` | Client | → `aboutpage`, `legalpage` | static words: the easiest to port |
 | `/for-clubs`, `/pricing` | Client | → `forclubspage`, `pricingpage` | plans from `/api/v1/plans` |
-| `/me/tickets`, `/me/following` | Client | `me/…` → `mepages` | signed in; `noindex`; `/me` → 307 `/me/tickets` (next.config) |
-| `/events/{slug}/register` | Dynamic + client | `events/[slug]/register/page.jsx` → `register` | the server finds the event (404, 308 from an old slug with the query); `noindex` |
-| `/events/{slug}/live`, `/compete` | Dynamic + client | → `live`, `compete` | same |
-| `/play/{eventId}`, `/feedback/{eventId}/{registrationId}` | Client | → `play`, `feedback` | `noindex` |
-| `/tickets/{ticketid}`, `/certificates/{ticketid}` | Client | → `ticket`, `certificate` | `noindex` |
+| `/me/tickets`, `/me/following` | Static + client component | `me/…/page.jsx` → `me/mepages` | the same neutral first paint for everyone (who is signed in lives in the browser); `noindex`; Finish payment in each unpaid row; `/me` → 307 `/me/tickets` (next.config) |
+| `/events/{slug}/register` | Dynamic + client component | `events/[slug]/register/page.jsx` → `register/register` | the server finds the event (404, 308 from an old slug or an id, query kept) and hands the form only what it draws (`registerEvent`); `noindex` |
+| `/events/{slug}/live`, `/compete` | Dynamic + client component | → `live`, `compete` | same; the room's top (the event's name) is in the first paint |
+| `/play/{eventId}`, `/feedback/{eventId}/{registrationId}` | Dynamic + client component | → `play`, `feedback` | the server checks the address's shape (404 otherwise) and hands it over (feedback: `?k=` too); `noindex` |
+| `/tickets/{ticketid}`, `/certificates/{ticketid}` | Dynamic + client component | → `ticket`, `certificate` | same; the ticket is read in the browser (only its holder's token opens it); `noindex` |
 | `/events/rss.xml`, `/clubs/{slug}/rss.xml` | Route handler | `events/rss.xml/route.js`, … | RSS 2.0 + the RSS event module; cached 10 min at the edge |
 | `/sitemap.xml`, `/sitemaps/{name}.xml` | Route handler | `sitemap.xml/route.js`, `sitemaps/[name]/route.js` | a sitemap index; pages of ≤ 5,000 |
 | `/robots.txt` | Metadata route | `robots.js` | |
@@ -94,18 +94,27 @@ The event and club pages are the worked examples (`events/[slug]/page.jsx` + `co
 
 ### Rules that hold for every page
 
-- Links and navigation come from `@/lib/router` (`Link to`, `NavLink`, `useNavigate`, ...), never `next/link`, `next/navigation` or `react-router-dom` directly, so components run the same in the app and in tests (vitest swaps the module for a react-router version, `src/test/router.jsx`).
+- Links and navigation: the signed-in flows (`components/register`, `me`, `auth`, `live`, `compete`, `play`, `feedback`, `ticket`, `certificate`) use `next/link` and `next/navigation` directly; the pages not yet ported still use `@/lib/router` (`Link to`, `NavLink`, `useNavigate`, ...). Never `react-router-dom` directly. In tests, vitest swaps all three for versions on react-router's `<MemoryRouter>` (`src/test/router.jsx`, `src/test/next-navigation.jsx`, `src/test/next-link.jsx`), so a test renders inside a `<MemoryRouter>` and reads where it went with `useLocation()` either way; `next/navigation`'s server helpers (`notFound`, `redirect`) stay the real ones.
 - Stylesheets are imported once, in `src/app/layout.jsx`, in the old bundle's order. Add a new one there, not in a component.
 - Env: `process.env.NEXT_PUBLIC_*` literally (Next inlines it), read through `src/config.js`. Server-only settings stay unprefixed.
 - `npm run lint` uses Next's rules; the React Compiler's stricter hook rules are off until the old components are revisited.
 
 ## The signed-in flows (step 2's second half)
 
-`/me/*`, the registration form, the live room, the competition, tickets and certificates stay client pages: they depend on the session in `localStorage` and work as before. To move signing in to the server later (the BFF/proxy-auth plan in docs/ARCHITECTURE_PLAN.md), the session must move to an httpOnly cookie first; until then, render these on the server only around the parts that don't depend on who is signed in (as `/events/{slug}/register` already finds the event on the server).
+Ported: `/events/{slug}/register` (and `/register/{ref}`), `/me/tickets`, `/me/following`, `/events/{slug}/live`, `/events/{slug}/compete`, `/play/…`, `/feedback/…`, `/tickets/…`, `/certificates/…`. None goes through `ClientPage` any more, and bots get their real head (the event's picture and words) rather than `/api/share`.
+
+Each is a server `page.jsx` (the head, a real 404, the 308s, the props) rendering a `"use client"` component directly: the server renders its first paint and the browser hydrates it. Their state lives in the browser (the session in `localStorage`, drafts and the quiz player in storage), so the rule is:
+
+- **The first paint never depends on the browser.** The server knows nobody, and the browser's first render must match it. `useAuth()` has `ready`: false on the server and while hydrating (when `status` is always "signed-out"), true once the session is read; a page that differs by who is reading shows a neutral state until then (My tickets shows its loading rows, not "Sign in"). Storage is read in effects (the quiz's player, the kept ticket) or only in state that isn't drawn until data arrives (the form's draft). `src/components/flows.hydration.test.jsx` renders each page to HTML with no storage, hydrates it signed in and out, and fails on any mismatch.
+- **Steps without the server.** The form's `?step=` changes with `window.history.pushState` / `replaceState` (Next follows both, and so does `useSearchParams`) rather than `router.push`, which would ask the server for the page again; Back goes back through history when the step was opened from the one before. The ticket just made is kept in `sessionStorage` for a reload and forgotten when the page is left. No history `state` is used any more.
+- **Finish payment** (`components/register/finishpayment.jsx`): signed in, `GET /events/info/{id}` says `is_paid` and `registration_id` (backend#68); a registration waiting for payment is paid as it stands: `POST /payments/orders?checkout=2` with `{source: "event_registration", payload: {event_id, event_registration_id}}`, Razorpay with the order's `key_id`, `POST /payments/verify`, then the page reads again. No form is sent, so it works past the registration deadline (until the event ends) whatever the questions require. 409 `ALREADY_PAID` (from either call) is paid; 422 `NOTHING_TO_PAY` is nothing due. A server that says neither field leaves the old way: the form. Offered in My tickets (each unpaid row), on the event page's register card (`register/registercta.jsx`, an island in the server-rendered card) and on the registration page (a panel instead of the form, past the deadline too).
+- **Refusals by code.** `utils/register.js` (`describeRegisterError`) sorts the register call's refusals by `error_code` (ALREADY_REGISTERED, REGISTRATION_AWAITING_PAYMENT, REGISTRATIONS_CLOSED with its `closed_reason`, EVENT_FULL, SOLD_OUT / ITEM_UNAVAILABLE, CLUB_EMAIL, EMAIL_MISMATCH, INVALID_ANSWERS) and still reads the older shapes; a 409 is "already registered" only without a code. `utils/payment.js` (`describePayment`) says each payment refusal (EVENT_ENDED, EVENT_FULL, REGISTRATION_NOT_FOUND, EVENT_NOT_FOUND, GATEWAY_UNAVAILABLE, UPDATE_APP_TO_PAY; ORDER_NOT_FOUND, PAYMENT_ORDER_MISMATCH, UNSUPPORTED_PAYMENT_METHOD, PAYMENT_NOT_FOUND). Sign-in: ACCOUNT_SUSPENDED, INVALID_GOOGLE_TOKEN, EMAIL_NOT_VERIFIED, TOTP_REQUIRED (`SIGN_IN_REFUSALS` in auth/context.js). The live room hides its ask box when the feed says `qa.open` is false, or a question comes back 409 QA_CLOSED.
+
+To move signing in to the server later (the BFF/proxy-auth plan in docs/ARCHITECTURE_PLAN.md), the session must move to an httpOnly cookie first; then these pages can render the signed-in state on the server and `ready` goes away.
 
 ## What to remove when the last client page is ported
 
-`src/app/_client/pages.jsx`, the bot rewrites (`src/seo/bots.js`, next.config's `beforeFiles` bot entries), `src/server/share` and `src/app/api/share`, `src/utils/meta.js`, and `react-router-dom` (a dev dependency kept only for the tests' router; the shim can then call `next/navigation` without the adapter).
+`src/app/_client/pages.jsx`, the bot rewrites (`src/seo/bots.js`, next.config's `beforeFiles` bot entries), `src/server/share` and `src/app/api/share`, `src/utils/meta.js`, and `react-router-dom` (a dev dependency kept only for the tests' router; the shim can then call `next/navigation` without the adapter). The shim's history `state` (`navigate(..., {state})`, `useLocation().state`) was there for the registration form only, which no longer uses it: it can go now.
 
 ## Known limits and follow-ups
 
