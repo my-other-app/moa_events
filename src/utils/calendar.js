@@ -3,6 +3,7 @@
  * here from the event, with nothing sent anywhere. Times go out in UTC, so
  * every calendar puts the event at the right hour wherever the reader is.
  */
+import { eventEnd, summary } from "./eventpage";
 
 const DEFAULT_HOURS = 2;
 
@@ -87,3 +88,22 @@ export const icsHref = (ics) => `data:text/calendar;charset=utf-8,${encodeURICom
 
 /** A safe file name from the event's slug: "hack-night-04.ics". */
 export const icsFilename = (name) => `${String(name || "event").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "event"}.ics`;
+
+/**
+ * The two ways to add an event to a calendar, ready to link: {google, ics,
+ * filename}; null when the event has no start. Pure, so the server works
+ * them out and the button only opens its menu.
+ */
+export function calendarLinks(event, url) {
+  if (!event) return null;
+  const times = calendarTimes(event.starts_at, eventEnd(event));
+  if (!times) return null;
+  const location = event.is_online ? `Online — ${url}` : event.location_name || "";
+  const about = summary(event.about, 600);
+  const details = [about, `Event page: ${url}`].filter(Boolean).join("\n\n");
+  return {
+    google: googleCalendarUrl({ title: event.name, start: times.start, end: times.end, details, location }),
+    ics: icsHref(buildIcs({ uid: `event-${event.id}@myotherapp.in`, title: event.name, start: times.start, end: times.end, description: details, location, url })),
+    filename: icsFilename(event.slug || event.name),
+  };
+}

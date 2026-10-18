@@ -1,7 +1,5 @@
-import { useId } from "react";
+import { cloneElement, isValidElement, useId } from "react";
 import { coverLook, dateParts } from "@/utils/cover";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
 
 const RAYS = 20;
 const BAR_HEIGHTS = [0.42, 0.6, 0.3, 0.54, 0.36, 0.64, 0.46];
@@ -13,8 +11,26 @@ function wave(y, w, amp, len) {
   return d;
 }
 
+const round = (n) => Math.round(n * 100) / 100;
+const roundIn = (s) => s.replace(/-?\d+\.\d{3,}/g, (x) => String(round(Number(x))));
+
+/**
+ * The art with every coordinate at two decimals: the same picture, a
+ * fraction of the bytes (a page sends each cover twice, as HTML and as data).
+ */
+export function tidySvg(node) {
+  if (Array.isArray(node)) return node.map(tidySvg);
+  if (!isValidElement(node)) return node;
+  const props = {};
+  for (const [k, v] of Object.entries(node.props)) {
+    if (k === "children") continue;
+    props[k] = typeof v === "number" ? round(v) : typeof v === "string" && (k === "d" || k === "transform") ? roundIn(v) : v;
+  }
+  return node.props.children === undefined ? cloneElement(node, props) : cloneElement(node, props, tidySvg(node.props.children));
+}
+
 /** The shape on a generated cover. Everything sits in the top part, leaving the bottom for the date. */
-function Motif({ motif, w, h, c, v, uid }) {
+export function Motif({ motif, w, h, c, v, uid }) {
   const m = Math.min(w, h);
   const shift = [0, 0.07, -0.05][v] || 0;
   switch (motif) {
@@ -164,7 +180,7 @@ export function CoverArt({ look, w = 100, h = 125 }) {
   return (
     <svg className="dc-cover-art" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMin slice" aria-hidden="true" focusable="false">
       <g transform={flip ? `translate(${w} 0) scale(-1 1)` : undefined}>
-        <Motif motif={look.motif} w={w} h={h} c={look.palette} v={look.variant} uid={uid} />
+        {tidySvg(Motif({ motif: look.motif, w, h, c: look.palette, v: look.variant, uid }))}
       </g>
     </svg>
   );

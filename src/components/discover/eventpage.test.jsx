@@ -1,62 +1,47 @@
 import { StrictMode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
 
-const get = vi.fn();
-vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
+vi.mock("@/api/client", () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 vi.mock("@/api/live", () => ({ liveApi: { fetchFeed: vi.fn(() => Promise.reject(new Error("no room"))) } }));
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn(() => Promise.reject(new Error("none"))) } }));
 
-const { forgetEvents } = await import("@/api/discover");
+const { parseEventPage } = await import("@/api/discover");
+const { stableEventPage } = await import("@/seo/stabilize");
 const { liveApi } = await import("@/api/live");
-const EventPage = (await import("./eventpage.jsx")).default;
+const { EventView } = await import("./eventpage.jsx");
 
-/** Answers GET /discover/events/{ref} from a table; anything else is a 404. */
-const serve = (pages) =>
-  get.mockImplementation((url) => {
-    const ref = decodeURIComponent(url.replace("/api/v1/discover/events/", ""));
-    const page = pages.find((p) => p.event.slug === ref || String(p.event.id) === ref);
-    return page ? Promise.resolve({ data: page }) : Promise.reject(Object.assign(new Error("404"), { response: { status: 404 } }));
-  });
-
-function Where() {
-  const l = useLocation();
-  return <output data-testid="where">{`${l.pathname}${l.search}${l.hash}`}</output>;
-}
-
-const show = (path) =>
-  render(
+/*
+ * The event page as the server renders it (src/app/events/[slug]/page.jsx
+ * fetches, then renders <EventView>); its islands run here as they do in the
+ * browser. How the route finds the event, moves old addresses and answers
+ * 404 is tested in src/app/_tests/event-route.test.js; its head and
+ * structured data in src/seo/*.test.js.
+ */
+const show = (data, { stable = false } = {}) => {
+  const page = parseEventPage(data);
+  return render(
     <StrictMode>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/events/:slug" element={<EventPage />} />
-          <Route path="/events/:slug/:sub" element={<p>sub page</p>} />
-        </Routes>
-        <Where />
+      <MemoryRouter initialEntries={[`/events/${page.event.slug}`]}>
+        <EventView page={stable ? stableEventPage(page) : page} />
       </MemoryRouter>
     </StrictMode>
   );
+};
 
-const title = (name) => screen.findByRole("heading", { level: 1, name }, { timeout: 4000 });
+const title = (name) => screen.getByRole("heading", { level: 1, name });
 const h2 = (name) => screen.queryByRole("heading", { level: 2, name });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  forgetEvents();
-  window.scrollTo = vi.fn();
-});
-afterEach(() => {
-  document.head.querySelectorAll('script[type="application/ld+json"], link[rel="canonical"], meta[property^="og:"], meta[name^="twitter:"]').forEach((el) => el.remove());
 });
 
 describe("an event's page", () => {
-  it("shows every section of a full event, in the site's own words", async () => {
-    serve([fullEvent()]);
-    show("/events/hack-night-04");
-    expect(await title("Hack Night 04")).toBeInTheDocument();
-    expect(get).toHaveBeenCalledWith("/api/v1/discover/events/hack-night-04", { params: undefined, skipAuth: true });
+  it("shows every section of a full event, in the site's own words", () => {
+    show(fullEvent());
+    expect(title("Hack Night 04")).toBeInTheDocument();
 
     for (const name of ["About this event", "Prizes", "Speakers", "Agenda", "Venue", "Guidelines", "Organising team", "Questions?", "More from Circuit Society", "Similar events"]) {
       expect(h2(name)).toBeInTheDocument();
@@ -109,61 +94,28 @@ describe("an event's page", () => {
     expect(screen.getByText(/Registration closes Sat, 17 Oct/)).toBeInTheDocument();
   });
 
-  it("tells search engines and link previews what the event is", async () => {
-    serve([fullEvent()]);
-    show("/events/hack-night-04");
-    await title("Hack Night 04");
-    // The head is filled in effects, which can land a beat after the page paints.
-    await waitFor(() => expect(document.title).toBe("Hack Night 04 · MyOtherApp"));
-    expect(document.head.querySelector('meta[name="description"]').getAttribute("content")).toMatch(/^Twenty-four hours of building\./);
-    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/events/hack-night-04");
-    const og = (p) => document.head.querySelector(`meta[property="og:${p}"]`)?.getAttribute("content");
-    expect(og("title")).toBe("Hack Night 04 · MyOtherApp");
-    expect(og("url")).toBe("https://myotherapp.in/events/hack-night-04");
-    expect(og("image")).toBe("https://cdn.example/p.jpg");
-    expect(og("description")).toMatch(/^Twenty-four hours/);
-
-    const scripts = document.head.querySelectorAll('script[type="application/ld+json"]');
-    expect(scripts).toHaveLength(1);
-    const ld = JSON.parse(scripts[0].textContent);
-    expect(ld).toMatchObject({
-      "@context": "https://schema.org",
-      "@type": "Event",
-      name: "Hack Night 04",
-      startDate: "2026-10-18T18:00:00+05:30",
-      endDate: "2026-10-18T21:00:00+05:30",
-      eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-      location: { "@type": "Place", name: "Lab 3B, COEP", geo: { latitude: 18.5293, longitude: 73.8565 } },
-      image: ["https://cdn.example/p.jpg"],
-      organizer: { "@type": "Organization", name: "Circuit Society", url: "https://myotherapp.in/clubs/circuit-society" },
-      offers: { "@type": "Offer", price: 250, priceCurrency: "INR", availability: "https://schema.org/InStock" },
-    });
-    // A "</script>" in a club's text cannot close the tag.
-    expect(scripts[0].textContent).not.toContain("</script>");
+  it("points every picture at the site's stable media addresses once the server has swapped them in", () => {
+    const data = fullEvent();
+    data.speakers[0].photo = "https://s3.example/ananya.jpg?Expires=1";
+    data.more_from_club[0].poster = "https://s3.example/solder.png?Expires=1";
+    show(data, { stable: true });
+    expect(screen.getByAltText("Poster for Hack Night 04")).toHaveAttribute("src", "/media/events/hack-night-04/poster");
+    const html = document.body.innerHTML;
+    expect(html).toContain("/media/events/hack-night-04/speakers/1/photo");
+    expect(html).toContain("/media/events/solder-sprint/poster?size=medium");
+    expect(html).not.toMatch(/s3\.example|cdn\.example/);
   });
 
-  it("an online event points at the ticket, and its structured data says so", async () => {
-    serve([fullEvent({ event: { ...fullEvent().event, is_online: true, location_name: null, lat: null, lng: null } })]);
-    show("/events/hack-night-04");
-    await title("Hack Night 04");
+  it("an online event points at the ticket", () => {
+    show(fullEvent({ event: { ...fullEvent().event, is_online: true, location_name: null, lat: null, lng: null } }));
     expect(h2("Online event")).toBeInTheDocument();
     expect(screen.getByText(/joining link is on your ticket/)).toBeInTheDocument();
     expect(screen.queryByTitle(/Map of/)).toBeNull();
-    // Added to the head in an effect, which can land a beat after the page paints.
-    const script = await waitFor(() => {
-      const el = document.head.querySelector('script[type="application/ld+json"]');
-      expect(el).not.toBeNull();
-      return el;
-    });
-    const ld = JSON.parse(script.textContent);
-    expect(ld.location).toEqual({ "@type": "VirtualLocation", url: "https://myotherapp.in/events/hack-night-04" });
-    expect(ld.eventAttendanceMode).toBe("https://schema.org/OnlineEventAttendanceMode");
   });
 
-  it("leaves out what a sparse event doesn't have, and never says 0", async () => {
-    serve([sparseEvent()]);
-    show("/events/quiet-evening");
-    expect(await title("Quiet Evening")).toBeInTheDocument();
+  it("leaves out what a sparse event doesn't have, and never says 0", () => {
+    show(sparseEvent());
+    expect(title("Quiet Evening")).toBeInTheDocument();
     for (const name of ["About this event", "Prizes", "Speakers", "Agenda", "Guidelines", "Organising team", "Questions?", /More from/, "Similar events"]) {
       expect(h2(name)).toBeNull();
     }
@@ -182,6 +134,14 @@ describe("an event's page", () => {
     expect(text).not.toMatch(/followers|going|seats/);
     expect(screen.getAllByText("Free").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Register" })).toHaveAttribute("href", "/events/quiet-evening/register");
+  });
+
+  it("a past event still shows in full, marked as ended", () => {
+    show(fullEvent({ event: { ...fullEvent().event, status: "ended", registration_open: false } }));
+    expect(title("Hack Night 04")).toBeInTheDocument();
+    expect(h2("About this event")).toBeInTheDocument();
+    expect(within(document.querySelector(".ep-poster")).getByText("Ended")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Registration" })).getByRole("button", { name: "This event has ended" })).toBeDisabled();
   });
 
   describe("the register button", () => {
@@ -206,10 +166,8 @@ describe("an event's page", () => {
       ],
       ["ended", { status: "ended", registration_open: false }, (s) => expect(s.getByRole("button", { name: "This event has ended" })).toBeDisabled()],
     ];
-    it.each(cases)("%s", async (_, over, check) => {
-      serve([sparseEvent({ event: { ...base, ...over } })]);
-      show("/events/quiet-evening");
-      await title("Quiet Evening");
+    it.each(cases)("%s", (_, over, check) => {
+      show(sparseEvent({ event: { ...base, ...over } }));
       const card = within(screen.getByRole("region", { name: "Registration" }));
       check(card);
       // Exactly one way to register on the page.
@@ -218,9 +176,7 @@ describe("an event's page", () => {
   });
 
   it("shares through the phone's sheet, or copies the link and says so", async () => {
-    serve([fullEvent()]);
-    show("/events/hack-night-04");
-    await title("Hack Night 04");
+    show(fullEvent());
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Share" })));
@@ -234,10 +190,8 @@ describe("an event's page", () => {
     delete navigator.share;
   });
 
-  it("adds the event to a calendar: Google, or an .ics file", async () => {
-    serve([fullEvent()]);
-    show("/events/hack-night-04");
-    await title("Hack Night 04");
+  it("adds the event to a calendar: Google, or an .ics file", () => {
+    show(fullEvent());
     const toggle = screen.getByRole("button", { name: "Add to calendar" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
@@ -253,39 +207,9 @@ describe("an event's page", () => {
 
   it("keeps the live-room strip while the room is on", async () => {
     liveApi.fetchFeed.mockResolvedValue({ banner: { kind: "general", text: "Round two in ten minutes" }, poll: null, quiz: null, questions: [] });
-    serve([fullEvent()]);
-    show("/events/hack-night-04");
-    await title("Hack Night 04");
+    show(fullEvent());
     expect(await screen.findByText("Round two in ten minutes")).toBeInTheDocument();
     expect(liveApi.fetchFeed).toHaveBeenCalledWith(123);
     expect(screen.getByRole("link", { name: "Open the live room" })).toHaveAttribute("href", "/events/hack-night-04/live");
-  });
-
-  it("moves an id address to the slug, keeping the query", async () => {
-    serve([fullEvent()]);
-    show("/events/123?ref=abc12345#agenda");
-    expect(await title("Hack Night 04")).toBeInTheDocument();
-    expect(screen.getByTestId("where")).toHaveTextContent("/events/hack-night-04?ref=abc12345#agenda");
-  });
-
-  it("shows the 404 page for an event that isn't public", async () => {
-    serve([]);
-    show("/events/nope");
-    expect(await screen.findByText("404")).toBeInTheDocument();
-  });
-
-  it("offers a retry when the API fails, and tries again for real", async () => {
-    get.mockRejectedValue(new Error("Network Error"));
-    show("/events/hack-night-04");
-    expect(await screen.findByRole("heading", { name: "That didn't load" })).toBeInTheDocument();
-    serve([fullEvent()]);
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await title("Hack Night 04")).toBeInTheDocument();
-  });
-
-  it("holds the page's shape while it loads, not a spinner", () => {
-    get.mockReturnValue(new Promise(() => {}));
-    show("/events/hack-night-04");
-    expect(screen.getByRole("status", { name: "Loading the event" })).toBeInTheDocument();
   });
 });
