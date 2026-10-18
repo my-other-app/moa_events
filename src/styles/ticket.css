@@ -50,7 +50,7 @@
   font-size: 28px;
   font-weight: bold;
   letter-spacing: 1px;
-  font-family: "Bebas Neue", sans-serif;
+  font-family: var(--font-bebas-neue), "Bebas Neue", sans-serif;
 }
 
 /* Ticket info grid */
@@ -71,13 +71,13 @@
   font-size: 14px;
   color: #ffffff;
   margin-bottom: 4px;
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-dm-sans), "DM Sans", sans-serif;
 }
 
 .ticket-info-value {
   font-size: 20px;
   font-weight: 400;
-  font-family: "Bebas Neue", sans-serif;
+  font-family: var(--font-bebas-neue), "Bebas Neue", sans-serif;
 }
 
 /* Guidelines section */

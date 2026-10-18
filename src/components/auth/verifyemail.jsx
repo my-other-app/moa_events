@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { useAuth } from "@/auth/context";
 import { useCountdown } from "@/auth/countdown";
 import { CODE_LENGTH, RESEND_AFTER_S, clock, describeAuthError, emptyCode, waitFrom } from "@/auth/email";
 import Icon from "../discover/icons";
 import { CodeBoxes, ErrorText, FormNote, Submit } from "./emailfields";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
-import "@/styles/signin-email.css";
 
 /**
  * "Check your email": the six-digit code that shows a password account owns

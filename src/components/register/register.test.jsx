@@ -5,7 +5,7 @@ import { fullEvent, sparseEvent } from "@/test/eventFixture";
 
 // A made-up test key, set before payment.js reads it: never a real one.
 vi.hoisted(() => {
-  vi.stubEnv("VITE_RAZORPAY_KEY", "rzp_test_not_a_real_key");
+  vi.stubEnv("NEXT_PUBLIC_RAZORPAY_KEY", "rzp_test_not_a_real_key");
 });
 
 vi.mock("@/api/events", () => ({

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { CLUBS_URL, CONTACT_EMAIL } from "@/config";
 import {
   addedFeatures,
@@ -15,7 +15,6 @@ import {
   yearlyOffer,
 } from "@/utils/pricing";
 import Icon from "./icons";
-import "@/styles/pricing.css";
 
 /** A card lists everything its plan adds up to this many, and otherwise five and "and N more". */
 const ADDS_ALL = 6;

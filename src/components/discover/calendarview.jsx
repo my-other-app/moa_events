@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { eventHref } from "@/utils/cover";
 import { WEEKDAYS, addMonths, dayName, dayShort, istDay, monthLabel, monthOf, monthWeeks, monthWord } from "@/utils/days";
 import { NAMES_PER_DAY, eventsByDay, useCalendarCounts } from "@/utils/eventcalendar";
@@ -7,7 +7,6 @@ import { formatTime } from "@/utils/format";
 import { NARROW, useMedia } from "@/utils/media";
 import { EmptyState, ErrorState } from "./bits";
 import Icon from "./icons";
-import "@/styles/calendar.css";
 
 const plural = (n) => `${n} ${n === 1 ? "event" : "events"}`;
 const shortTime = (iso) => formatTime(iso).replace(":00", "");

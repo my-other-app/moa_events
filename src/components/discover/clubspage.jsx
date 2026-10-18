@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "@/lib/router";
 import { CLUB_SORT_OPTIONS, PAGE_SIZE, RADIUS_OPTIONS, discoverApi, filtersToSearch, readClubFilters } from "@/api/discover";
 import { usePageMeta } from "@/utils/meta";
 import { usePagedList } from "@/utils/paged";

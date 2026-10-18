@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import "@/styles/live.css";
+import { useParams, useSearchParams } from "@/lib/router";
 
 import { errorLine, liveApi } from "@/api/live";
 

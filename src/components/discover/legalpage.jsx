@@ -1,11 +1,10 @@
 import { Fragment } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { CONTACT_EMAIL } from "@/config";
 import { LEGAL, inline, updatedLabel } from "@/content/legal";
 import { usePageSeo } from "@/utils/meta";
 import { SitePage } from "./chrome";
 import Icon from "./icons";
-import "@/styles/pages.css";
 
 /** One line of a legal text: plain words, bold, and links (the site's own go through the router). */
 export function Inline({ text }) {

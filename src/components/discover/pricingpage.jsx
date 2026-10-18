@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "@/lib/router";
 import { SITE_URL } from "@/config";
 import { PRICING_PAGE } from "@/content/forclubs";
 import { useJsonLd, usePageSeo } from "@/utils/meta";
@@ -9,10 +9,6 @@ import { SitePage } from "./chrome";
 import { ClubFaq, ClubsCta } from "./clubsparts";
 import { Pricing } from "./pricing";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/pages.css";
-import "@/styles/forclubs.css";
-import "@/styles/pricing.css";
 
 const COMMON_SHOWN = 7;
 

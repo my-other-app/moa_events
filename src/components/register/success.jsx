@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { QRCodeSVG } from "qrcode.react";
 import { eventPath, eventUrl, scheduleLines } from "@/utils/eventpage";
 import { rupees } from "@/utils/register";

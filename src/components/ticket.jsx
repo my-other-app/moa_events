@@ -1,10 +1,9 @@
-import { useParams } from "react-router-dom";
+import { useParams } from "@/lib/router";
 import { useEffect, useState } from "react";
 import { eventsApi } from "@/api/events";
 import { competitionApi } from "@/api/competition";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { QRCodeCanvas } from "qrcode.react";
-import "@/styles/ticket.css";
 import Download from "@/components/download";
 
 const Ticket = () => {

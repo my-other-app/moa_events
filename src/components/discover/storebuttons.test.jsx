@@ -21,7 +21,7 @@ afterEach(() => {
 
 describe("the store badges", () => {
   it("link to both stores once the App Store address is set", async () => {
-    vi.stubEnv("VITE_APP_STORE_URL", "https://apps.apple.com/in/app/myotherapp/id6700000000");
+    vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "https://apps.apple.com/in/app/myotherapp/id6700000000");
     const { StoreButtons } = await load();
     render(<StoreButtons />);
     const play = screen.getByRole("link", { name: "Get it on Google Play" });
@@ -39,7 +39,7 @@ describe("the store badges", () => {
   });
 
   it("say the App Store is coming soon, as text and not a link, while it isn't set", async () => {
-    vi.stubEnv("VITE_APP_STORE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "");
     const { StoreButtons } = await load();
     const { container } = render(<StoreButtons tone="light" />);
     expect(screen.getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe("the store badges", () => {
   });
 
   it("come in pairs wherever the app is offered: the header's prompt and the footer", async () => {
-    vi.stubEnv("VITE_APP_STORE_URL", "https://apps.apple.com/app/id1");
+    vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "https://apps.apple.com/app/id1");
     const { SitePage } = await load();
     render(
       <MemoryRouter>
@@ -72,7 +72,7 @@ describe("the store badges", () => {
   });
 
   it("show the iPhone app as coming soon in the footer while it isn't out", async () => {
-    vi.stubEnv("VITE_APP_STORE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "");
     const { SiteFooter } = await load();
     render(
       <MemoryRouter>

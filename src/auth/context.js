@@ -4,7 +4,7 @@ import { imageUrl } from "@/utils/format";
 /**
  * What every page knows about signing in:
  *
- *   enabled    sign-in is switched on for this build (VITE_GOOGLE_CLIENT_ID set)
+ *   enabled    sign-in is switched on for this build (NEXT_PUBLIC_GOOGLE_CLIENT_ID set)
  *   status     "signed-in" | "signed-out"
  *   user       {id, name, firstName, email, phone, picture, provider, emailVerified} while signed in;
  *              emailVerified is null until the profile has said

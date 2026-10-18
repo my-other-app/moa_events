@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/router";
 import { accountApi } from "@/api/account";
 import { PAGE_SIZE, discoverApi } from "@/api/discover";
 import { useAuth } from "@/auth/context";

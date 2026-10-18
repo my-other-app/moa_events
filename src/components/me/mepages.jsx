@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink } from "@/lib/router";
 import { accountApi } from "@/api/account";
 import { useAuth } from "@/auth/context";
 import { eventPath, whenLine } from "@/utils/eventpage";
@@ -11,9 +11,6 @@ import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
 import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
 import { EventCover } from "../discover/cover";
 import Icon from "../discover/icons";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
 
 /**
  * The signed-in person's own pages: /me/tickets and /me/following. Kept out

@@ -1,7 +1,5 @@
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
-import "../styles/registerbutton.css";
-import "../styles/download.css";
 
 const Download = () => {
 

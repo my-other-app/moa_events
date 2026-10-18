@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { discoverApi } from "@/api/discover";
 import { CONTACT_EMAIL } from "@/config";
 import { ABOUT } from "@/content/about";
@@ -9,8 +9,7 @@ import { SitePage } from "./chrome";
 import { StoreButtons } from "./bits";
 import Icon from "./icons";
 import logoIcon from "@/assets/logo-icon.png";
-import "@/styles/cards-hero.css";
-import "@/styles/pages.css";
+import { assetSrc } from "@/utils/asset";
 
 /** The numbers on the front page, live: upcoming events, clubs, cities. Each shows only when there is one. */
 function LiveNumbers({ stats }) {
@@ -32,7 +31,7 @@ function LiveNumbers({ stats }) {
   if (!rows.length) {
     return (
       <div className="dc-about-live dc-about-live--mark" aria-hidden="true">
-        <img src={logoIcon} alt="" width="96" height="96" />
+        <img src={assetSrc(logoIcon)} alt="" width="96" height="96" />
       </div>
     );
   }

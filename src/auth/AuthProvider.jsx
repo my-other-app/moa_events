@@ -8,6 +8,7 @@ import { jwtClaims } from "./jwt";
 import { clearSession, forgetGuestTokens, getSession, setSession, subscribe, updateSession } from "./session";
 
 const IDLE = { status: "idle", error: null };
+const noSession = () => null;
 const SHUT = { open: false, reason: null, view: "start", email: "", n: 0 };
 
 /** Ends a session on the server too, sent with the token it ends, so its refresh token is dead everywhere. */
@@ -39,12 +40,14 @@ const noteMissingReset = (error) => {
  * into the account; the guest token stays put (it is never sent while signed
  * in) until the address is verified.
  *
- * Without VITE_GOOGLE_CLIENT_ID it provides nothing new: nobody is signed in
+ * Without NEXT_PUBLIC_GOOGLE_CLIENT_ID it provides nothing new: nobody is signed in
  * and no page offers it.
  */
 export function AuthProvider({ children }) {
   const enabled = googleEnabled();
-  const session = useSyncExternalStore(subscribe, getSession, getSession);
+  // The server (and the first render in the browser, which must match it)
+  // knows nobody: the session is in localStorage. It shows straight after.
+  const session = useSyncExternalStore(subscribe, getSession, noSession);
   const [sheet, setSheet] = useState(SHUT);
   const [attempt, setAttempt] = useState(IDLE);
   const after = useRef(null);

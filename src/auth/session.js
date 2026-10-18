@@ -29,7 +29,9 @@ const GUEST_KEYS = ["access_token", "refresh_token"];
 
 const storage = () => {
   try {
-    return typeof localStorage === "undefined" ? null : localStorage;
+    // Only in a browser: on the server there is none (newer Node has a localStorage global that isn't one).
+    if (typeof window === "undefined" || typeof localStorage === "undefined" || typeof localStorage?.getItem !== "function") return null;
+    return localStorage;
   } catch {
     return null;
   }

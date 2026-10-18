@@ -1,13 +1,11 @@
 import { useId, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "@/lib/router";
 import { formatCount, formatWhen, imageUrl } from "@/utils/format";
 import { eventHref, heroPicks } from "@/utils/cover";
 import { Avatar, Img } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import { LocationPill } from "./locationpill";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
 
 const CHIPS = 8;
 

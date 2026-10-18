@@ -56,7 +56,9 @@ export function clock(seconds) {
 const RESET_KEY = "moa.pwreset";
 const session = () => {
   try {
-    return typeof sessionStorage === "undefined" ? null : sessionStorage;
+    // Only in a browser: on the server there is none (newer Node has a sessionStorage global that isn't one).
+    if (typeof window === "undefined" || typeof sessionStorage === "undefined" || typeof sessionStorage?.getItem !== "function") return null;
+    return sessionStorage;
   } catch {
     return null;
   }

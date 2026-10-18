@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "@/lib/router";
 import { competitionApi, errorLine } from "@/api/competition";
-import "@/styles/compete.css";
 
 /**
  * A team's side of the competition, from their ticket: pick a track and

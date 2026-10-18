@@ -6,7 +6,7 @@ import { plansResponse } from "@/test/plansFixture";
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
-const { AppRoutes } = await import("@/App.jsx");
+const { AppRoutes } = await import("@/test/routes");
 
 const SIGNUP = "https://clubs-next.myotherapp.in/signup";
 const LOGIN = "https://clubs-next.myotherapp.in/login";

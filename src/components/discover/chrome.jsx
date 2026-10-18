@@ -1,85 +1,18 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { APP_STORE_URL, CONTACT_EMAIL, PLAY_STORE_URL } from "@/config";
-import { HeaderAccount } from "../auth/account";
-import { AppPrompt, AppleGlyph, PlayGlyph } from "./bits";
+import { assetSrc } from "@/utils/asset";
+import { feeds } from "@/seo/urls";
 import Icon from "./icons";
+import { SiteHeader } from "./header";
+import { AppleGlyph, PlayGlyph } from "./stores";
 import wordmark from "@/assets/wordmark-sm.png";
-import "@/styles/discover.css";
 
-/**
- * The bar on top of every public page: the wordmark home, the three ways
- * in (events, clubs, posts) and the page for clubs that run events, a
- * search that lands on find-events, signing in (when the build has it) and
- * the way to the app.
+/*
+ * The frame of every public page. The header is interactive (search, the
+ * account menu, "Get the app") and lives in header.jsx; the footer and the
+ * frame itself render on the server.
  */
-export function SiteHeader() {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const [q, setQ] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [appOpen, setAppOpen] = useState(false);
-  const input = useRef(null);
-  const inputId = useId();
-  const formId = useId();
-
-  useEffect(() => {
-    if (searchOpen) input.current?.focus();
-  }, [searchOpen]);
-
-  const submit = (e) => {
-    e.preventDefault();
-    const term = q.trim();
-    navigate(term ? `/events?q=${encodeURIComponent(term)}` : "/events");
-    setSearchOpen(false);
-  };
-
-  return (
-    <header className="dc-header dc-scope">
-      <div className="dc-wrap dc-header-row">
-        <Link to="/" className="dc-brand" aria-label="MyOtherApp home">
-          <img src={wordmark} alt="MyOtherApp" width="108" height="26" />
-        </Link>
-        <nav className="dc-nav" aria-label="Discover">
-          <NavLink to="/events">Events</NavLink>
-          <NavLink to="/clubs">Clubs</NavLink>
-          <NavLink to="/threads">Threads</NavLink>
-          {/* The clubs' page and its pricing are one place to a visitor. */}
-          <NavLink to="/for-clubs" className={({ isActive }) => (isActive || pathname === "/pricing" ? "active dc-nav-clubs" : "dc-nav-clubs")}>
-            For clubs
-          </NavLink>
-        </nav>
-        <form id={formId} className={`dc-header-search${searchOpen ? " is-open" : ""}`} role="search" onSubmit={submit}>
-          <div className="dc-searchbox">
-            <Icon name="search" size={16} />
-            <label className="dc-sr" htmlFor={inputId}>
-              Search events
-            </label>
-            <input ref={input} id={inputId} type="search" placeholder="Search events" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" />
-            <button type="submit">Search</button>
-          </div>
-        </form>
-        <button
-          type="button"
-          className="dc-header-searchtoggle"
-          aria-label={searchOpen ? "Close search" : "Search events"}
-          aria-expanded={searchOpen}
-          aria-controls={formId}
-          onClick={() => setSearchOpen((o) => !o)}
-        >
-          <Icon name={searchOpen ? "close" : "search"} size={20} />
-        </button>
-        <div className="dc-header-account">
-          <HeaderAccount />
-        </div>
-        <button type="button" className="dc-btn dc-btn--sm dc-header-app" onClick={() => setAppOpen(true)}>
-          Get the app
-        </button>
-      </div>
-      <AppPrompt open={appOpen} onClose={() => setAppOpen(false)} />
-    </header>
-  );
-}
+export { SiteHeader };
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
@@ -88,7 +21,7 @@ export function SiteFooter() {
       <div className="dc-wrap">
         <div className="dc-footer-grid">
           <div className="dc-footer-brand">
-            <img src={wordmark} alt="MyOtherApp" width="100" height="24" />
+            <img src={assetSrc(wordmark)} alt="MyOtherApp" width="100" height="24" />
             <p>Events and clubs near you — hackathons, workshops, meetups and more, run by the clubs on MyOtherApp.</p>
           </div>
           <nav aria-label="Discover more">
@@ -105,6 +38,11 @@ export function SiteFooter() {
               </li>
               <li>
                 <Link to="/threads">Threads</Link>
+              </li>
+              <li>
+                <a className="dc-footer-feed" href={feeds.events()} type="application/rss+xml">
+                  <Icon name="rss" size={14} /> Events feed (RSS)
+                </a>
               </li>
             </ul>
           </nav>
@@ -167,16 +105,11 @@ export function SiteFooter() {
   );
 }
 
-/** A discovery page: header, the page, footer. A new page starts at the top. */
+/**
+ * A discovery page: header, the page, footer. (Next scrolls a new page to
+ * the top on navigation, as the old SPA did here by hand.)
+ */
 export function SitePage({ children }) {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    try {
-      window.scrollTo(0, 0);
-    } catch {
-      /* not in a browser */
-    }
-  }, [pathname]);
   return (
     <div className="dc-page dc-scope">
       <a className="dc-skip" href="#dc-main">

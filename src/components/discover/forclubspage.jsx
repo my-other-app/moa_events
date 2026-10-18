@@ -12,10 +12,6 @@ import { ClubFaq, ClubsCta } from "./clubsparts";
 import { HeroFan, PhaseArt } from "./forclubsart";
 import { Pricing } from "./pricing";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
-import "@/styles/pages.css";
-import "@/styles/forclubs.css";
 
 /** Where "Start free" goes: the dashboard's sign-up, on the Free plan. */
 const START_FREE_URL = signupUrl(CLUBS_URL, "free", "monthly");

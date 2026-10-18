@@ -1,10 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { formatCount, formatDistance, imageUrl } from "@/utils/format";
 import { Avatar, Img } from "./bits";
 import { ClubCover } from "./cover";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
 
 /**
  * A club in a list: its cover (or one drawn in the event covers' family),

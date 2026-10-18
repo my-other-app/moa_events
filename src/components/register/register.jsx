@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "@/lib/router";
 import { eventsApi } from "@/api/events";
 import { useAuth } from "@/auth/context";
 import { cancelOneTap } from "@/auth/google";
@@ -33,8 +33,6 @@ import { QuestionField, TextField } from "./fields";
 import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
 import Success from "./success";
-import "@/styles/event-page.css";
-import "@/styles/register.css";
 
 /**
  * Registering for an event, at /events/{slug}/register.

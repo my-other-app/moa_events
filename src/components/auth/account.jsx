@@ -1,11 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { useAuth } from "@/auth/context";
 import { initials } from "@/utils/cover";
 import Icon from "../discover/icons";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
 
 /** The signed-in person's face: their photo, or their initials on the site's yellow. */
 export function UserAvatar({ user, size = 32 }) {

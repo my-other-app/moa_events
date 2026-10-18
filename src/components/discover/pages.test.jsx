@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
-const { AppRoutes } = await import("@/App.jsx");
+const { AppRoutes } = await import("@/test/routes");
 const { PRIVACY, TERMS, plainText } = await import("@/content/legal");
 
 const at = (path) =>

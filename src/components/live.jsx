@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import "@/styles/live.css";
+import { Link, useNavigate, useParams } from "@/lib/router";
 
 import { errorLine, liveApi } from "@/api/live";
 import { currentPlayer, rememberPlayer } from "@/utils/live";

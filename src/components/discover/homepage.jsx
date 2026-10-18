@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { discoverApi, isEmptyHome } from "@/api/discover";
 import { usePageMeta } from "@/utils/meta";
 import { useWhere } from "@/utils/where";
@@ -9,7 +9,6 @@ import { EventCard, EventRailSkeleton } from "./eventcard";
 import { ClubCard } from "./clubcard";
 import { ThreadCard } from "./threadcard";
 import { HomeHero } from "./hero";
-import "@/styles/cards-hero.css";
 
 const RAIL = 8;
 

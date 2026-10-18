@@ -80,7 +80,7 @@ describe("which token goes", () => {
 });
 
 function resetAuthEnvOnly() {
-  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "");
+  vi.stubEnv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "");
 }
 
 describe("registering while signed in", () => {

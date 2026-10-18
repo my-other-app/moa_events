@@ -43,7 +43,7 @@ export const PROFILE = {
 };
 
 export function enableSignIn() {
-  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", TEST_CLIENT_ID);
+  vi.stubEnv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", TEST_CLIENT_ID);
 }
 
 /** Signs in as if on an earlier visit: the session is in storage before the page reads it. */
@@ -81,7 +81,7 @@ export function stubGoogle({ credential = googleCredential() } = {}) {
 
 /** Back to a fresh page with sign-in switched off (other stubbed variables are left alone). */
 export function resetAuth() {
-  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "");
+  vi.stubEnv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "");
   localStorage.clear();
   sessionStorage.clear();
   reloadSessionForTests();

@@ -1,11 +1,9 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, statusPill } from "@/utils/format";
 import { eventHref, seatsInfo } from "@/utils/cover";
 import { Avatar, Img } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import Icon from "./icons";
-import "@/styles/discover.css";
-import "@/styles/cards-hero.css";
 
 /** The pill for the poster: what is most pressing, and a quiet "Free" beside it while there are places. */
 function Pills({ event }) {

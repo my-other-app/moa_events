@@ -7,10 +7,7 @@ import Icon from "../discover/icons";
 import { ForgotForm, ResetForm, SignInForm, SignUpForm, TotpForm } from "./emailforms";
 import { Verified, VerifyEmail } from "./verifyemail";
 import logoIcon from "@/assets/logo-icon.png";
-// After discover.css, so these rules win over its resets and components.
-import "@/styles/discover.css";
-import "@/styles/account.css";
-import "@/styles/signin-email.css";
+import { assetSrc } from "@/utils/asset";
 
 const TITLES = {
   tickets: "Sign in to see your tickets",
@@ -225,7 +222,7 @@ export default function SignInSheet({ open, reason, start = "start", email: type
           <Icon name={view === "verified" ? "check" : "mail"} size={26} />
         </span>
       ) : (
-        <img className="dc-modal-mark" src={logoIcon} alt="" width="56" height="56" />
+        <img className="dc-modal-mark" src={assetSrc(logoIcon)} alt="" width="56" height="56" />
       )}
       <h2 id={titleId}>{title}</h2>
       {why ? <p className="ac-sheet-why">{why}</p> : null}

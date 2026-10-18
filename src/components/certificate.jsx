@@ -1,8 +1,8 @@
-import { useParams } from "react-router-dom";
+import { useParams } from "@/lib/router";
 import { useEffect, useState } from "react";
 import { eventsApi } from "@/api/events";
+import { API_BASE_URL as SITE_API_BASE_URL } from "@/config";
 import { QRCodeCanvas } from "qrcode.react";
-import "@/styles/certificate.css";
 import Download from "@/components/download";
 
 const Certificate = () => {
@@ -38,7 +38,7 @@ const Certificate = () => {
     }, [ticketid]);
 
     const handleDownload = () => {
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+        const API_BASE_URL = SITE_API_BASE_URL;
         window.open(
             `${API_BASE_URL}/api/v1/events/certificates/${ticketid}/pdf`,
             "_blank"

@@ -4,9 +4,9 @@ import { paymentsApi } from "../api/payments";
 /**
  * The publishable key checkout opens with: the one that came with the order
  * (a club's own Razorpay account, or the platform's), or the site's own
- * VITE_RAZORPAY_KEY when the order has none (an older server).
+ * NEXT_PUBLIC_RAZORPAY_KEY when the order has none (an older server).
  */
-export const checkoutKey = (order, fallback = import.meta.env.VITE_RAZORPAY_KEY) => order?.key_id || fallback;
+export const checkoutKey = (order, fallback = process.env.NEXT_PUBLIC_RAZORPAY_KEY) => order?.key_id || fallback;
 
 export const processPayment = async ({
   paymentData,

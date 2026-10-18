@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "@/lib/router";
 import { imageUrl, plural, timeAgo } from "@/utils/format";
 import { Avatar, Img } from "./bits";
 import Icon from "./icons";

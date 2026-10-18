@@ -17,7 +17,6 @@ import {
 } from "@/utils/days";
 import { Dialog } from "./bits";
 import Icon from "./icons";
-import "@/styles/calendar.css";
 
 /* ---------- the month grid ---------- */
 

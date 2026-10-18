@@ -16,7 +16,7 @@ const CLUB_KEY = "rzp_test_club_not_real";
 
 describe("checkoutKey", () => {
     beforeEach(() => {
-        vi.stubEnv("VITE_RAZORPAY_KEY", SITE_KEY);
+        vi.stubEnv("NEXT_PUBLIC_RAZORPAY_KEY", SITE_KEY);
     });
     afterEach(() => {
         vi.unstubAllEnvs();
@@ -64,7 +64,7 @@ describe("processPayment", () => {
     });
 
     it("opens Razorpay Checkout with the order's own key_id", async () => {
-        vi.stubEnv("VITE_RAZORPAY_KEY", SITE_KEY);
+        vi.stubEnv("NEXT_PUBLIC_RAZORPAY_KEY", SITE_KEY);
         try {
             await processPayment({
                 paymentData: { amount: 100, currency: "INR", razorpay_order_id: "order_1", key_id: CLUB_KEY, gateway: "club" },

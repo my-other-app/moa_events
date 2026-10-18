@@ -1,0 +1,237 @@
+/**
+ * The structured data search engines read off the site's pages
+ * (schema.org, as JSON-LD). Pure functions of the API's data, so they are
+ * tested on their own (jsonld.test.js) and shared by the pages and the
+ * link-preview function.
+ *
+ * Every image here is a stable address on the site (/media/..., /og/...),
+ * never a presigned S3 link: a crawler keeps what it read for weeks.
+ */
+import { APP_STORE_URL, CONTACT_EMAIL, PLAY_STORE_URL, SITE_NAME, SITE_URL } from "@/config";
+import { istIso } from "./time";
+
+const SCHEMA = "https://schema.org/";
+
+const positive = (v) => {
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
+};
+
+const isHttp = (v) => typeof v === "string" && /^https?:\/\//i.test(v);
+
+/** Drops empty values (null, "", []) all the way down, so no field is ever there with nothing in it. */
+export function clean(o) {
+  if (Array.isArray(o)) return o.map(clean).filter((v) => v !== null && v !== undefined);
+  if (!o || typeof o !== "object") return o;
+  const out = {};
+  for (const [k, v] of Object.entries(o)) {
+    const c = clean(v);
+    if (c === null || c === undefined || c === "" || (Array.isArray(c) && !c.length)) continue;
+    if (typeof c === "object" && !Array.isArray(c) && !Object.keys(c).length) continue;
+    out[k] = c;
+  }
+  return out;
+}
+
+/** JSON for inside a <script> tag: a "</script>" in a club's text can't close it. */
+export const jsonForScript = (data) => JSON.stringify(data).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
+
+/** When it ends: the end it was given, or the start plus its length. */
+function endOf(event) {
+  if (event.ends_at) return event.ends_at;
+  const hours = positive(event.duration_hours);
+  const start = event.starts_at ? new Date(event.starts_at) : null;
+  if (!hours || !start || Number.isNaN(start.getTime())) return null;
+  return new Date(start.getTime() + hours * 3600 * 1000).toISOString();
+}
+
+/**
+ * schema.org's availability for the ticket: InStock while registration is
+ * open, PreOrder before it opens, SoldOut once it is full or closed (or the
+ * event is over).
+ */
+export function availability(event, now = Date.now()) {
+  if (event.status === "full") return "SoldOut";
+  if (event.status === "ended") return "SoldOut";
+  if (event.registration_open) return "InStock";
+  const opens = event.reg_opens_at ? new Date(event.reg_opens_at) : null;
+  if (opens && !Number.isNaN(opens.getTime()) && opens.getTime() > now) return "PreOrder";
+  return "SoldOut";
+}
+
+const hasPoint = (e) => typeof e.lat === "number" && typeof e.lng === "number" && !(e.lat === 0 && e.lng === 0);
+
+/** Offline, online, or both: an online event that also has a pinned venue is mixed. */
+export function attendanceMode(event) {
+  if (!event.is_online) return "OfflineEventAttendanceMode";
+  return hasPoint(event) ? "MixedEventAttendanceMode" : "OnlineEventAttendanceMode";
+}
+
+function place(event) {
+  const name = event.location_name && !/^online$/i.test(event.location_name.trim()) ? event.location_name : null;
+  return {
+    "@type": "Place",
+    name: name || "Venue to be announced",
+    address: { "@type": "PostalAddress", streetAddress: name, addressCountry: "IN" },
+    geo: hasPoint(event) ? { "@type": "GeoCoordinates", latitude: event.lat, longitude: event.lng } : null,
+    hasMap: isHttp(event.location_link) ? event.location_link : null,
+  };
+}
+
+function location(event, url) {
+  const mode = attendanceMode(event);
+  const virtual = { "@type": "VirtualLocation", url };
+  if (mode === "OnlineEventAttendanceMode") return virtual;
+  if (mode === "MixedEventAttendanceMode") return [place(event), virtual];
+  return place(event);
+}
+
+function offer(event, url) {
+  const fee = event.has_fee ? positive(event.fee) : 0;
+  if (fee === null) return null;
+  return {
+    "@type": "Offer",
+    price: fee,
+    priceCurrency: "INR",
+    availability: `${SCHEMA}${availability(event)}`,
+    validFrom: istIso(event.reg_opens_at),
+    url,
+  };
+}
+
+/**
+ * The Event for an event's page.
+ *
+ *   event, club, speakers   as parseEventPage reads them
+ *   url                     the canonical page (absolute)
+ *   images                  absolute picture addresses, the poster's first
+ *   clubUrl, clubLogo       absolute, or null
+ *   description             plain text
+ *   speakerImage(s, i)      an absolute photo address for a speaker, or null
+ */
+export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, description = null, speakerImage = () => null }) {
+  if (!event) return null;
+  const fee = event.has_fee ? positive(event.fee) : 0;
+  const pictures = [...(image ? [image] : []), ...images].filter(isHttp);
+  return clean({
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.name,
+    description: description || null,
+    startDate: istIso(event.starts_at),
+    endDate: istIso(endOf(event)),
+    eventStatus: `${SCHEMA}EventScheduled`,
+    eventAttendanceMode: `${SCHEMA}${attendanceMode(event)}`,
+    location: location(event, url),
+    image: [...new Set(pictures)],
+    url,
+    isAccessibleForFree: fee === 0 ? true : null,
+    keywords: Array.isArray(event.interests) && event.interests.length ? event.interests.join(", ") : null,
+    organizer: club ? { "@type": "Organization", name: club.name, url: clubUrl, logo: isHttp(clubLogo) ? clubLogo : null } : null,
+    performer: speakers
+      .filter((s) => s && s.name)
+      .map((s, i) => ({
+        "@type": "Person",
+        name: s.name,
+        jobTitle: s.designation || null,
+        description: s.bio ? String(s.bio).slice(0, 300) : null,
+        image: speakerImage(s, i),
+        sameAs: isHttp(s.link) ? [s.link] : null,
+      })),
+    offers: offer(event, url),
+    maximumAttendeeCapacity: positive(event.capacity),
+    remainingAttendeeCapacity: positive(event.capacity) && typeof event.seats_left === "number" ? Math.max(0, event.seats_left) : null,
+  });
+}
+
+/** A short Event for a list (a club's upcoming events): an event card as the API sends it. */
+export function eventCardJsonLd(card, { url, image = null, organizer = null }) {
+  const fee = card.has_fee ? positive(card.fee) : 0;
+  return clean({
+    "@type": "Event",
+    name: card.name,
+    url,
+    startDate: istIso(card.starts_at),
+    endDate: istIso(card.ends_at),
+    eventStatus: `${SCHEMA}EventScheduled`,
+    eventAttendanceMode: `${SCHEMA}${attendanceMode(card)}`,
+    location: location(card, url),
+    image: isHttp(image) ? [image] : null,
+    organizer,
+    offers:
+      fee === null
+        ? null
+        : { "@type": "Offer", price: fee, priceCurrency: "INR", availability: `${SCHEMA}${card.status === "full" || card.status === "ended" ? "SoldOut" : "InStock"}`, url },
+  });
+}
+
+/** Home › … › here, as a BreadcrumbList: `items` are [name, absolute url]. */
+export function breadcrumbJsonLd(items) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map(([name, item], i) => ({ "@type": "ListItem", position: i + 1, name, item })),
+  };
+}
+
+const SOCIAL_KEYS = ["instagram", "linkedin", "youtube", "x", "website"];
+
+/**
+ * The Organization for a club's page, with its upcoming events.
+ *   data      parseClubPage's result
+ *   url       the club page (absolute); logo, image: absolute or null
+ *   events    [{card, url, image}] for the upcoming events
+ */
+export function clubJsonLd({ club, url, logo = null, image = null, description = null, events = [] }) {
+  if (!club) return null;
+  const sameAs = [...SOCIAL_KEYS.map((k) => club.socials?.[k]), club.website_url].filter(isHttp);
+  const organizer = { "@type": "Organization", name: club.name, url };
+  return clean({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${url}#organization`,
+    name: club.name,
+    url,
+    logo: isHttp(logo) ? logo : null,
+    image: isHttp(image) ? image : null,
+    description: description || club.tagline || null,
+    slogan: club.tagline || null,
+    email: club.contact_email || null,
+    address: club.location_name ? { "@type": "PostalAddress", addressLocality: club.location_name, addressCountry: "IN" } : null,
+    knowsAbout: club.interests?.length ? club.interests : null,
+    sameAs: [...new Set(sameAs)],
+    event: events.map((e) => eventCardJsonLd(e.card, { url: e.url, image: e.image, organizer })),
+  });
+}
+
+/** The site itself, for the home page: who runs it, and how to search it. */
+export function siteJsonLd() {
+  const org = `${SITE_URL}/#organization`;
+  return [
+    clean({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": org,
+      name: SITE_NAME,
+      url: SITE_URL,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/logo-icon.png`, width: 312, height: 312 },
+      email: CONTACT_EMAIL,
+      contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: CONTACT_EMAIL, areaServed: "IN", availableLanguage: ["en"] },
+      sameAs: [PLAY_STORE_URL, APP_STORE_URL].filter(isHttp),
+    }),
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      inLanguage: "en-IN",
+      publisher: { "@id": org },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/events?q={search_term_string}` },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ];
+}
