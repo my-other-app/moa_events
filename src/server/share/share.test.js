@@ -189,3 +189,15 @@ describe("the preview page", () => {
     expect(clip("short")).toBe("short");
   });
 });
+
+describe("the preview route", () => {
+  it("answers by path (what the bot rewrites send) and by ?path=", async () => {
+    const { GET: byPath } = await import("@/app/api/share/[...path]/route.js");
+    const { GET: byQuery } = await import("@/app/api/share/route.js");
+    const a = await byPath(new Request("https://myotherapp.in/api/share/events"), { params: Promise.resolve({ path: ["events"] }) });
+    const b = await byQuery({ nextUrl: new URL("https://myotherapp.in/api/share?path=/about") });
+    expect(a.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(await a.text()).toContain("<title>Find events · MyOtherApp</title>");
+    expect(await b.text()).toContain("<title>About MyOtherApp</title>");
+  });
+});

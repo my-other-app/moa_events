@@ -58,7 +58,11 @@ async function resolve(url, { ua = "Mozilla/5.0" } = {}) {
     const m = compile(r.source).exec(path);
     if (!m) continue;
     if (r.has && !r.has.every((h) => h.type === "header" && new RegExp(`^${h.value}$`).test(ua))) continue;
-    if (r.destination.startsWith("/api/share")) return { file: "api/share/route.js", share: true };
+    if (r.destination.startsWith("/api/share/")) {
+      // The bot's page goes to /api/share/{the same path}.
+      let i = 0;
+      return { file: "api/share/[...path]/route.js", share: true, to: r.destination.replace(/:\w+/g, () => m[++i]) };
+    }
     path = r.destination.replace(/:(\w+)/g, () => m[1]);
   }
   const hit = match(ROOT, path.split("/").filter(Boolean));
@@ -142,7 +146,7 @@ describe("what link-preview bots get", () => {
 
   it("is the small preview page for the ones still drawn in the browser", async () => {
     for (const url of ["/events", "/clubs", "/threads", "/about", "/privacy", "/terms", "/for-clubs", "/pricing", "/events/hack-night-04/register"]) {
-      expect(await resolve(url, { ua: BOT })).toEqual({ file: "api/share/route.js", share: true });
+      expect(await resolve(url, { ua: BOT })).toEqual({ file: "api/share/[...path]/route.js", share: true, to: `/api/share${url}` });
       expect((await resolve(url)).share).toBeUndefined();
     }
     expect(BOT_PAGES.map((p) => p.source)).not.toContain("/events/:slug");

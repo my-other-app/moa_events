@@ -39,7 +39,7 @@ const nextConfig = {
         ...BOT_PAGES.map(({ source, path }) => ({
           source,
           has: [{ type: "header", key: "user-agent", value: BOT_UA }],
-          destination: `/api/share?path=${path}`,
+          destination: `/api/share${path}`,
         })),
         // /events/{id}: an id is never the canonical address. The old-address
         // page (/{id}) answers it with a 308 to /events/{slug}, query kept.
