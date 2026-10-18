@@ -765,3 +765,20 @@
     animation: none;
   }
 }
+
+/* A payment just went through, said once at the top of My tickets. */
+.me-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dc-accent);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.me-ticket-actions .pay-note {
+  max-width: 260px;
+}

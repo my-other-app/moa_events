@@ -1,9 +1,12 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const get = vi.fn();
-vi.mock("@/api/client", () => ({ default: { get, post: vi.fn(), delete: vi.fn(() => Promise.resolve({ data: {} })) } }));
+const post = vi.fn();
+vi.mock("@/api/client", () => ({ default: { get, post, delete: vi.fn(() => Promise.resolve({ data: {} })) } }));
+// The checkout script is never fetched; window.Razorpay is ours.
+vi.mock("@/utils/loadScript", () => ({ loadScript: vi.fn(() => Promise.resolve(true)) }));
 
 const { AuthProvider } = await import("@/auth/AuthProvider");
 const { FollowingPage, MyTicketsPage } = await import("./mepages.jsx");
@@ -77,6 +80,7 @@ const show = (path) =>
         <Routes>
           <Route path="/me/tickets" element={<MyTicketsPage />} />
           <Route path="/me/following" element={<FollowingPage />} />
+          <Route path="/events/:slug/register" element={<p>the registration form</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -107,12 +111,13 @@ describe("My tickets, signed in", () => {
     const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
     const pending = within(upcoming).getByRole("listitem");
     expect(within(pending).getByText("Awaiting payment")).toBeInTheDocument();
-    expect(within(pending).getByRole("link", { name: "Finish payment for Hack Night 04" })).toHaveAttribute("href", "/events/hack-night-04/register");
+    expect(within(pending).getByRole("button", { name: "Finish payment for Hack Night 04" })).toBeInTheDocument();
     expect(within(pending).queryByRole("link", { name: /View ticket/ })).toBeNull();
 
     const old = within(screen.getByRole("region", { name: /Past/ })).getByRole("listitem");
     expect(within(old).getByText("Payment not completed")).toBeInTheDocument();
-    expect(within(old).queryByRole("link", { name: /View ticket|Finish payment/ })).toBeNull();
+    expect(within(old).queryByRole("link", { name: /View ticket/ })).toBeNull();
+    expect(within(old).queryByRole("button", { name: /Finish payment/ })).toBeNull();
   });
 
   it("lists upcoming and past tickets, each linking to its ticket and its event", async () => {
@@ -142,13 +147,10 @@ describe("My tickets, signed in", () => {
     expect(get).toHaveBeenCalledWith("/api/v1/events/list", { params: { is_registered: true, is_ended: true, offset: 0, limit: 20 } });
   });
 
-  it("keeps the page out of search results", async () => {
+  it("leaves the head to the server (its title and noindex are the route's metadata)", async () => {
     answer();
-    const { unmount } = show("/me/tickets");
+    show("/me/tickets");
     await screen.findByRole("region", { name: /Upcoming/ });
-    expect(document.head.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
-    expect(document.title).toBe("My tickets · MyOtherApp");
-    unmount();
     expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
   });
 
@@ -195,6 +197,185 @@ describe("My tickets, signed in", () => {
     fail = false;
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
+  });
+});
+
+describe("Finish payment, from My tickets", () => {
+  /** GET /events/info/901 for the signed-in person (backend#68): their unpaid registration's id. */
+  const UNPAID = {
+    id: 901,
+    name: "Hack Night 04",
+    has_fee: true,
+    reg_fee: 250,
+    // Registration closed a while ago: the form would refuse; paying the registration as it is doesn't.
+    reg_enddate: "2026-10-01T23:59:00+05:30",
+    is_registered: true,
+    is_paid: false,
+    registration_id: "reg-9",
+    ticket_id: "MOA7Q4K2X",
+  };
+  const ORDER = { id: 5, razorpay_order_id: "order_9", amount: 25000, currency: "INR", status: "created", key_id: "rzp_test_club_not_real", gateway: "club" };
+  const refusal = (status, message, error_code, errors = null) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: { message, errors, error_code } } });
+
+  let info;
+  let paidNow;
+  let razorpay;
+  beforeEach(() => {
+    enableSignIn();
+    signInAs();
+    info = UNPAID;
+    paidNow = false;
+    razorpay = null;
+    window.Razorpay = vi.fn(function (options) {
+      razorpay = options;
+      this.open = vi.fn();
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    get.mockImplementation(async (url, config) => {
+      if (url === "/api/v1/user/profile/me") return { data: PROFILE };
+      if (url === "/api/v1/events/list") return pageOf(config.params.is_ended ? [] : [row({ is_paid: paidNow })]);
+      if (url === "/api/v1/events/info/901") return { data: info };
+      throw new Error(`unexpected GET ${url}`);
+    });
+  });
+  afterEach(() => {
+    delete window.Razorpay;
+    vi.restoreAllMocks();
+  });
+
+  const button = async () => screen.findByRole("button", { name: "Finish payment for Hack Night 04" });
+  const posted = () => post.mock.calls.map((c) => c[0]);
+
+  it("pays the registration as it stands, past the deadline: its id and checkout=2, the order's own key, the check, then the list again", async () => {
+    post.mockImplementation(async (url) => {
+      if (url === "/api/v1/payments/orders") return { data: ORDER };
+      if (url === "/api/v1/payments/verify") {
+        paidNow = true;
+        return { data: { payment_status: "captured" } };
+      }
+      throw new Error(`unexpected POST ${url}`);
+    });
+    show("/me/tickets");
+    fireEvent.click(await button());
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+
+    expect(get).toHaveBeenCalledWith("/api/v1/events/info/901");
+    expect(post).toHaveBeenCalledWith(
+      "/api/v1/payments/orders",
+      { source: "event_registration", payload: { event_id: "901", event_registration_id: "reg-9" } },
+      { params: { checkout: 2 } },
+    );
+    expect(razorpay).toMatchObject({ key: "rzp_test_club_not_real", order_id: "order_9", amount: 25000, prefill: { name: "Asha Rao", email: "asha@example.org", contact: "98765 43210" } });
+    expect(window.Razorpay.mock.instances[0].open).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /Opening payment/ })).toBeDisabled();
+
+    await act(() => razorpay.handler({ razorpay_order_id: "order_9", razorpay_payment_id: "pay_9" }));
+    expect(post).toHaveBeenCalledWith("/api/v1/payments/verify", { razorpay_order_id: "order_9", razorpay_payment_id: "pay_9" });
+    expect(await screen.findByText("Payment received — your ticket for Hack Night 04 is ready.")).toBeInTheDocument();
+    // Read again: the row is a ticket now.
+    expect(await screen.findByRole("link", { name: "View ticket for Hack Night 04" })).toHaveAttribute("href", "/tickets/MOA7Q4K2X");
+    expect(screen.queryByRole("button", { name: /Finish payment/ })).toBeNull();
+    // The form was never sent again (it would be refused past the deadline).
+    expect(posted()).toEqual(["/api/v1/payments/orders", "/api/v1/payments/verify"]);
+  });
+
+  it("counts 409 ALREADY_PAID from the order as paid: no checkout, the list again", async () => {
+    post.mockImplementation(async () => {
+      paidNow = true;
+      throw refusal(409, "This registration is already paid for.", "ALREADY_PAID", { event_registration_id: "already paid" });
+    });
+    show("/me/tickets");
+    fireEvent.click(await button());
+    expect(await screen.findByText("Payment received — your ticket for Hack Night 04 is ready.")).toBeInTheDocument();
+    expect(window.Razorpay).not.toHaveBeenCalled();
+    expect(await screen.findByRole("link", { name: "View ticket for Hack Night 04" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("counts 409 ALREADY_PAID from the check as paid too", async () => {
+    post.mockImplementation(async (url) => {
+      if (url === "/api/v1/payments/orders") return { data: ORDER };
+      paidNow = true;
+      throw refusal(409, "This order is already paid.", "ALREADY_PAID");
+    });
+    show("/me/tickets");
+    fireEvent.click(await button());
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    await act(() => razorpay.handler({ razorpay_order_id: "order_9", razorpay_payment_id: "pay_9" }));
+    expect(await screen.findByText("Payment received — your ticket for Hack Night 04 is ready.")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("counts 422 NOTHING_TO_PAY as nothing due", async () => {
+    post.mockImplementation(async () => {
+      paidNow = true;
+      throw refusal(422, "There is nothing to pay for this registration.", "NOTHING_TO_PAY");
+    });
+    show("/me/tickets");
+    fireEvent.click(await button());
+    expect(await screen.findByRole("link", { name: "View ticket for Hack Night 04" })).toBeInTheDocument();
+    expect(window.Razorpay).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("takes the form's old way when the server doesn't say which registration it is (before registration_id)", async () => {
+    info = { id: 901, has_fee: true, is_registered: true, ticket_id: "MOA7Q4K2X" };
+    show("/me/tickets");
+    fireEvent.click(await button());
+    expect(await screen.findByText("the registration form")).toBeInTheDocument();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when the event is over (EVENT_ENDED), and charges nothing", async () => {
+    post.mockRejectedValue(refusal(409, "This event is over; it can no longer be paid for.", "EVENT_ENDED"));
+    show("/me/tickets");
+    fireEvent.click(await button());
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("This event is over");
+    expect(alert).toHaveTextContent("It can't be paid for any more, so nothing was charged.");
+    expect(window.Razorpay).not.toHaveBeenCalled();
+    expect(await button()).not.toBeDisabled();
+  });
+
+  it.each([
+    ["REGISTRATION_NOT_FOUND", 404, "We couldn't find your registration"],
+    ["EVENT_NOT_FOUND", 404, "This event isn't available any more"],
+    ["EVENT_FULL", 400, "This event filled up"],
+  ])("says %s in words", async (code, status, title) => {
+    post.mockRejectedValue(refusal(status, "refused", code));
+    show("/me/tickets");
+    fireEvent.click(await button());
+    expect(await screen.findByRole("alert")).toHaveTextContent(title);
+  });
+
+  it("after a closed checkout, says the registration is kept and nothing was charged", async () => {
+    post.mockResolvedValue({ data: ORDER });
+    show("/me/tickets");
+    fireEvent.click(await button());
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    act(() => razorpay.modal.ondismiss());
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Payment not completed");
+    expect(alert).toHaveTextContent("nothing was charged. Your registration is kept");
+  });
+
+  it.each([
+    ["PAYMENT_ORDER_MISMATCH", 400, "That payment was for a different order", /write to support@myotherapp\.in before paying again/],
+    ["UNSUPPORTED_PAYMENT_METHOD", 400, "That payment method isn't accepted here", /Pay with UPI, a card, netbanking or a wallet/],
+    ["PAYMENT_NOT_FOUND", 404, "Razorpay hasn't confirmed your payment yet", /don't pay again/],
+    ["ORDER_NOT_FOUND", 404, "We couldn't match your payment to its order", /your ticket will reach asha@example\.org/],
+  ])("says a refused check (%s) in words", async (code, status, title, text) => {
+    post.mockImplementation(async (url) => {
+      if (url === "/api/v1/payments/orders") return { data: ORDER };
+      throw refusal(status, "refused", code);
+    });
+    show("/me/tickets");
+    fireEvent.click(await button());
+    await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
+    await act(() => razorpay.handler({ razorpay_order_id: "order_9", razorpay_payment_id: "pay_9" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(title);
+    expect(alert.textContent).toMatch(text);
   });
 });
 
