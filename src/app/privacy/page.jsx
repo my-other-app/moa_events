@@ -1,10 +1,15 @@
-import ClientPage from "../_client/pages";
+import { SitePage } from "@/components/discover/chrome";
+import { LegalPage } from "@/components/discover/legalpage";
 import { LEGAL } from "@/content/legal";
 import { pageMetadata } from "@/seo/metadata";
 
-/* Privacy. CLIENT PAGE (@/components/discover/legalpage); its words are in @/content/legal. */
+/* Privacy. SERVER-RENDERED and static (made at build time): its words are @/content/legal's. /privacy#delete-account is the account-deletion page Google Play links to. */
 export const metadata = pageMetadata({ title: LEGAL.privacy.title, description: LEGAL.privacy.description, path: LEGAL.privacy.path });
 
 export default function Privacy() {
-  return <ClientPage name="privacy" />;
+  return (
+    <SitePage>
+      <LegalPage doc={LEGAL.privacy} />
+    </SitePage>
+  );
 }

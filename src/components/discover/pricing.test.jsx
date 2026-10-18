@@ -1,19 +1,32 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { plansResponse } from "@/test/plansFixture";
-import { parsePlans } from "@/utils/pricing";
-import { Pricing } from "./pricing";
 
+const get = vi.fn();
+vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
+
+const { parsePlans } = await import("@/utils/pricing");
+const { Pricing } = await import("./pricing");
+
+/*
+ * The plans block. The server reads the plans and renders it whole (the
+ * cards and the table are in the HTML); the island switches the cycle.
+ * Without the server's plans (null), it asks the API from the browser.
+ */
 const SIGNUP = "https://clubs-next.myotherapp.in/signup";
-const ready = (over = {}) => ({ status: "ready", data: parsePlans(plansResponse()), retry: vi.fn(), ...over });
+const ready = () => parsePlans(plansResponse());
 
-const show = (plans = ready(), props = {}) =>
+const show = (data = ready(), props = {}) =>
   render(
     <MemoryRouter>
-      <Pricing plans={plans} {...props} />
+      <Pricing data={data} {...props} />
     </MemoryRouter>
   );
+
+beforeEach(() => {
+  get.mockReset();
+});
 
 /** A plan's card, found by its name. */
 const card = (name) => screen.getByRole("heading", { level: 3, name }).closest("li");
@@ -161,29 +174,37 @@ describe("the comparison", () => {
 });
 
 describe("before and without the plans", () => {
-  it("says it is loading, with no price on the page", () => {
-    const { container } = show({ status: "loading", data: null, retry: vi.fn() });
+  it("with the server's plans, asks for nothing", () => {
+    show();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("without them, says it is loading, with no price on the page, while the browser asks", () => {
+    get.mockReturnValue(new Promise(() => {}));
+    const { container } = show(null);
     expect(screen.getByRole("status")).toHaveTextContent("Pricing is loading…");
     expect(container.querySelector("[aria-busy='true']")).not.toBeNull();
     expect(container.textContent).not.toMatch(/₹/);
+    expect(get).toHaveBeenCalledWith("/api/v1/plans", { skipAuth: true });
   });
 
-  it("when the API fails: calm words, the dashboard's plans, and a retry — never a broken page", () => {
-    const retry = vi.fn();
-    const { container } = show({ status: "error", data: null, retry });
-    expect(screen.getByRole("heading", { name: "Pricing is loading…" })).toBeInTheDocument();
+  it("when the API fails: calm words, the dashboard's plans, and a retry — never a broken page", async () => {
+    get.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ data: plansResponse() });
+    const { container } = show(null);
+    expect(await screen.findByRole("heading", { name: "Pricing is loading…" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "See plans in the dashboard" })).toHaveAttribute("href", SIGNUP);
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(retry).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.queryByText("Most popular")).toBeNull();
     expect(container.textContent).not.toMatch(/₹/);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("Most popular")).toBeInTheDocument());
+    expect(get).toHaveBeenCalledTimes(2);
   });
 
   it("has no switch when no plan is sold both ways", () => {
     const monthlyOnly = plansResponse();
     monthlyOnly.plans.forEach((p) => (p.price_yearly_paise = 0));
-    show({ status: "ready", data: parsePlans(monthlyOnly), retry: vi.fn() });
+    show(parsePlans(monthlyOnly));
     expect(screen.queryByRole("group", { name: "Billing period" })).toBeNull();
     expect(within(card("Growth")).getByText("₹699")).toBeInTheDocument();
   });

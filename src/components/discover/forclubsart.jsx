@@ -1,3 +1,5 @@
+"use client";
+
 import { useId } from "react";
 import { COVER_PALETTES } from "@/utils/cover";
 

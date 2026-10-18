@@ -1,40 +1,29 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { LEGAL, PRIVACY, TERMS, plainText, updatedLabel } from "@/content/legal";
+import { AboutView } from "./aboutpage";
+import { SitePage } from "./chrome";
+import { LegalPage } from "./legalpage";
 
-const get = vi.fn();
-vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
-
-const { AppRoutes } = await import("@/test/routes");
-const { PRIVACY, TERMS, plainText } = await import("@/content/legal");
-
-const at = (path) =>
+/*
+ * The site's own pages as the server renders them (src/app/about, privacy,
+ * terms): their words are all in the HTML. Their heads are tested with the
+ * routes (src/app/_tests/static-routes.test.js). The legal tests read the
+ * text from @/content/legal, so they hold whatever its words are.
+ */
+const at = (path, page) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
+      <SitePage>{page}</SitePage>
     </MemoryRouter>
   );
 
-const head = (selector) => document.head.querySelector(selector);
-
-beforeEach(() => {
-  get.mockReset();
-  window.scrollTo = vi.fn();
-  get.mockImplementation(async (url) => {
-    if (url === "/api/v1/discover/home") return { data: { stats: { upcoming_events: 128, clubs: 42, cities: 1 } } };
-    throw Object.assign(new Error("404"), { response: { status: 404 } });
-  });
-});
-
-describe("the site's own pages", () => {
-  it("serves /about, never as an old event address, with the live numbers and both kinds of people it is for", async () => {
-    at("/about");
+describe("/about", () => {
+  it("is who it is for, with the live numbers", () => {
+    at("/about", <AboutView stats={{ upcoming_events: 128, clubs: 42, cities: 1 }} />);
     expect(screen.getByRole("heading", { level: 1, name: /Where student clubs run their events/ })).toBeInTheDocument();
-    // Asked for the home numbers, and nothing about an event called "about".
-    await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/discover/home", expect.anything()));
-    expect(get).not.toHaveBeenCalledWith("/api/v1/discover/events/about", expect.anything());
-
-    const live = (await screen.findByText("On MyOtherApp right now")).closest(".dc-about-live");
+    const live = screen.getByText("On MyOtherApp right now").closest(".dc-about-live");
     expect(live).toHaveTextContent("128 upcoming events");
     expect(live).toHaveTextContent("42 clubs");
     // One city is not worth a number.
@@ -56,62 +45,43 @@ describe("the site's own pages", () => {
     expect(within(screen.getByRole("region", { name: /three steps/ })).getAllByRole("listitem")).toHaveLength(3);
     expect(screen.getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
     expect(within(screen.getByRole("main")).getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
-
-    await waitFor(() => expect(document.title).toBe("About MyOtherApp"));
-    expect(head('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/about");
-    expect(head('meta[property="og:url"]')).toHaveAttribute("content", "https://myotherapp.in/about");
-    expect(head('meta[name="robots"]')).toBeNull();
   });
 
-  it("shows the mark instead of numbers when the numbers can't be had", async () => {
-    get.mockRejectedValue(new Error("offline"));
-    const { container } = at("/about");
-    await waitFor(() => expect(container.querySelector(".dc-about-live--mark")).not.toBeNull());
+  it("shows the mark instead of numbers when the numbers couldn't be had", () => {
+    const { container } = at("/about", <AboutView stats={null} />);
+    expect(container.querySelector(".dc-about-live--mark")).not.toBeNull();
     expect(screen.queryByText("On MyOtherApp right now")).toBeNull();
   });
+});
 
-  it("serves the Privacy Policy as a page to read: headings, lists, when it last changed, indexable", async () => {
-    at("/privacy");
-    const main = screen.getByRole("main");
-    expect(within(main).getByRole("heading", { level: 1, name: "Privacy Policy" })).toBeInTheDocument();
-    expect(within(main).getByText("Last updated", { exact: false })).toHaveTextContent("Last updated 20 May 2025");
-    expect(main.querySelector("time")).toHaveAttribute("dateTime", "2025-05-20");
-    const sections = within(main).getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(sections).toEqual(expect.arrayContaining(PRIVACY.sections.map((s) => s.heading)));
-    const collect = within(main).getByRole("region", { name: "1. What We Collect" });
-    expect(within(collect).getAllByRole("listitem")).toHaveLength(4);
-    expect(within(collect).getByText("Basic Info:")).toContainHTML("Basic Info:");
-    expect(within(main).getAllByRole("link", { name: "support@myotherapp.in" })[0]).toHaveAttribute("href", "mailto:support@myotherapp.in");
-    // The section list jumps to each part.
-    expect(within(screen.getByRole("navigation", { name: "On this page" })).getByRole("link", { name: "6. Cookies & Tracking" })).toHaveAttribute(
-      "href",
-      "#cookies-and-tracking"
-    );
-    // The old name is gone.
-    expect(main.textContent).not.toMatch(/Finnet/i);
-    expect(main.textContent).toContain("Welcome to MyOtherApp! We care about your privacy");
+describe("the legal pages", () => {
+  for (const doc of [PRIVACY, TERMS]) {
+    it(`serve the ${doc.title} as a page to read: every heading and line, when it last changed, a list of its parts`, () => {
+      at(doc.path, <LegalPage doc={doc} />);
+      const main = screen.getByRole("main");
+      expect(within(main).getByRole("heading", { level: 1, name: doc.title })).toBeInTheDocument();
+      expect(within(main).getByText("Last updated", { exact: false })).toHaveTextContent(`Last updated ${updatedLabel(doc.updated)}`);
+      expect(main.querySelector("time")).toHaveAttribute("dateTime", doc.updated);
+      const toc = screen.getByRole("navigation", { name: "On this page" });
+      for (const s of doc.sections) {
+        const section = within(main).getByRole("region", { name: s.heading });
+        expect(section).toHaveAttribute("id", s.id);
+        expect(within(toc).getByRole("link", { name: s.heading })).toHaveAttribute("href", `#${s.id}`);
+        const lists = s.blocks.filter(([kind]) => kind === "ul" || kind === "ol");
+        expect(section.querySelectorAll("ul, ol")).toHaveLength(lists.length);
+      }
+      // Every line of the text is on the page, bold and links included.
+      const text = main.textContent.replace(/\s+/g, " ");
+      for (const [kind, body] of [...doc.intro, ...doc.sections.flatMap((s) => s.blocks)]) for (const line of kind === "ul" || kind === "ol" ? body : [body]) expect(text).toContain(plainText(line));
+      expect(main.textContent).not.toMatch(/Finnet/i);
+      // And it links across to the other.
+      const other = doc.key === "privacy" ? LEGAL.terms : LEGAL.privacy;
+      expect(within(screen.getByRole("complementary", { name: "More" })).getByRole("link", { name: new RegExp(other.title) })).toHaveAttribute("href", other.path);
+    });
+  }
 
-    await waitFor(() => expect(document.title).toBe("Privacy Policy · MyOtherApp"));
-    expect(head('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/privacy");
-    expect(head('meta[name="description"]').getAttribute("content")).toMatch(/collects, uses/);
-    expect(head('meta[name="robots"]')).toBeNull();
-  });
-
-  it("serves the Terms with every part of the app's text, and links across to the policy", async () => {
-    at("/terms");
-    const main = screen.getByRole("main");
-    expect(within(main).getByRole("heading", { level: 1, name: "Terms and Conditions" })).toBeInTheDocument();
-    for (const s of TERMS.sections) expect(within(main).getByRole("heading", { level: 2, name: s.heading })).toBeInTheDocument();
-    expect(within(main).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toContain("Exclusions and Jurisdiction");
-    const duties = within(main).getByRole("region", { name: "User Responsibilities" });
-    expect(duties.querySelector("ol").children).toHaveLength(4);
-    // Every line of the text is on the page.
-    const text = main.textContent.replace(/\s+/g, " ");
-    for (const s of TERMS.sections)
-      for (const [kind, body] of s.blocks) for (const line of kind === "ul" || kind === "ol" ? body : [body]) expect(text).toContain(plainText(line));
-    expect(text).not.toMatch(/Myotherapp/);
-    expect(within(main.querySelector(".dc-prose")).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
-    await waitFor(() => expect(head('link[rel="canonical"]')).toHaveAttribute("href", "https://myotherapp.in/terms"));
-    cleanup();
+  it("write the support address as a link", () => {
+    at("/privacy", <LegalPage doc={PRIVACY} />);
+    expect(screen.getAllByRole("link", { name: "support@myotherapp.in" })[0]).toHaveAttribute("href", "mailto:support@myotherapp.in");
   });
 });

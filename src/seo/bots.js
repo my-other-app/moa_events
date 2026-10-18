@@ -21,11 +21,6 @@ export const BOT_PAGES = [
   { source: "/events", path: "/events" },
   { source: "/clubs", path: "/clubs" },
   { source: "/threads", path: "/threads" },
-  { source: "/about", path: "/about" },
-  { source: "/privacy", path: "/privacy" },
-  { source: "/terms", path: "/terms" },
-  { source: "/for-clubs", path: "/for-clubs" },
-  { source: "/pricing", path: "/pricing" },
   { source: "/events/:slug/:sub(register|live|compete)", path: "/events/:slug/:sub" },
 ];
 

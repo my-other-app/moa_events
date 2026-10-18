@@ -1,12 +1,7 @@
-import { useEffect, useState } from "react";
-import { discoverApi } from "@/api/discover";
-import { CLUBS_URL, SITE_URL } from "@/config";
+import { CLUBS_URL } from "@/config";
 import { FOR_CLUBS } from "@/content/forclubs";
 import { formatCount } from "@/utils/format";
-import { useJsonLd, usePageSeo } from "@/utils/meta";
-import { usePlans } from "@/utils/plans";
-import { cheapestPaid, formatMoney, loginUrl, plansJsonLd, signupUrl, yearlyOffer } from "@/utils/pricing";
-import { SitePage } from "./chrome";
+import { cheapestPaid, formatMoney, loginUrl, signupUrl, yearlyOffer } from "@/utils/pricing";
 import { Avatar } from "./bits";
 import { ClubFaq, ClubsCta } from "./clubsparts";
 import { HeroFan, PhaseArt } from "./forclubsart";
@@ -114,28 +109,15 @@ function Phase({ phase, index }) {
  * and after an event and in between, how a club gets on, the plans, the
  * questions organisers ask, and the way in. Every "Start free" and "Log in"
  * goes to the clubs dashboard; nothing here signs anyone up itself.
+ *
+ * Rendered on the server (src/app/for-clubs/page.jsx): `plans` and `home`
+ * (for the live numbers) as it read them, either null when it couldn't.
  */
-export default function ForClubsPage() {
-  usePageSeo({ title: FOR_CLUBS.title, description: FOR_CLUBS.description, path: FOR_CLUBS.path });
-  const plans = usePlans();
-  useJsonLd(plans.data ? plansJsonLd(plans.data, { url: `${SITE_URL}${FOR_CLUBS.path}`, siteUrl: SITE_URL, description: FOR_CLUBS.description }) : null);
-  const [home, setHome] = useState(null);
-
-  useEffect(() => {
-    let alive = true;
-    discoverApi.home().then(
-      (d) => alive && setHome(d),
-      () => {}
-    );
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const offer = yearlyOffer(plans.data?.yearlyMonthsFree);
+export function ForClubsView({ plans = null, home = null }) {
+  const offer = yearlyOffer(plans?.yearlyMonthsFree);
 
   return (
-    <SitePage>
+    <>
       <div className="dc-wrap">
         <section className="dc-hero2 fc-hero" aria-labelledby="fc-title">
           <div className="dc-hero2-copy">
@@ -160,7 +142,7 @@ export default function ForClubsPage() {
                 Log in
               </a>
             </p>
-            <PlanFacts data={plans.data} />
+            <PlanFacts data={plans} />
             <LiveStats home={home} />
           </div>
           <HeroFan />
@@ -212,12 +194,12 @@ export default function ForClubsPage() {
             <h2 id="fc-pricing-title">Plans that grow with your club</h2>
             <p>Start free, and move up when your events do.{offer ? ` Pay yearly and get ${offer}.` : ""}</p>
           </div>
-          <Pricing plans={plans} compare="link" />
+          <Pricing data={plans} compare="link" />
         </section>
 
-        <ClubFaq yearlyMonthsFree={plans.data?.yearlyMonthsFree ?? null} />
+        <ClubFaq yearlyMonthsFree={plans?.yearlyMonthsFree ?? null} />
         <ClubsCta />
       </div>
-    </SitePage>
+    </>
   );
 }
