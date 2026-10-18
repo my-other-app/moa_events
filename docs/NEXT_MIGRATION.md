@@ -1,6 +1,6 @@
 # The site on Next.js: what is where, and how to port the rest
 
-The public site moved from a Vite single-page app to Next.js 16 (App Router). Step 1 (this branch) built the foundation and server-rendered the pages search engines care most about: every event and every club. Every other page still renders in the browser exactly as before, at the same address. This document is the map, and the one pattern for porting the rest.
+The public site moved from a Vite single-page app to Next.js 16 (App Router). Step 1 built the foundation and server-rendered the pages search engines care most about: every event and every club. Step 2 server-rendered the rest of the public site: the home page, find events, find clubs, the posts and the site's own pages (about, privacy, terms, for clubs, pricing). The signed-in and transactional pages (registration, `/me/*`, the live room, the competition, play, feedback, tickets, certificates) are ported separately; until then they render in the browser exactly as before, at the same address. This document is the map, and the one pattern for porting the rest.
 
 ## How it fits together
 
@@ -18,7 +18,7 @@ src/api/                    the browser's API client (axios); parse.js holds the
 src/components/             the UI, unchanged in look; "use client" only where something reacts
 ```
 
-Reading the API on the server: `src/server/discover.js` (`getEventPage`, `getClubPage`, `getClubEvents`, `getEvents`, `getThread`, the sitemap's). Each returns the same parsed shapes the browser gets from `@/api/discover` (both use `@/api/parse`), `null` when the API says 404, and throws `ApiError` otherwise. Every read goes through Next's data cache (`revalidate: 60`, tagged `event:{ref}` / `club:{slug}` / `lists` / `sitemap`), and React's `cache()` makes a page's `generateMetadata` and the page share one read.
+Reading the API on the server: `src/server/discover.js` (`getEventPage`, `getClubPage`, `getClubEvents`, `getEvents`, `getNewestEvents`, `getClubs`, `getHome`, `getNearHome`, `getThreads`, `getThread`, `getComments`, `getPlans`, the sitemap's), and `src/server/listings.js` for the find pages' first page. Each returns the same parsed shapes the browser gets from `@/api/discover` (both use `@/api/parse`), `null` when the API says 404, and throws `ApiError` otherwise. Every read goes through Next's data cache (`revalidate: 60`, tagged `event:{ref}` / `club:{slug}` / `lists` / `sitemap`), and React's `cache()` makes a page's `generateMetadata` and the page share one read.
 
 Images: the API's posters, logos and photos are presigned S3 links that die within the hour. **No server-rendered HTML may hold one.** Before a page renders, `stableEventPage` / `stableClubPage` (src/seo/stabilize.js) swap every image for its `/media/...` address; `src/app/media/[...path]/route.jsx` looks the current link up and redirects (307, cached at most five minutes and never past the link's life; a link with under ten minutes left is fetched again past the caches). Components don't change: they render whatever address they get. Structured data and feeds use the same addresses; share pictures are `/og/events/{slug}` and `/og/clubs/{slug}`.
 
@@ -30,12 +30,16 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | --- | --- | --- | --- |
 | `/events/{slug}` | **SSR + ISR** | `events/[slug]/page.jsx` | Event + BreadcrumbList JSON-LD; islands: share, calendar, live strip, section tabs, "Read more", poster fallback |
 | `/clubs/{slug}` | **SSR + ISR** | `clubs/[slug]/page.jsx` | Organization (+ upcoming events) + BreadcrumbList; islands: follow (button, count, empty state, prompt), `?follow=` hint, visit count, Show more |
-| `/` | Client | `page.jsx` → `homepage` | server head + Organization and WebSite (SearchAction) JSON-LD, RSS link |
-| `/events` | Client | `events/page.jsx` → `eventspage` | filters in the query; RSS link |
-| `/clubs` | Client | `clubs/page.jsx` → `clubspage` | |
-| `/threads`, `/threads/{id}` | Client | `threads/…` → `threadspage` | a post is read as the signed-in person |
-| `/about`, `/privacy`, `/terms` | Client | → `aboutpage`, `legalpage` | static words: the easiest to port |
-| `/for-clubs`, `/pricing` | Client | → `forclubspage`, `pricingpage` | plans from `/api/v1/plans` |
+| `/` | **SSR + ISR** | `page.jsx` + `homepage.jsx` | the same for everyone: hero, categories, numbers, this week, clubs, online, popular, posts; Organization and WebSite (SearchAction) JSON-LD, RSS link. Islands: near you (`/api/near`, below), the search and its place |
+| `/events` | **Dynamic** (edge-cached 60 s) | `events/page.jsx` + `eventspage.jsx` | filters in the query; the first 12 events, chips and count in the HTML; ItemList JSON-LD; canonical / noindex rules below; RSS link to the same list. Islands: filters, place, sheet, dates, order, "Load more", the calendar (`?view=calendar`) |
+| `/clubs` | **Dynamic** (edge-cached 60 s) | `clubs/page.jsx` + `clubspage.jsx` | the same for clubs (`interest`, `sort`, `radius_km`, `near`); ItemList |
+| `/threads` | **SSR + ISR** | `threads/page.jsx` + `threadspage.jsx` | the first 12 posts; "Load more" and the signed-in line are islands |
+| `/threads/{id}` | **SSR + ISR** | `threads/[id]/page.jsx` | the post (read as nobody), counts, comments; DiscussionForumPosting + BreadcrumbList; like, vote, "Add a comment" are islands (read again as the signed-in reader); gone → `threads/[id]/not-found.jsx` (404) |
+| `/about` | **SSR + ISR** | `about/page.jsx` + `aboutpage.jsx` | words from `@/content/about`, the home page's numbers |
+| `/privacy`, `/terms` | **Static** | `privacy/page.jsx`, `terms/page.jsx` + `legalpage.jsx` | words from `@/content/legal` |
+| `/for-clubs` | **SSR + ISR** | `for-clubs/page.jsx` + `forclubspage.jsx` | plans and numbers in the HTML; the plans' SoftwareApplication JSON-LD; the billing switch is the island, the drawings client components |
+| `/pricing` | **SSR + ISR** (5 min) | `pricing/page.jsx` + `pricingpage.jsx` | every card and the comparison table in the HTML; SoftwareApplication with an Offer per plan and cycle |
+| `/api/near` | Route handler | `api/near/route.js` | near one visitor, for the home page (below) |
 | `/me/tickets`, `/me/following` | Client | `me/…` → `mepages` | signed in; `noindex`; `/me` → 307 `/me/tickets` (next.config) |
 | `/events/{slug}/register` | Dynamic + client | `events/[slug]/register/page.jsx` → `register` | the server finds the event (404, 308 from an old slug with the query); `noindex` |
 | `/events/{slug}/live`, `/compete` | Dynamic + client | → `live`, `compete` | same |
@@ -46,7 +50,7 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | `/robots.txt` | Metadata route | `robots.js` | |
 | `/media/...` | Route handler | `media/[...path]/route.jsx` | stable image addresses (307) and the drawn cover (PNG) |
 | `/og/events/{slug}`, `/og/clubs/{slug}` | Route handler | `og/…/route.jsx` | 1200×630 share pictures, `?v=` changes with what they show |
-| `/api/share/{path}` (or `?path=`) | Route handler | `api/share/[...path]/route.js` | the preview page bots get for client pages (below) |
+| `/api/share/{path}` (or `?path=`) | Route handler | `api/share/[...path]/route.js` | the preview page bots get for client pages (below); only the registration, live and competition pages still use it |
 | `/api/revalidate` | Route handler | `api/revalidate/route.js` | `POST`, `Bearer REVALIDATE_SECRET`: `{events, clubs, sitemap}` |
 | anything else | 404 | `not-found.jsx` | the old 404 page; clubs have their own (`clubs/[slug]/not-found.jsx`) |
 
@@ -74,7 +78,7 @@ The site's own words (`events`, `clubs`, `about`, …) have their own routes, wh
 
 ## Link-preview bots
 
-WhatsApp, Telegram, Slack, X, LinkedIn, Facebook, Discord and search engines read the HTML they are sent. Server-rendered pages need no help. For **client pages**, next.config.mjs rewrites a bot's request (by user agent) to `/api/share/{the same path}`, which answers with the page's title, description, picture and words. The list is `BOT_PAGES` in `src/seo/bots.js`. **When you port a page, delete its line there.** When the last one goes, delete `src/server/share`, `src/app/api/share` and `src/seo/bots.js`.
+WhatsApp, Telegram, Slack, X, LinkedIn, Facebook, Discord and search engines read the HTML they are sent. Server-rendered pages need no help. For **client pages** (now only registration, the live room and the competition under `/events/{slug}/`), next.config.mjs rewrites a bot's request (by user agent) to `/api/share/{the same path}`, which answers with the page's title, description, picture and words. The list is `BOT_PAGES` in `src/seo/bots.js`. **When you port a page, delete its line there.** When the last one goes, delete `src/server/share`, `src/app/api/share` and `src/seo/bots.js`.
 
 ## Porting a page: the one pattern
 
@@ -107,12 +111,34 @@ The event and club pages are the worked examples (`events/[slug]/page.jsx` + `co
 
 `src/app/_client/pages.jsx`, the bot rewrites (`src/seo/bots.js`, next.config's `beforeFiles` bot entries), `src/server/share` and `src/app/api/share`, `src/utils/meta.js`, and `react-router-dom` (a dev dependency kept only for the tests' router; the shim can then call `next/navigation` without the adapter).
 
+## Near you on the home page
+
+The home page is one static page for everyone (ISR, at most once a minute): the hero, this week, the clubs, online, popular and the posts are in its HTML, read with no place. "Events near you" (and, once the visitor is placed, "Clubs near …" instead of the most followed) is the `NearYou` island (`homeislands.jsx`): once the page is in the browser it asks **`/api/near`**, which places the visitor on the server:
+
+1. the point they shared in this browser ("Use my location", `?lat=&lng=`), else
+2. Vercel's guess from their connection: `x-vercel-ip-latitude`, `-longitude`, `-city` go to the API as the point (the city names it when the API names none), else
+3. their address, as `X-Visitor-IP` (when `API_SITE_TOKEN` is set), for the API to place them itself, else
+4. nowhere: an empty answer, without asking the API (it would place this server).
+
+A guess is the same for everyone Vercel puts at the same spot, so that answer is kept at the edge for a minute (stale for five more while it is remade), `Vary: X-Vercel-IP-Latitude, X-Vercel-IP-Longitude, X-Vercel-IP-City`: one copy per place, never another place's. An answer for a shared point or an address is the visitor's alone (`private, max-age=60`). Sharing or forgetting a location asks again.
+
+**Why not a page rendered per request with the geo headers.** Measured against the production API with `next start`: the static home answers in 1–12 ms (on Vercel, from the edge, for everyone, with no function run); a page rendered per visit has to read `/discover/home` for the place first, 0.3–1.1 s on a miss, and with the edge varied by city a site with visitors in many towns and modest traffic misses most of the time. The near-you answer is 2 KB and arrives a moment after the page; the rest of the page never waits for it, and the edge copy per place is shared. Crawlers (which come from the US) get the full, place-free page rather than an empty "near Mountain View". The cost: the near-you rail is filled after the first paint (a skeleton holds its place, and it collapses when there is nothing near).
+
+## The find pages: addresses, canonicals, the place
+
+Every filter of `/events` lives in the address (`q`, `when`, `from`/`to`, `category`, `type`, `price`, `sort`, `radius_km`, `near`, plus `view=calendar&month=`), and the server renders the first page for it. `near=lat,lng` is the place; without it the list is **everywhere** (radius 0, no distances, no order by distance), so the HTML depends on the address alone and the edge keeps each address a minute (`Vercel-CDN-Cache-Control` in next.config). A place the visitor kept in this browser is put into the address on arrival (with the order by distance a link asked for). `/clubs` works the same way.
+
+Which addresses search engines keep (`src/seo/listings.js`): the page itself (an order alone counts as the page: canonical `/events`), and one browsing filter alone with something in it, at its own tidy canonical (`/events?category=3`, `?type=online`, `?price=free`, `?when=this_week`; `/clubs?interest=4`). Every other mix (words, days, a place, a radius, the calendar, two filters) is `noindex, follow` with no canonical. Tracking parameters never reach a canonical. Category chips are real links, so crawlers can reach the kept addresses.
+
 ## Known limits and follow-ups
 
 - The whole stylesheet (157 KB, 29 KB gzipped) loads on every page, as it did before. Splitting it per route is safe once the client pages are ported.
-- An event's page is about 60 KB of HTML (a very full one, with a dozen speakers and agenda items, about 140 KB; 16 KB gzipped). React sends server-rendered parts twice (HTML and its own data); keep big, static, prop-light things as client components and pass islands few props.
+- Page weights (HTML, production data): home 90 KB (13 KB gzipped), /events 42 KB, /clubs 32 KB, /threads 24 KB, a post 27 KB, /about 40 KB, /privacy 30 KB, /terms 40 KB, /pricing 100 KB (12 KB gzipped; 35 KB of it the table's tick icons), /for-clubs 154 KB (25 KB gzipped; 68 KB of it the drawings). Event and club cards are client components (much markup, little data), so a list sends each card's data, not its markup twice.
 - `/events/{old slug}?query` loses its query in the 308 (the page is ISR). Ids and the old top-level addresses keep it.
-- The feeds fetch each event's page for its words (cached, at most 6 s in all): see below for the backend change that removes this.
+- The feeds read each event's page for its words only for cards without `summary` (an older API); with it, none.
+- Import `JsonLd` as `@/seo/JsonLd.jsx`: on a case-blind disk (macOS) vitest resolves `@/seo/JsonLd` to `jsonld.js`.
+- Later pages of a list ("Load more"), the calendar's month and the date picker's dots are read by the browser from the API directly, as before (on localhost that needs the browser's CORS checks off).
+- Past 1,000 results the API stops counting (`total: 1000`, `total_capped: true`): the pages say "1,000+", and "Load more" goes on until a page comes back short.
 
 ## What the backend should add (for better search results)
 
@@ -121,10 +147,10 @@ The site reads only what the discover API sends; these would make the pages, str
 1. **Paged sitemap** (in progress on `perf/discover-scale-2`): `GET /discover/sitemap/index` → `{page_size, pages: [{kind: "events"|"clubs", page, entries, updated_at}]}` and `GET /discover/sitemap/{kind}/{page}` → `{kind, page, pages, items: [{slug, updated_at}]}`, 404 past the last page. The site tries `/sitemap/index` first and falls back to `/discover/sitemap` on a 404, so nothing needs switching on. Please keep page boundaries stable (id order), and include every public event, past ones too (they stay indexable), not just the last year.
 2. **On-demand revalidation**: when an event or club is published, edited, cancelled or unpublished, `POST https://myotherapp.in/api/revalidate` with `Authorization: Bearer <REVALIDATE_SECRET>` and `{"events": ["<slug>", "<id>"], "clubs": ["<slug>"], "sitemap": true}`. Pages then change within seconds instead of a minute, and an unpublished event stops being served from the cache at once.
 3. **Event status**: `cancelled`, `postponed`, `rescheduled` (with `previous_starts_at`) and `moved_online` on the event page, kept public with the status rather than a 404. The structured data then says `EventCancelled` / `EventPostponed` / `EventRescheduled` / `EventMovedOnline` (today it is always `EventScheduled`), and the page can say so.
-4. **When it changed and when it went up**: `updated_at` on the event page and on cards (sitemap `lastmod`, `dateModified`), and `published_at` (or `created_at`) on cards, for the feeds' `pubDate` and "newest first" (today: the start time and the id). A `sort=newest` on `/discover/events` would let the feed take the 50 newest directly.
-5. **A short summary on cards**: `summary` (the first ~300 characters of `about`) on `/discover/events` items. The feeds then need no per-event read (today they fetch each event's page, cached, within a 6-second budget).
+4. **When it changed and when it went up** (done on `perf/discover-scale-2`): `updated_at` and `created_at` on the event page and on cards; events have no separate publish time, so the site reads `published_at ?? created_at` for the feeds' `pubDate` and "newest first". The feed asks `/discover/events?sort=newest` (created first, then id, newest first: one read, in the API's order); an API that answers that with 422 gets the old way (120 by date, sorted here by `published_at`/`created_at`, else the id).
+5. **A short summary on cards** (done there too): `summary`, plain text of at most 200 characters, on cards and the event page. The feeds use it and read no event's page; a card without one (an older API) still has its page read (cached, within a 6-second budget).
 6. **A real venue address**: `locality` (city), `region` (state), `postal_code`, `country` for an event's venue, and a city for clubs. Google recommends them in an Event's `PostalAddress`; today the site can only send the venue's name as `streetAddress`.
 7. **Attendance mode**: in person, online, or both, explicitly. Today "both" is guessed from an online event that also has a pinned venue.
 8. **Stable image addresses**: public, content-addressed URLs (CloudFront, or a public-read bucket) instead of presigned links that expire within the hour. `/media/...` keeps working either way, but the redirect hop and its API read go away, and `next/image` could resize posters. At the least, presign for days, not an hour.
-9. **Rate limits**: the site's server now reads the API from Vercel's addresses, shared by every visitor. Either exempt requests carrying `X-Site-Token` (set `API_SITE_TOKEN` on both sides) from the 120/minute per-address limit, or trust Vercel's `X-Forwarded-For`. Without lat/lng the API also places "the visitor" by that server address; the site works around it by asking for everywhere (`radius_km=0`) on the server.
+9. **Rate limits and who is asking** (done on the backend, PR #70): the site's server reads the API from Vercel's addresses, shared by every visitor. With `API_SITE_TOKEN` set (both sides), every server read sends `X-Site-Token`, and the API counts all of them in one bucket for the token (3000 a minute), not per visitor. Every read made for one visitor (the find pages, `/api/near`) also sends `X-Visitor-IP: <their address>` (the first hop of Vercel's `X-Forwarded-For`, else `X-Real-IP`), used only to place them. Reads made for nobody (ISR pages, feeds, sitemaps, media and share pictures) send the token alone. (Next's data cache keys a read by its headers, so a visitor's address also keeps their answer to themselves; shared reads stay shared.) Until the API trusts `X-Visitor-IP`, a read without a point would be placed by the server's address, so the site asks for everywhere (`radius_km=0`) unless the visitor's address goes along.
 10. **Test events**: production lists `[TEST] …` events; they are public, so they are in the sitemap and feeds and will be indexed. Mark them unlisted (or not public).

@@ -2,7 +2,7 @@
 
 https://myotherapp.in: events and clubs near you, each event's and club's page, the clubs' posts, registration, tickets, the live room. (www.myotherapp.in and events.myotherapp.in redirect to it.)
 
-Next.js 16 (App Router), React 19, plain JavaScript. Event and club pages are rendered on the server and regenerated at most once a minute (ISR); the rest of the pages still render in the browser while they are ported. **How the site is put together, which page is which, and how to port the rest: [docs/NEXT_MIGRATION.md](docs/NEXT_MIGRATION.md).**
+Next.js 16 (App Router), React 19, plain JavaScript. Every public page is rendered on the server: events, clubs, posts, the home page and the site's own pages are regenerated at most once a minute (ISR); the find pages (`/events`, `/clubs`) are rendered for their address and kept a minute at the edge. The signed-in and transactional pages (registration, tickets, the live room) still render in the browser while they are ported. **How the site is put together, which page is which, and how to port the rest: [docs/NEXT_MIGRATION.md](docs/NEXT_MIGRATION.md).**
 
 ## Run it
 
@@ -30,7 +30,7 @@ Set these on the Vercel project (Production and Preview). `NEXT_PUBLIC_*` values
 | `NEXT_PUBLIC_PLAY_STORE_URL` | `VITE_PLAY_STORE_URL` | "Get the app" on Android | the Play Store listing |
 | `NEXT_PUBLIC_APP_STORE_URL` | `VITE_APP_STORE_URL` | "Get the app" on iPhone; unset, it says "coming soon" | none |
 | `REVALIDATE_SECRET` | (new, optional) | Turns on `POST /api/revalidate` (the API saying an event or club changed) | off |
-| `API_SITE_TOKEN` | (new, optional) | Sent to the API as `X-Site-Token`, for it to tell the site's server from a visitor | not sent |
+| `API_SITE_TOKEN` | (new, optional) | Sent to the API as `X-Site-Token` on every server read, for it to tell the site's server from a visitor; the API counts all site reads in one bucket for the token. With it, reads made for one visitor also send `X-Visitor-IP` (their address, from Vercel's `X-Forwarded-For`), used only to place them. Never sent from the browser | not sent |
 
 `MOA_API_URL` (the old link-preview function's) is still read by the server as a last fallback; it can be removed.
 
