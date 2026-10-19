@@ -11,13 +11,16 @@
  * What the app opens itself (the app's router maps each one to its screen,
  * lib/app/router/web_links.dart in moa_mobileapp):
  *
+ *   /events?…                       Find events, with the same filters
  *   /events/{slug or id}            the event's page
  *   /events/{slug}/register         registration
- *   /clubs/{slug}                   the club's page
- *   /threads/{id}                   the post
+ *   /events/{slug}/compete          the team and submission
+ *   /clubs?…, /clubs/{slug}         the clubs directory, a club's page
+ *   /threads, /threads/{id}         every club's posts, a post
  *   /tickets/{id}                   the ticket (its QR works offline)
  *   /certificates/{id}              the certificate
- *   /topics/{slug}                  the topic
+ *   /topics, /topics/{slug}         the topics, a topic
+ *   /feedback/{event}/{reg}?k=      the survey from the email
  *
  * What stays in the browser, and why:
  *   - /events/{slug}/live: the live room is this site's page in the app too
@@ -25,17 +28,16 @@
  *     hop for the people in the room, most of whom scanned a QR on the
  *     screen. It also keeps the app's in-app browser from being handed the
  *     room's address back.
- *   - /events/{slug}/compete: the team and submission pages exist only here
- *     until the app has its own; then this line goes.
  *   - the feeds (rss.xml) under /events, /clubs and /topics: a feed reader's
  *     link, not a page.
- *   - /feedback, /play, /api, /og, /media, /for-clubs, /pricing: web-only
- *     pages and the server's own addresses. They sit outside the claimed
- *     paths anyway; they are listed so a wider claim later can't take them.
+ *   - /play, /api, /og, /media, /for-clubs, /pricing: web-only pages and the
+ *     server's own addresses. They sit outside the claimed paths anyway;
+ *     they are listed so a wider claim later can't take them.
+ *   - the home page, the policies, /about and /me: not claimed.
  *
  * Android's intent filters cannot leave a path out, so there the app is
- * handed /events/{slug}/live and …/compete too; its router opens the event
- * (and the room, for /live) and sends anything it can't show to the browser.
+ * handed /events/{slug}/live too; its router opens the event with the room,
+ * and sends anything it can't show to the browser.
  */
 
 /** The iOS app: Team ID and bundle id. */
@@ -45,18 +47,27 @@ export const IOS_APP_ID = "PX6QV826X4.app.myotherapp.com";
 export const ANDROID_PACKAGE = "app.myotherapp.com";
 
 /** The paths the apps open. */
-export const APP_PATHS = ["/events/*", "/clubs/*", "/threads/*", "/tickets/*", "/certificates/*", "/topics/*"];
+export const APP_PATHS = [
+  "/events",
+  "/events/*",
+  "/clubs",
+  "/clubs/*",
+  "/threads",
+  "/threads/*",
+  "/tickets/*",
+  "/certificates/*",
+  "/topics",
+  "/topics/*",
+  "/feedback/*",
+];
 
 /** The paths that stay in the browser, checked first (the first match wins). */
 export const BROWSER_PATHS = [
   ["/events/*/live", "The live room is the web page in the app too"],
   ["/events/*/live/*", "The live room is the web page in the app too"],
-  ["/events/*/compete", "Teams and submissions are web-only for now"],
-  ["/events/*/compete/*", "Teams and submissions are web-only for now"],
   ["/events/rss.xml", "A feed"],
   ["/clubs/*/rss.xml", "A feed"],
   ["/topics/*/rss.xml", "A feed"],
-  ["/feedback/*", "The survey from the email"],
   ["/play/*", "The quiz, joined from the live room"],
   ["/api/*", "The server's functions"],
   ["/og/*", "Share pictures"],

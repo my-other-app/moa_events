@@ -37,7 +37,7 @@ Set these on the Vercel project (Production and Preview). `NEXT_PUBLIC_*` values
 
 ## App links
 
-`/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` tell iOS and Android that the MyOtherApp app may open `/events/…`, `/clubs/…`, `/threads/…`, `/tickets/…`, `/certificates/…` and `/topics/…`. The live room (`/events/{slug}/live`), the competition pages, the feeds, `/feedback`, `/play`, `/api`, `/og`, `/media`, `/for-clubs` and `/pricing` stay in the browser on iPhone. What is claimed, and why, is in `src/seo/appLinks.js`. Only `myotherapp.in` is claimed: `www.` and `events.` redirect, and neither Apple nor Google follows a redirect for these files.
+`/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` tell iOS and Android that the MyOtherApp app may open `/events` and `/events/…`, `/clubs` and `/clubs/…`, `/threads` and `/threads/…`, `/topics` and `/topics/…`, `/tickets/…`, `/certificates/…` and `/feedback/…`. The live room (`/events/{slug}/live`), the feeds, `/play`, `/api`, `/og`, `/media`, `/for-clubs` and `/pricing` stay in the browser on iPhone. What is claimed, and why, is in `src/seo/appLinks.js`. Only `myotherapp.in` is claimed: `www.` and `events.` redirect, and neither Apple nor Google follows a redirect for these files.
 
 Check them after a deploy:
 

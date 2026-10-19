@@ -68,24 +68,27 @@ describe(AASA, () => {
     ["/tickets/abc-123", true],
     ["/certificates/abc-123", true],
     ["/topics/development", true],
-    // The live room and the competition stay on the web.
+    ["/events/hack-night-04/compete", true],
+    ["/feedback/123/456", true],
+    // The directories: the app's Discover screens.
+    ["/events", true],
+    ["/clubs", true],
+    ["/threads", true],
+    ["/topics", true],
+    // The live room stays on the web.
     ["/events/hack-night-04/live", false],
-    ["/events/hack-night-04/compete", false],
     // Feeds, the server's own addresses, web-only pages.
     ["/events/rss.xml", false],
     ["/clubs/circuit-society/rss.xml", false],
     ["/topics/development/rss.xml", false],
-    ["/feedback/123/456", false],
     ["/play/123", false],
     ["/api/share/events/x", false],
     ["/og/events/hack-night-04", false],
     ["/media/events/hack-night-04/poster", false],
     ["/for-clubs", false],
     ["/pricing", false],
-    // Not claimed: the home page, the directories, the old addresses, the policies.
+    // Not claimed: the home page, the old addresses, the policies, /me.
     ["/", false],
-    ["/events", false],
-    ["/clubs", false],
     ["/123", false],
     ["/123/live", false],
     ["/privacy", false],
