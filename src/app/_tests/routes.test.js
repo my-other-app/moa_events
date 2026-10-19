@@ -108,6 +108,9 @@ describe("which file answers which address", () => {
     ["/og/events/hack-night-04", "og/events/[slug]/route.jsx"],
     ["/og/clubs/circuit-society", "og/clubs/[slug]/route.jsx"],
     ["/og/topics/development", "og/topics/[slug]/route.jsx"],
+    // The apps' link files: answered where Apple and Google ask, never redirected.
+    ["/.well-known/apple-app-site-association", ".well-known/apple-app-site-association/route.js"],
+    ["/.well-known/assetlinks.json", ".well-known/assetlinks.json/route.js"],
   ])("%s → %s", async (url, file) => {
     if (file === null) return; // robots.txt is Next's own metadata route (src/app/robots.js)
     expect((await resolve(url)).file).toBe(file);
