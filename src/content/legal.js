@@ -26,7 +26,7 @@ export const PRIVACY = {
   intro: [
     [
       "p",
-      "Welcome to MyOtherApp! We care about your privacy. This policy explains what we collect when you use MyOtherApp (the app for iOS and Android, our website at myotherapp.in, the clubs dashboard at clubs-next.myotherapp.in, and the club websites we host), why we collect it, who sees it, how long we keep it, and the controls you have.",
+      "Welcome to MyOtherApp! We care about your privacy. This policy explains what we collect when you use MyOtherApp (the app for iOS and Android, our website at myotherapp.in, the clubs dashboard at club-dashboard.myotherapp.in, and the club websites we host), why we collect it, who sees it, how long we keep it, and the controls you have.",
     ],
     ["p", 'In this policy, "we", "us" and "our" mean MyOtherApp and the people who run it, named in our [Terms](/terms).'],
   ],
@@ -261,7 +261,7 @@ export const TERMS = {
   intro: [
     [
       "p",
-      'Welcome to MyOtherApp! These Terms and Conditions ("Terms") govern your access to and use of MyOtherApp: our mobile app for iOS and Android (the "App"), our website at myotherapp.in, the clubs dashboard at clubs-next.myotherapp.in, and the websites we host for clubs at their own myotherapp.in addresses or on their own domains (together, the "Service"). By downloading, installing, or using the Service, you agree to be bound by these Terms. If you do not agree with any part of these Terms, please do not use the Service.',
+      'Welcome to MyOtherApp! These Terms and Conditions ("Terms") govern your access to and use of MyOtherApp: our mobile app for iOS and Android (the "App"), our website at myotherapp.in, the clubs dashboard at club-dashboard.myotherapp.in, and the websites we host for clubs at their own myotherapp.in addresses or on their own domains (together, the "Service"). By downloading, installing, or using the Service, you agree to be bound by these Terms. If you do not agree with any part of these Terms, please do not use the Service.',
     ],
   ],
   sections: [

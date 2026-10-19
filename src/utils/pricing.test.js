@@ -24,7 +24,7 @@ import {
   yearlyOffer,
 } from "./pricing";
 
-const CLUBS = "https://clubs-next.myotherapp.in";
+const CLUBS = "https://club-dashboard.myotherapp.in";
 const data = parsePlans(plansResponse());
 const plan = (key) => data.plans.find((p) => p.key === key);
 const opts = { clubsUrl: CLUBS, contactEmail: "support@myotherapp.in" };
@@ -219,10 +219,10 @@ describe("features", () => {
 
 describe("where the buttons go", () => {
   it("sends each plan to the dashboard's sign-up with the plan and the cycle", () => {
-    expect(signupUrl(CLUBS, "growth", "yearly")).toBe("https://clubs-next.myotherapp.in/signup?plan=growth&cycle=yearly");
-    expect(signupUrl(`${CLUBS}/`, "free", "nonsense")).toBe("https://clubs-next.myotherapp.in/signup?plan=free&cycle=monthly");
-    expect(loginUrl(CLUBS)).toBe("https://clubs-next.myotherapp.in/login");
-    expect(plansPageUrl(CLUBS)).toBe("https://clubs-next.myotherapp.in/signup");
+    expect(signupUrl(CLUBS, "growth", "yearly")).toBe("https://club-dashboard.myotherapp.in/signup?plan=growth&cycle=yearly");
+    expect(signupUrl(`${CLUBS}/`, "free", "nonsense")).toBe("https://club-dashboard.myotherapp.in/signup?plan=free&cycle=monthly");
+    expect(loginUrl(CLUBS)).toBe("https://club-dashboard.myotherapp.in/login");
+    expect(plansPageUrl(CLUBS)).toBe("https://club-dashboard.myotherapp.in/signup");
     expect(contactUrl("support@myotherapp.in")).toBe("mailto:support@myotherapp.in?subject=MyOtherApp%20for%20our%20institution");
   });
 

@@ -17,8 +17,8 @@ const { PricingView } = await import("./pricingpage");
  * src/app/pricing): the plans and the numbers it read are in the HTML.
  * Their heads and structured data: src/app/_tests/static-routes.test.js.
  */
-const SIGNUP = "https://clubs-next.myotherapp.in/signup";
-const LOGIN = "https://clubs-next.myotherapp.in/login";
+const SIGNUP = "https://club-dashboard.myotherapp.in/signup";
+const LOGIN = "https://club-dashboard.myotherapp.in/login";
 const PLANS = () => parsePlans(plansResponse());
 const HOME = () => parseHome({ stats: { upcoming_events: 128, clubs: 42, cities: 3 } });
 
@@ -174,7 +174,7 @@ describe("routes and links", () => {
     expect(within(footer).getByRole("link", { name: "For clubs" })).toHaveAttribute("href", "/for-clubs");
     expect(within(footer).getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing");
     // No marketing link in the chrome goes straight to the dashboard.
-    for (const a of [...document.querySelectorAll("header a, footer a")]) expect(a.getAttribute("href")).not.toMatch(/clubs-next/);
+    for (const a of [...document.querySelectorAll("header a, footer a")]) expect(a.getAttribute("href")).not.toMatch(/club-dashboard/);
 
     fireEvent.click(forClubs);
     expect(screen.getByTestId("where").textContent).toBe("/for-clubs");
