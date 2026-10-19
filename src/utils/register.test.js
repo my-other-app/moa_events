@@ -112,6 +112,20 @@ describe("the payload", () => {
     });
   });
 
+  it("sends `store: []` when the event has a shelf and nothing is picked, so taking every pick off clears the order", () => {
+    // The server re-places the order only when `store` is present: without it,
+    // coming back to pay after removing every pick kept charging for them.
+    const sock = { id: "sock", name: "Socks", price: 120, left: 4, variants: [] };
+    expect(buildPayload({ values, questions: [], answers: {}, ref: null, items: [tee, sock], picks: {} }).store).toEqual([]);
+    // Picks taken back down to nothing, and a size chosen with no quantity, are nothing too.
+    expect(buildPayload({ values, questions: [], answers: {}, ref: null, items: [tee, sock], picks: { tee: { qty: 0, variant_id: "m" }, sock: { qty: 0, variant_id: null } } }).store).toEqual([]);
+    // And it survives the trip to the server as an empty list, not a missing key.
+    expect(JSON.parse(JSON.stringify(buildPayload({ values, questions: [], answers: {}, ref: null, items: [sock], picks: {} })))).toHaveProperty("store", []);
+    // An event with no shelf still sends no store at all, nor does a caller that passes no shelf.
+    expect(buildPayload({ values, questions: [], answers: {}, ref: null, items: [], picks: { tee: { qty: 1, variant_id: "m" } } })).not.toHaveProperty("store");
+    expect(buildPayload({ values, questions: [], answers: {}, ref: null })).not.toHaveProperty("store");
+  });
+
   it("carries the answers given (blank optional ones left out), the tracking code and the picks", () => {
     const questions = parseQuestions([
       { key: "college", label: "College", field_type: "text" },
