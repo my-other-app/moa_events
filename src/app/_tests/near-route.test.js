@@ -53,6 +53,20 @@ describe("/api/near", () => {
     expect(fetch.calls[0].init.headers).toEqual({ Accept: "application/json" });
   });
 
+  it("calls only the clubs within 50 km near; the rest come apart, nearest first, as the API sends them or not", async () => {
+    const club = (id, slug, distance_km) => ({ id, slug, name: slug, logo: S3, cover: S3, distance_km });
+    vi.stubGlobal(
+      "fetch",
+      fakeFetch(() => ({
+        body: { where: { city: "Kochi", lat: 9.93, lng: 76.27, source: "ip" }, near: [], clubs: [club(1, "c", 1.2), club(2, "far", 126.2)], clubs_more: [club(3, "farther", 411.7)] },
+      }))
+    );
+    const body = await (await near("", GEO)).json();
+    expect(body.clubs.map((c) => [c.slug, c.distance_km])).toEqual([["c", 1.2]]);
+    expect(body.clubs_more.map((c) => [c.slug, c.distance_km])).toEqual([["far", 126.2], ["farther", 411.7]]);
+    expect(body.clubs_more[0].cover.original).toBe("/media/clubs/far/cover");
+  });
+
   it("takes a point the visitor shared over the guess, and keeps that answer theirs", async () => {
     where = { city: "Ernakulam", region: "Kerala", lat: 0, lng: 0, source: "browser" };
     const res = await near("?lat=10.0159&lng=76.3419", GEO);
@@ -81,7 +95,7 @@ describe("/api/near", () => {
 
   it("answers nowhere, without asking, when nothing places the visitor (the API would place this server)", async () => {
     const res = await near("", { "x-forwarded-for": "49.37.10.2" });
-    expect(await res.json()).toEqual({ where: { city: null, region: null, lat: null, lng: null, source: "none" }, near: [], clubs: [] });
+    expect(await res.json()).toEqual({ where: { city: null, region: null, lat: null, lng: null, source: "none" }, near: [], clubs: [], clubs_more: [] });
     expect(fetch.calls).toHaveLength(0);
     // Nonsense coordinates are no point.
     await near("?lat=abc&lng=1");

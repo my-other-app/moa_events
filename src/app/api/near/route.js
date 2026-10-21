@@ -8,7 +8,8 @@ import { NOWHERE, nearAnswer, sameTown } from "@/utils/home";
 /*
  * GET /api/near[?lat=&lng=] — what is near one visitor, for the home page's
  * NearYou island: {where: {city, region, lat, lng, source}, near: [event
- * cards], clubs: [club cards]} (images on /media/... links).
+ * cards], clubs: [club cards within 50 km], clubs_more: [the nearest club
+ * cards further away]} (images on /media/... links).
  *
  * Where they are:
  *   ?lat=&lng=     the point they shared in this browser ("Use my location")
@@ -52,13 +53,16 @@ export async function GET(request) {
     label = guess.city;
     headers = SHARED;
   } else if (!forwardsVisitor(visitor)) {
-    return Response.json({ where: NOWHERE, near: [], clubs: [] }, { headers: PRIVATE });
+    return Response.json({ where: NOWHERE, near: [], clubs: [], clubs_more: [] }, { headers: PRIVATE });
   }
 
   try {
     const home = await getNearHome(point, { visitor });
     const answer = nearAnswer(home, { label, source });
-    return Response.json({ where: answer.where, near: answer.near.map(stableCard), clubs: answer.clubs.map(stableClubCard) }, { headers });
+    return Response.json(
+      { where: answer.where, near: answer.near.map(stableCard), clubs: answer.clubs.map(stableClubCard), clubs_more: answer.clubs_more.map(stableClubCard) },
+      { headers }
+    );
   } catch (e) {
     if (!(e instanceof ApiError)) throw e;
     return Response.json({ error: "Near you can't be worked out right now" }, { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } });

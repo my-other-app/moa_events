@@ -96,6 +96,39 @@ describe("the home page", () => {
     expect(screen.getByText("Near Pune")).toBeInTheDocument();
   });
 
+  it("calls only the clubs within 50 km near, and puts the rest further afield", async () => {
+    const tvm = { city: "Thiruvananthapuram", lat: 8.52, lng: 76.94, source: "ip" };
+    answers = { where: tvm, near: [], clubs: [club(7, { distance_km: 5 }), club(8, { distance_km: 8.6 })], clubs_more: [club(9, { distance_km: 126.2 })] };
+    show();
+    const near = (await screen.findByRole("heading", { name: "Clubs near Thiruvananthapuram" })).closest("section");
+    expect(within(near).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Club 7", "Club 8"]);
+    const further = screen.getByRole("heading", { name: "Further afield" }).closest("section");
+    expect(within(further).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Club 9"]);
+    expect(within(further).getByText("Clubs more than 50 km from Thiruvananthapuram, nearest first")).toBeInTheDocument();
+  });
+
+  it("never calls a far club near, whatever an older answer sends", async () => {
+    answers = {
+      where: { city: "Thiruvananthapuram", lat: 8.52, lng: 76.94, source: "ip" },
+      near: [],
+      clubs: [club(7, { distance_km: 5 }), club(9, { distance_km: 126.2 }), club(10, { distance_km: 411.7 })],
+    };
+    show();
+    const near = (await screen.findByRole("heading", { name: "Clubs near Thiruvananthapuram" })).closest("section");
+    expect(within(near).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Club 7"]);
+    const further = screen.getByRole("heading", { name: "Further afield" }).closest("section");
+    expect(within(further).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Club 9", "Club 10"]);
+  });
+
+  it("with no club within 50 km, keeps the popular clubs and calls nothing near", async () => {
+    answers = { where: { city: "Mumbai", lat: 19.08, lng: 72.88, source: "ip" }, near: [], clubs: [club(9, { distance_km: 1150.4 })], clubs_more: [club(10, { distance_km: 1290 })] };
+    show();
+    await screen.findByText("Near Mumbai");
+    expect(screen.getByRole("heading", { name: "Popular clubs" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Clubs near/ })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Further afield" })).toBeNull();
+  });
+
   it("keeps the popular clubs when none of the nearest has a place", async () => {
     answers = { where: { city: "Pune", lat: 18.52, lng: 73.86, source: "ip" }, near: [], clubs: [club(7)] };
     show();

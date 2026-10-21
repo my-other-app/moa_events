@@ -4,7 +4,8 @@
  * The home page's client islands. The page itself is the same for everyone
  * and statically regenerated (homepage.jsx); these are the parts about the
  * one reading it: where they are (the pill in the search), the events near
- * them, the clubs nearest them, and the search box.
+ * them, the clubs near them and further off, and the search box. Near is
+ * within NEAR_KM (50 km), as the API reckons it.
  *
  * <NearYou> asks /api/near once the page is in the browser: with the point
  * the visitor shared ("Use my location", kept in this browser), else with
@@ -14,6 +15,7 @@
 import { createContext, useContext, useEffect, useId, useState } from "react";
 import { useNavigate } from "@/lib/router";
 import { nearParam, parseClub, parseEvent, parseWhere } from "@/api/parse";
+import { NEAR_KM, splitClubs } from "@/utils/home";
 import { useWhere } from "@/utils/where";
 import { Section } from "./bits";
 import { ClubCard } from "./clubcard";
@@ -29,10 +31,10 @@ const list = (v, fn) => (Array.isArray(v) ? v.map(fn).filter(Boolean) : []);
 /** The address /api/near is asked at: with the shared point, or bare for a guess. */
 export const nearUrl = (point) => (point ? `/api/near?lat=${encodeURIComponent(point.lat)}&lng=${encodeURIComponent(point.lng)}` : "/api/near");
 
-/** {status: "loading" | "ready" | "error", where, near, clubs} for the visitor, and their stored point. */
+/** {status: "loading" | "ready" | "error", where, near, clubs, more} for the visitor, and their stored point. */
 export function NearYou({ children }) {
   const [stored, setStored] = useWhere();
-  const [state, setState] = useState({ status: "loading", where: null, near: [], clubs: [] });
+  const [state, setState] = useState({ status: "loading", where: null, near: [], clubs: [], more: [] });
   const lat = stored?.lat ?? null;
   const lng = stored?.lng ?? null;
   const known = stored !== undefined;
@@ -45,8 +47,10 @@ export function NearYou({ children }) {
     fetch(nearUrl(lat !== null ? { lat, lng } : null), { headers: { Accept: "application/json" } })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`near: ${r.status}`))))
       .then(
-        (d) => alive && setState({ status: "ready", where: parseWhere(d?.where), near: list(d?.near, parseEvent), clubs: list(d?.clubs, parseClub) }),
-        () => alive && setState({ status: "error", where: null, near: [], clubs: [] })
+        (d) =>
+          alive &&
+          setState({ status: "ready", where: parseWhere(d?.where), near: list(d?.near, parseEvent), clubs: list(d?.clubs, parseClub), more: list(d?.clubs_more, parseClub) }),
+        () => alive && setState({ status: "error", where: null, near: [], clubs: [], more: [] })
       );
     return () => {
       alive = false;
@@ -84,22 +88,39 @@ export function NearEvents() {
 
 /**
  * The clubs: the most followed (the server's, for everyone) until the
- * visitor is placed, then the ones nearest them — when any of those has a
- * distance at all (clubs without a place can't be near anyone).
+ * visitor is placed. Then "Clubs near …" holds only those within NEAR_KM,
+ * and the nearest further away follow under "Further afield", with their
+ * distances. With none near, the most followed stay, and nothing further
+ * off is offered as near.
  */
 export function NearClubs({ clubs }) {
   const near = useNear();
-  const local = near.status === "ready" && placed(near.where) && near.clubs.some((c) => c.distance_km !== null) ? near.clubs : null;
-  const shown = local || clubs;
-  if (!shown.length) return null;
+  const { near: local, further } = near.status === "ready" && placed(near.where) ? splitClubs(near.clubs, near.more) : { near: [], further: [] };
+  const where = near.where?.city || "you";
+  const shown = local.length ? local : clubs;
   return (
-    <Section id="clubs" title={local ? `Clubs near ${near.where.city || "you"}` : "Popular clubs"} seeAll="/clubs">
-      <div className="dc-rail dc-rail--cards dc-rail--clip">
-        {shown.slice(0, RAIL).map((c) => (
-          <ClubCard key={c.slug || c.id} club={c} />
-        ))}
-      </div>
-    </Section>
+    <>
+      {shown.length ? (
+        <Section id="clubs" title={local.length ? `Clubs near ${where}` : "Popular clubs"} seeAll="/clubs">
+          <ClubRail clubs={shown} />
+        </Section>
+      ) : null}
+      {local.length && further.length ? (
+        <Section id="clubs-further" title="Further afield" sub={`Clubs more than ${NEAR_KM} km from ${where}, nearest first`}>
+          <ClubRail clubs={further} />
+        </Section>
+      ) : null}
+    </>
+  );
+}
+
+function ClubRail({ clubs }) {
+  return (
+    <div className="dc-rail dc-rail--cards dc-rail--clip">
+      {clubs.slice(0, RAIL).map((c) => (
+        <ClubCard key={c.slug || c.id} club={c} />
+      ))}
+    </div>
   );
 }
 
