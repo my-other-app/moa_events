@@ -17,7 +17,7 @@ export const PLAY_STORE_URL = clean(process.env.NEXT_PUBLIC_PLAY_STORE_URL) || "
 export const APP_STORE_URL = clean(process.env.NEXT_PUBLIC_APP_STORE_URL) || null;
 
 /** The clubs' own dashboard, for "For clubs". */
-export const CLUBS_URL = "https://clubs-next.myotherapp.in";
+export const CLUBS_URL = "https://club-dashboard.myotherapp.in";
 
 export const CONTACT_EMAIL = "support@myotherapp.in";
 

@@ -14,7 +14,7 @@ const { Pricing } = await import("./pricing");
  * cards and the table are in the HTML); the island switches the cycle.
  * Without the server's plans (null), it asks the API from the browser.
  */
-const SIGNUP = "https://clubs-next.myotherapp.in/signup";
+const SIGNUP = "https://club-dashboard.myotherapp.in/signup";
 const ready = () => parsePlans(plansResponse());
 
 const show = (data = ready(), props = {}) =>
