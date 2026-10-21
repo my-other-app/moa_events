@@ -15,8 +15,8 @@ describe("an event's structured data", () => {
     const [ld, crumbs] = eventStructuredData(event());
     const check = validateEvent(ld);
     expect(check.errors).toEqual([]);
-    // Every recommended field is there too, but the venue's postal parts the API doesn't have.
-    expect(check.warnings.filter((w) => !/address\.(addressLocality|addressRegion|postalCode)/.test(w))).toEqual([]);
+    // Every recommended field is there too, but the PIN code its words don't have.
+    expect(check.warnings).toEqual(["location.address.postalCode is recommended"]);
     expect(ld).toMatchObject({
       "@context": "https://schema.org",
       "@type": "Event",
@@ -29,12 +29,14 @@ describe("an event's structured data", () => {
       location: {
         "@type": "Place",
         name: "Lab 3B, COEP",
-        address: { "@type": "PostalAddress", streetAddress: "Lab 3B, COEP", addressCountry: "IN" },
+        // The city and state from its point (it is in Pune), in India.
+        address: { "@type": "PostalAddress", streetAddress: "Lab 3B, COEP", addressLocality: "Pune", addressRegion: "Maharashtra", addressCountry: "IN" },
         geo: { "@type": "GeoCoordinates", latitude: 18.5293, longitude: 73.8565 },
         hasMap: "https://maps.app.goo.gl/abc",
       },
       url: "https://myotherapp.in/events/hack-night-04",
-      organizer: { "@type": "Organization", name: "Circuit Society", url: "https://myotherapp.in/clubs/circuit-society" },
+      organizer: { "@type": "Organization", "@id": "https://myotherapp.in/clubs/circuit-society#organization", name: "Circuit Society", url: "https://myotherapp.in/clubs/circuit-society" },
+      inLanguage: "en-IN",
       offers: {
         "@type": "Offer",
         price: 250,
@@ -52,8 +54,13 @@ describe("an event's structured data", () => {
       { "@type": "Person", name: "Ananya Iyer", jobTitle: "Firmware lead", description: "Ships scooter firmware.", sameAs: ["https://www.linkedin.com/in/ananya"] },
       { "@type": "Person", name: "Rahul Menon" },
     ]);
-    // Pictures on the site's stable addresses: the poster, then the share picture. Never a presigned link.
-    expect(ld.image).toEqual(["https://myotherapp.in/media/events/hack-night-04/poster", expect.stringMatching(/^https:\/\/myotherapp\.in\/og\/events\/hack-night-04\?v=/)]);
+    // Pictures on the site's stable addresses: the poster, then the same at 16:9, 4:3 and 1:1. Never a presigned link.
+    expect(ld.image).toEqual([
+      "https://myotherapp.in/media/events/hack-night-04/poster",
+      expect.stringMatching(/^https:\/\/myotherapp\.in\/og\/events\/hack-night-04\?v=\w+&ratio=16x9$/),
+      expect.stringMatching(/^https:\/\/myotherapp\.in\/og\/events\/hack-night-04\?v=\w+&ratio=4x3$/),
+      expect.stringMatching(/^https:\/\/myotherapp\.in\/og\/events\/hack-night-04\?v=\w+&ratio=1x1$/),
+    ]);
     expect(JSON.stringify(ld)).not.toContain("cdn.example");
 
     expect(validateBreadcrumbs(crumbs).errors).toEqual([]);
@@ -158,7 +165,9 @@ describe("a club's structured data", () => {
       description: "A student club for hardware people.",
       slogan: "We build things that blink",
       email: "hello@circuit.club",
-      address: { "@type": "PostalAddress", addressLocality: "COEP, Pune", addressCountry: "IN" },
+      // Its city, from its words ("COEP, Pune"), and the state it is in.
+      address: { "@type": "PostalAddress", addressLocality: "Pune", addressRegion: "Maharashtra", addressCountry: "IN" },
+      areaServed: { "@type": "City", name: "Pune", containedInPlace: { "@type": "State", name: "Maharashtra" } },
     });
     // Only http(s) links, the website among them.
     expect(ld.sameAs).toEqual(["https://instagram.com/circuit", "https://x.com/circuit", "https://circuit.myotherapp.in"]);
@@ -199,6 +208,52 @@ describe("the site's own structured data", () => {
         "query-input": "required name=search_term_string",
       },
     });
+    // India, Kerala first.
+    expect(org.areaServed).toEqual([
+      { "@type": "Country", name: "India" },
+      { "@type": "State", name: "Kerala" },
+    ]);
+    expect(site.inLanguage).toBe("en-IN");
+  });
+});
+
+describe("what the API may say outright (newer APIs), in the structured data", () => {
+  it("says a called-off, postponed or moved event is, and when a moved one was to start", () => {
+    const status = (over) => eventStructuredData(event(over))[0];
+    expect(status({ event_status: "cancelled" }).eventStatus).toBe("https://schema.org/EventCancelled");
+    expect(status({ event_status: "postponed" }).eventStatus).toBe("https://schema.org/EventPostponed");
+    expect(status({ event_status: "moved_online" }).eventStatus).toBe("https://schema.org/EventMovedOnline");
+    const moved = status({ event_status: "rescheduled", previous_starts_at: "2026-10-11T12:30:00Z" });
+    expect(moved).toMatchObject({ eventStatus: "https://schema.org/EventRescheduled", previousStartDate: "2026-10-11T18:00:00+05:30" });
+    expect(validateEvent(moved).errors).toEqual([]);
+    // Anything else, or nothing (today's API), is as planned; a past event too.
+    expect(status({ event_status: "who-knows" }).eventStatus).toBe("https://schema.org/EventScheduled");
+    const past = status({ status: "ended", starts_at: "2025-01-10T18:00:00+05:30", ends_at: "2025-01-10T21:00:00+05:30" });
+    expect(past).toMatchObject({ eventStatus: "https://schema.org/EventScheduled", startDate: "2025-01-10T18:00:00+05:30", endDate: "2025-01-10T21:00:00+05:30" });
+    expect(past.offers.availability).toBe("https://schema.org/SoldOut");
+    expect(past).not.toHaveProperty("previousStartDate");
+  });
+
+  it("takes the attendance mode and the venue's address parts as the API says them", () => {
+    const [hybrid] = eventStructuredData(event({ attendance_mode: "hybrid", is_online: false }));
+    expect(hybrid.eventAttendanceMode).toBe("https://schema.org/MixedEventAttendanceMode");
+    expect(hybrid.location.map((l) => l["@type"])).toEqual(["Place", "VirtualLocation"]);
+    const [addressed] = eventStructuredData(event({ locality: "Shivajinagar", region: "MH", postal_code: "411005" }));
+    expect(addressed.location.address).toEqual({
+      "@type": "PostalAddress",
+      streetAddress: "Lab 3B, COEP",
+      addressLocality: "Shivajinagar",
+      addressRegion: "MH",
+      postalCode: "411005",
+      addressCountry: "IN",
+    });
+    expect(validateEvent(addressed)).toEqual({ errors: [], warnings: [] });
+  });
+
+  it("reads none of it from an answer that doesn't have it: today's pages parse as before", () => {
+    const page = event();
+    for (const k of ["event_status", "attendance_mode", "previous_starts_at", "locality", "region", "postal_code", "is_demo"]) expect(page.event).not.toHaveProperty(k);
+    expect(page.club).not.toHaveProperty("is_demo");
   });
 });
 

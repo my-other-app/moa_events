@@ -9,10 +9,18 @@ import { breadcrumbJsonLd, clubJsonLd, collectionPageJsonLd, discussionPostingJs
 import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
 import { absoluteUrl, clubPagePath, eventPagePath, eventRefOf, media, ogImage, topicPagePath } from "./urls";
 
-/** The event's pictures: the poster (or its drawn cover), then its share picture. */
+/** The shapes Google asks of an event's pictures (src/og/layouts.jsx's EVENT_FRAMES). */
+export const EVENT_IMAGE_RATIOS = ["16x9", "4x3", "1x1"];
+
+/**
+ * The event's pictures: the poster (or its drawn cover) as it is, then the
+ * same at 16:9, 4:3 and 1:1 (the whole poster on its drawn art; made by
+ * /og/events/{slug}?ratio=), each 1200 pixels wide.
+ */
 export function eventImages(page) {
   const ref = eventRefOf(page.event);
-  return [absoluteUrl(page.event.poster ? media.eventPoster(ref) : media.eventCover(ref)), absoluteUrl(ogImage.event(ref, eventOgVersion(page)))];
+  const v = eventOgVersion(page);
+  return [absoluteUrl(page.event.poster ? media.eventPoster(ref) : media.eventCover(ref)), ...EVENT_IMAGE_RATIOS.map((r) => absoluteUrl(ogImage.event(ref, v, r)))];
 }
 
 /**

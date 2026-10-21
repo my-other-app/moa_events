@@ -74,7 +74,7 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   const topics = await hasTopics();
   return (
-    <html lang="en" className={`${dmSans.variable} ${bebasNeue.variable} ${inter.variable}`}>
+    <html lang="en-IN" className={`${dmSans.variable} ${bebasNeue.variable} ${inter.variable}`}>
       <body>
         <Providers>
           <TopicsNavProvider on={topics}>{children}</TopicsNavProvider>

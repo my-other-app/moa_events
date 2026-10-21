@@ -8,6 +8,7 @@
  * never a presigned S3 link: a crawler keeps what it read for weeks.
  */
 import { APP_STORE_URL, CONTACT_EMAIL, PLAY_STORE_URL, SITE_NAME, SITE_URL } from "@/config";
+import { addressOf, cityOf } from "./cities";
 import { istIso } from "./time";
 
 const SCHEMA = "https://schema.org/";
@@ -61,10 +62,57 @@ export function availability(event, now = Date.now()) {
 
 const hasPoint = (e) => typeof e.lat === "number" && typeof e.lng === "number" && !(e.lat === 0 && e.lng === 0);
 
-/** Offline, online, or both: an online event that also has a pinned venue is mixed. */
+/** How the API may say it outright (`attendance_mode`, newer APIs); otherwise it is worked out. */
+const MODE_WORDS = {
+  in_person: "OfflineEventAttendanceMode",
+  offline: "OfflineEventAttendanceMode",
+  online: "OnlineEventAttendanceMode",
+  mixed: "MixedEventAttendanceMode",
+  hybrid: "MixedEventAttendanceMode",
+};
+
+/** Offline, online, or both: as the API says, else an online event that also has a pinned venue is mixed. */
 export function attendanceMode(event) {
+  const said = MODE_WORDS[String(event.attendance_mode || "").toLowerCase()];
+  if (said) return said;
   if (!event.is_online) return "OfflineEventAttendanceMode";
   return hasPoint(event) ? "MixedEventAttendanceMode" : "OnlineEventAttendanceMode";
+}
+
+/** What the API may say of an event's state (`event_status`, newer APIs); anything else is as planned. */
+const STATUS_WORDS = {
+  scheduled: "EventScheduled",
+  cancelled: "EventCancelled",
+  canceled: "EventCancelled",
+  postponed: "EventPostponed",
+  rescheduled: "EventRescheduled",
+  moved_online: "EventMovedOnline",
+};
+
+/**
+ * schema.org's eventStatus. An event that has happened (or is happening) as
+ * planned stays EventScheduled: Google reads the dates for "past", and
+ * EventScheduled is what it asks for an event that wasn't called off or moved.
+ */
+export function eventStatus(event) {
+  return STATUS_WORDS[String(event.event_status || "").toLowerCase()] || "EventScheduled";
+}
+
+/**
+ * The venue's PostalAddress: its words as the street address, and the city,
+ * state and PIN code, as the API says them (newer APIs) or as worked out
+ * from its words and point (./cities.js). Always in India.
+ */
+function postalAddress(place, street) {
+  const derived = addressOf(place);
+  return {
+    "@type": "PostalAddress",
+    streetAddress: street,
+    addressLocality: place.locality || derived.addressLocality,
+    addressRegion: place.region || derived.addressRegion,
+    postalCode: place.postal_code || derived.postalCode,
+    addressCountry: "IN",
+  };
 }
 
 function place(event) {
@@ -72,7 +120,7 @@ function place(event) {
   return {
     "@type": "Place",
     name: name || "Venue to be announced",
-    address: { "@type": "PostalAddress", streetAddress: name, addressCountry: "IN" },
+    address: postalAddress(event, name),
     geo: hasPoint(event) ? { "@type": "GeoCoordinates", latitude: event.lat, longitude: event.lng } : null,
     hasMap: isHttp(event.location_link) ? event.location_link : null,
   };
@@ -122,15 +170,19 @@ export function eventJsonLd({ event, club = null, speakers = [], url, images = [
     description: description || null,
     startDate: istIso(event.starts_at),
     endDate: istIso(endOf(event)),
-    eventStatus: `${SCHEMA}EventScheduled`,
+    eventStatus: `${SCHEMA}${eventStatus(event)}`,
+    previousStartDate: eventStatus(event) === "EventRescheduled" ? istIso(event.previous_starts_at) : null,
     eventAttendanceMode: `${SCHEMA}${attendanceMode(event)}`,
     location: location(event, url),
     image: [...new Set(pictures)],
     url,
+    inLanguage: "en-IN",
     isAccessibleForFree: fee === 0 ? true : null,
     about: topics.map((t) => ({ "@type": "Thing", name: t.name, url: isHttp(t.url) ? t.url : null })),
     keywords: words.length ? words.join(", ") : null,
-    organizer: club ? { "@type": "Organization", name: club.name, url: clubUrl, logo: isHttp(clubLogo) ? clubLogo : null } : null,
+    organizer: club
+      ? { "@type": "Organization", "@id": clubUrl ? `${clubUrl}#organization` : null, name: club.name, url: clubUrl, logo: isHttp(clubLogo) ? clubLogo : null }
+      : null,
     performer: speakers
       .filter((s) => s && s.name)
       .map((s, i) => ({
@@ -156,7 +208,7 @@ export function eventCardJsonLd(card, { url, image = null, organizer = null }) {
     url,
     startDate: istIso(card.starts_at),
     endDate: istIso(card.ends_at),
-    eventStatus: `${SCHEMA}EventScheduled`,
+    eventStatus: `${SCHEMA}${eventStatus(card)}`,
     eventAttendanceMode: `${SCHEMA}${attendanceMode(card)}`,
     location: location(card, url),
     image: isHttp(image) ? [image] : null,
@@ -191,6 +243,8 @@ export function clubJsonLd({ club, url, logo = null, image = null, description =
   const sameAs = [...SOCIAL_KEYS.map((k) => club.socials?.[k]), club.website_url].filter(isHttp);
   const knows = [...new Set([...(club.topics || []).map((t) => t.name), ...(club.interests || [])].filter(Boolean))];
   const organizer = { "@type": "Organization", name: club.name, url };
+  // Where it is: its city when its words name one ("Panampilly Nagar, Kochi"), else its words.
+  const city = cityOf({ location_name: club.location_name });
   return clean({
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -202,7 +256,10 @@ export function clubJsonLd({ club, url, logo = null, image = null, description =
     description: description || club.tagline || null,
     slogan: club.tagline || null,
     email: club.contact_email || null,
-    address: club.location_name ? { "@type": "PostalAddress", addressLocality: club.location_name, addressCountry: "IN" } : null,
+    address: club.location_name
+      ? { "@type": "PostalAddress", addressLocality: city ? city.name : club.location_name, addressRegion: city ? city.state : null, addressCountry: "IN" }
+      : null,
+    areaServed: city ? { "@type": "City", name: city.name, containedInPlace: { "@type": "State", name: city.state } } : null,
     knowsAbout: knows.length ? knows : null,
     sameAs: [...new Set(sameAs)],
     event: events.map((e) => eventCardJsonLd(e.card, { url: e.url, image: e.image, organizer })),
@@ -221,6 +278,11 @@ export function siteJsonLd() {
       url: SITE_URL,
       logo: { "@type": "ImageObject", url: `${SITE_URL}/brand/logo-icon.png`, width: 312, height: 312 },
       email: CONTACT_EMAIL,
+      // India, starting in Kerala.
+      areaServed: [
+        { "@type": "Country", name: "India" },
+        { "@type": "State", name: "Kerala" },
+      ],
       contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: CONTACT_EMAIL, areaServed: "IN", availableLanguage: ["en"] },
       sameAs: [PLAY_STORE_URL, APP_STORE_URL].filter(isHttp),
     }),

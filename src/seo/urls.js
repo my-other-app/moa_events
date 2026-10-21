@@ -45,8 +45,14 @@ export const media = {
 };
 
 /** The share pictures (1200×630), made by src/app/og/.../route.jsx. `v` changes when what they show does. */
+const query = (pairs) => {
+  const q = pairs.filter(([, v]) => v).map(([k, v]) => `${k}=${enc(v)}`).join("&");
+  return q ? `?${q}` : "";
+};
+
 export const ogImage = {
-  event: (ref, v) => `/og/events/${enc(ref)}${v ? `?v=${enc(v)}` : ""}`,
+  /** `ratio`: "16x9", "4x3" or "1x1" for the event's picture at that shape (its structured data's), else the share card. */
+  event: (ref, v, ratio = null) => `/og/events/${enc(ref)}${query([["v", v], ["ratio", ratio]])}`,
   club: (slug, v) => `/og/clubs/${enc(slug)}${v ? `?v=${enc(v)}` : ""}`,
   topic: (slug, v) => `/og/topics/${enc(slug)}${v ? `?v=${enc(v)}` : ""}`,
 };
