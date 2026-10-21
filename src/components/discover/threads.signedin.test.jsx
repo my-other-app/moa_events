@@ -103,6 +103,29 @@ describe("a post, signed in", () => {
     expect(screen.getByRole("dialog", { name: "Do this in the app" })).toBeInTheDocument();
   });
 
+  it("pops the heart and rolls the count only for the reader's own like", async () => {
+    post.mockResolvedValueOnce({ data: { liked: true, likes: 13 } });
+    show();
+    const like = await screen.findByRole("button", { name: "Like (12 likes)" });
+    await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/threads/t1", { userOnly: true }));
+    expect(like).not.toHaveAttribute("data-pop");
+    expect(like.querySelector(".dc-tcard-count")).not.toHaveClass("is-bumped");
+
+    fireEvent.click(like);
+    expect(like).toHaveAttribute("data-pop");
+    expect(like.querySelector(".dc-tcard-count")).toHaveClass("is-bumped");
+    await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/threads/t1/like"));
+  });
+
+  it("shows a like it already had without a pop", async () => {
+    thread = { ...post1, liked: true, likes: 13 };
+    show();
+    const like = await screen.findByRole("button", { name: "Liked (13 likes)" });
+    expect(like).toHaveAttribute("aria-pressed", "true");
+    expect(like).not.toHaveAttribute("data-pop");
+    expect(like.querySelector(".dc-tcard-count")).not.toHaveClass("is-bumped");
+  });
+
   it("puts the like back when it doesn't save", async () => {
     post.mockRejectedValue(Object.assign(new Error("500"), { response: { status: 500 } }));
     show();

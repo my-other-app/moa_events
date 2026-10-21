@@ -109,6 +109,34 @@ describe("following a club, signed in", () => {
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clubs/unfollow/3"));
   });
 
+  it("animates only the reader's own press: the tick pops and the new label slides in", async () => {
+    post.mockResolvedValue({ data: { is_following: true } });
+    show();
+    const button = await screen.findByRole("button", { name: "Follow" });
+    expect(button).not.toHaveAttribute("data-pop");
+    expect(button.querySelector(".ac-follow-label")).not.toHaveClass("is-swapped");
+
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("data-pop");
+    expect(button.querySelector(".ac-follow-label")).toHaveClass("is-swapped");
+    expect(button.querySelector(".ac-follow-label")).toHaveTextContent("Following");
+    await waitFor(() => expect(button).not.toHaveAttribute("aria-busy"));
+
+    // Unfollowing: no pop, the label still slides.
+    fireEvent.click(button);
+    expect(button).not.toHaveAttribute("data-pop");
+    expect(button.querySelector(".ac-follow-label")).toHaveClass("is-swapped");
+  });
+
+  it("starts as Following, without a pop, for someone who already follows", async () => {
+    following = true;
+    show();
+    const button = await screen.findByRole("button", { name: /Following/ });
+    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
+    expect(button).not.toHaveAttribute("data-pop");
+    expect(button.querySelector(".ac-follow-label")).not.toHaveClass("is-swapped");
+  });
+
   it("starts as Following for someone who already follows", async () => {
     following = true;
     show();

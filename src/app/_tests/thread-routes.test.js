@@ -67,7 +67,7 @@ describe("/threads/{id}", () => {
     for (const words of ["Kits are in!", "12 likes", "On my way", "Rohan P."]) expect(out).toContain(words);
     expect(out).toMatch(/Comments(<!-- -->)? \(1\)/);
     // One Like and one Comment, carrying the counts: no row of counts above them, no second comment button.
-    expect(out.match(/class="dc-tcard-action"/g)).toHaveLength(2);
+    expect(out.match(/class="dc-tcard-action[ "]/g)).toHaveLength(2);
     expect(out).not.toContain("dc-tcard-foot");
     expect(out).not.toContain("Add a comment");
     expect(out).not.toMatch(/Signature=|Expires=/);
