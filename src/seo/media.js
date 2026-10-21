@@ -55,6 +55,26 @@ export function mediaTarget(segments) {
   return null;
 }
 
+/**
+ * Where the API's pictures are served from ("https://bucket.s3.amazonaws.com",
+ * later the media CDN): the origin of the first picture among `values`
+ * (links, or {thumbnail, medium, original} objects), or null. A page tells
+ * the browser to connect there early (src/server/hints.js): its pictures
+ * reach it through /media redirects, so the browser can't know on its own.
+ */
+export function mediaOrigin(...values) {
+  for (const v of values) {
+    const url = imageUrl(v, "original");
+    if (typeof url !== "string" || !/^https:\/\//i.test(url)) continue;
+    try {
+      return new URL(url).origin;
+    } catch {
+      // not a link: try the next
+    }
+  }
+  return null;
+}
+
 /** The poster at a size: the original from `poster`, the smaller ones from `poster_thumb` when there is one. */
 export function posterOf(page, size = "original") {
   const e = page?.event;

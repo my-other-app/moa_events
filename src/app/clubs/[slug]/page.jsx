@@ -7,6 +7,7 @@ import { JsonLd } from "@/seo/JsonLd.jsx";
 import { stableClubPage } from "@/seo/stabilize";
 import { clubStructuredData } from "@/seo/structured";
 import { getClubPage } from "@/server/discover";
+import { preconnectMedia } from "@/server/hints";
 
 /*
  * /clubs/{slug}: a club's page. SERVER-RENDERED, statically regenerated
@@ -36,6 +37,7 @@ export default async function ClubRoute({ params }) {
   const data = await getClubPage(slug);
   if (!data) notFound();
   if (data.club.slug && data.club.slug !== slug) permanentRedirect(`/clubs/${encodeURIComponent(data.club.slug)}`);
+  preconnectMedia(data.club.cover, data.club.logo, ...data.upcoming.map((e) => e.poster));
   return (
     <SitePage>
       <JsonLd data={clubStructuredData(data)} />

@@ -6,6 +6,7 @@ import { cityByAnySlug, cityEventsPath } from "@/seo/cities";
 import { citiesWithEvents, cityEventsMetadata, cityEventsStructuredData } from "@/seo/citypages";
 import { stableCard, stableClubCard } from "@/seo/stabilize";
 import { getCityClubs, getCityEvents, getCitySummaries } from "@/server/cities";
+import { preconnectMedia } from "@/server/hints";
 import { getTopicsOrNull } from "@/server/topics";
 
 /*
@@ -48,6 +49,7 @@ export default async function CityEvents({ params }) {
     getTopicsOrNull(),
   ]);
   const others = citiesWithEvents(summaries).filter((s) => s.city.slug !== city.slug);
+  preconnectMedia(...events.items.map((e) => e.poster));
   return (
     <SitePage>
       <JsonLd data={cityEventsStructuredData(city, events.items)} />

@@ -8,6 +8,7 @@ import { stableEventPage } from "@/seo/stabilize";
 import { eventStructuredData } from "@/seo/structured";
 import { eventPagePath } from "@/seo/urls";
 import { getEventPage } from "@/server/discover";
+import { preconnectMedia } from "@/server/hints";
 
 /*
  * /events/{slug}: an event's page. SERVER-RENDERED, statically regenerated
@@ -42,6 +43,8 @@ export default async function EventRoute({ params }) {
   const page = await getEventPage(slug);
   if (!page) notFound();
   if (page.event.slug && page.event.slug !== slug) permanentRedirect(eventPagePath(page.event));
+  // The poster is the largest paint: connect to where it is served from before the redirect says so.
+  preconnectMedia(page.event.poster, page.club?.logo, ...page.speakers.map((s) => s.photo));
   return (
     <SitePage>
       <JsonLd data={eventStructuredData(page)} />
