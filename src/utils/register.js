@@ -199,10 +199,16 @@ export function stepsFor({ questions = [], items = [] } = {}) {
  * POST /events/registration/{id}/register, exactly as the form has always
  * sent it: the three details as typed, the answers (or `{}` for an event
  * that asks nothing), the tracking link's code when there is one, and the
- * shelf picks when there are any. Unanswered optional questions are left
- * out, as an untouched field always was.
+ * shelf picks. Unanswered optional questions are left out, as an untouched
+ * field always was.
+ *
+ * `store` goes whenever the event has a shelf, as `[]` when nothing is
+ * picked. The server re-places a registration's order only when `store` is
+ * there, so leaving it out after taking every pick off kept charging for the
+ * earlier picks on the way back to pay. An event with nothing on its shelf
+ * still sends no `store`, as it never did.
  */
-export function buildPayload({ values, questions, answers, ref, items, picks }) {
+export function buildPayload({ values, questions, answers, ref, items = [], picks = {} }) {
   let details = {};
   if (questions.length > 0) {
     details = undefined;
@@ -218,8 +224,7 @@ export function buildPayload({ values, questions, answers, ref, items, picks }) 
     additional_details: details,
     ...(ref ? { ref } : {}),
   };
-  const store = picksToPayload(items, picks);
-  if (store.length > 0) payload.store = store;
+  if (items.length > 0) payload.store = picksToPayload(items, picks);
   return payload;
 }
 

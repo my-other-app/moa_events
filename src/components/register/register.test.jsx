@@ -234,6 +234,33 @@ describe("registering for a paid event", () => {
     await waitFor(() => expect(eventsApi.registerForEvent).toHaveBeenCalled());
     expect(eventsApi.registerForEvent.mock.calls[0][1].store).toEqual([{ item_id: "tee", variant_id: "m", qty: 1 }]);
   });
+
+  it("sends an empty store when every pick is taken off before paying, so the order drops them", async () => {
+    eventsApi.registerForEvent.mockReturnValue(new Promise(() => {}));
+    show(paid, { items: [TEE] });
+    await heading(/Your details/);
+    fillDetails();
+    go();
+    await heading(/Add to your ticket/);
+    fireEvent.click(screen.getByRole("radio", { name: /^M/ }));
+    expect(screen.getByLabelText("Hack Night tee quantity")).toHaveTextContent("1");
+    go();
+    await heading(/Review and pay/);
+    expect(screen.getByRole("button", { name: "Pay ₹700" })).toBeInTheDocument();
+    // Back to the add-ons, and the pick taken off again.
+    fireEvent.click(screen.getByRole("button", { name: "Edit your add-ons" }));
+    await heading(/Add to your ticket/);
+    fireEvent.click(screen.getByRole("button", { name: "One less Hack Night tee" }));
+    expect(screen.getByLabelText("Hack Night tee quantity")).toHaveTextContent("0");
+    expect(screen.getByText("None yet")).toBeInTheDocument();
+    go();
+    await heading(/Review and pay/);
+    // The total is the ticket alone, and the payload says "nothing" rather than nothing at all.
+    expect(screen.getByRole("button", { name: "Pay ₹250" })).toBeInTheDocument();
+    go();
+    await waitFor(() => expect(eventsApi.registerForEvent).toHaveBeenCalled());
+    expect(eventsApi.registerForEvent.mock.calls[0][1]).toHaveProperty("store", []);
+  });
 });
 
 describe("registering for a free event", () => {
