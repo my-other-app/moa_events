@@ -47,7 +47,15 @@ export const metadata = {
   title: { default: HOME_TITLE, template: TITLE_TEMPLATE },
   description: DEFAULT_DESCRIPTION,
   applicationName: SITE_NAME,
-  icons: { icon: [{ url: "/logo.svg", type: "image/svg+xml" }] },
+  // Small, square, at stable addresses (Google shows the 48px one in results). The old
+  // /logo.svg is a 690 KB picture in an SVG: kept in public/, no longer the page's icon.
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
   openGraph: {
     siteName: SITE_NAME,
     locale: "en_IN",
