@@ -140,6 +140,16 @@ describe("which file answers which address", () => {
     }
   });
 
+  it("sends a city's other names to its page, before any page renders (308)", async () => {
+    expect(await resolve("/events/in/cochin")).toEqual({ redirect: "/events/in/kochi", permanent: true });
+    expect(await resolve("/events/in/trivandrum")).toEqual({ redirect: "/events/in/thiruvananthapuram", permanent: true });
+    expect(await resolve("/clubs/in/calicut")).toEqual({ redirect: "/clubs/in/kozhikode", permanent: true });
+    expect(await resolve("/events/in/navi-mumbai")).toEqual({ redirect: "/events/in/mumbai", permanent: true });
+    // A city's own address, and anything else, is the page's.
+    expect((await resolve("/events/in/kochi")).file).toBe("events/in/[city]/page.jsx");
+    expect((await resolve("/events/in/cochin-extra")).file).toBe("events/in/[city]/page.jsx");
+  });
+
   it("sends /me to the tickets, for now", async () => {
     expect(await resolve("/me")).toEqual({ redirect: "/me/tickets", permanent: false });
   });

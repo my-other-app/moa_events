@@ -123,6 +123,21 @@ const BY_ANY_NAME = new Map(CITIES.flatMap((c) => [c.name, ...c.also].map((n) =>
  */
 export const cityByAnySlug = (slug) => cityBySlug(slug) || BY_ANY_NAME.get(slugify(slug)) || null;
 
+/**
+ * The 308s from a city's other names to its page, for next.config.mjs
+ * (/events/in/cochin → /events/in/kochi, and the same under /clubs/in). In
+ * the config rather than the page: a redirect from a statically
+ * regenerated page answers its first request with the Location header
+ * twice. The page still redirects any other spelling (KOCHI) itself.
+ */
+export function cityRedirects() {
+  return CITIES.flatMap((city) => {
+    const others = [...new Set(city.also.map(slugify))].filter((s) => s && s !== city.slug);
+    if (!others.length) return [];
+    return ["events", "clubs"].map((kind) => ({ source: `/${kind}/in/:alias(${others.join("|")})`, destination: `/${kind}/in/${city.slug}`, permanent: true }));
+  });
+}
+
 export const isKerala = (city) => city?.state === KERALA;
 
 /* ---------- addresses ---------- */

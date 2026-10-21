@@ -30,7 +30,7 @@ Things deliberately not done:
 `/events/in/kochi` is "Events in Kochi: hackathons, workshops and meetups". It shows the city's upcoming in-person events, its first clubs, the topics and the other cities. `/clubs/in/kochi` lists the city's clubs. `/events/in` is the hub. All three are regenerated every five minutes (ISR).
 
 - **How a city is read.** The API has no city filter, so a city is a point and a radius (`src/seo/cities.js`). An event belongs to one city: the city its venue's words name last ("…, Payyannur, Kannur 670309" is Kannur), else the nearest city whose radius holds its point.
-- **Other names.** `/events/in/cochin`, `/trivandrum`, `/calicut` and `/bangalore` 308 to the city's own slug. An unknown city is a 404.
+- **Other names.** `/events/in/cochin`, `/trivandrum`, `/calicut` and `/bangalore` 308 to the city's own slug, from `next.config.mjs` (`cityRedirects()`), with the query kept. An unknown city is a 404.
 - **When a page is indexed.** Only while it lists something real, meaning not the demo clubs'. Otherwise it is `noindex, follow`. Only indexed pages go into `cities.xml`, and only indexed cities go into the hub's ItemList.
 - **Where they are linked.** "Browse by city" on `/events` links every city with upcoming events, and the footer links "Events by city". The iOS app leaves `/events/in` and `/clubs/in` to the browser.
 - **To add a city:** add a row to `CITIES` with its centre, a radius, the names people write it by and, for the big ones, a line of our own for the introduction.
@@ -118,5 +118,15 @@ The rest is infra:
 - the media CDN (item 6 above);
 - a mid-size poster for `srcset`;
 - WebP. Club logos are 150 px PNGs shown at 40 to 56 px.
+
+Measured again with `next start` (the median of three Lighthouse runs, origin/main against this branch, the same production API and S3):
+
+| Page | Before | After |
+| --- | --- | --- |
+| Home | 91; LCP 3.3 s; 7 console 404s (club covers) | 90; LCP 3.7 s; no errors; best practices 96 → 100 |
+| Event | 75; LCP 7.7 s; 1,488 KiB | 75; LCP 7.0–8.8 s across runs; 1,191 KiB |
+| Club | 90; LCP 3.6 s (the tagline: the cover was a 404) | 81; LCP 5.1 s (the cover, now loading, is the largest paint) |
+
+Two things to know when reading these. First, the event LCP swings by more than a second from run to run, because it is the S3 download itself, so the preconnect's saving is lost in that noise. Second, the club page's LCP rose because its cover now shows. A demo page's Lighthouse SEO score is 69 because it is `noindex`, which is intended. The console errors left on localhost are CORS refusals of `localhost` by the API, which production doesn't have.
 
 Fonts are self-hosted by `next/font`: two preloaded, with `display: swap` and size-adjusted fallbacks. CLS is 0.
