@@ -13,8 +13,9 @@
  *     kept a minute at Vercel's edge: they are rendered per request, but
  *     their HTML depends on the address alone;
  *   - the certificate check (/verify) never framed by another site, and its
- *     results (/verify/{number}) never stored, indexed or referred on (the
- *     number is in the address);
+ *     results (/verify/{number}) and a guest's certificate
+ *     (/certificates/{ticket id}) never stored, indexed or referred on (the
+ *     code is in the address);
  *   - the OG fonts traced into the functions that read them.
  */
 import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
@@ -68,6 +69,8 @@ const nextConfig = {
       { source: "/topics/:slug", headers: edge },
       { source: "/verify", headers: VERIFY_HEADERS },
       { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
+      // A guest's certificate: its address holds the ticket's code.
+      { source: "/certificates/:ticketid", headers: VERIFY_RESULT_HEADERS },
     ];
   },
   async redirects() {

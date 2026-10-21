@@ -20,7 +20,6 @@ import "@/styles/register.css";
 import "@/styles/ticket.css";
 import "@/styles/registerbutton.css";
 import "@/styles/download.css";
-import "@/styles/certificate.css";
 import "@/styles/notfound.css";
 import "@/styles/live.css";
 import "@/styles/compete.css";

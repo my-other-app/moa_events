@@ -585,6 +585,85 @@
   margin-top: 14px;
 }
 
+/* ---------- a guest's own certificate (/certificates/{ticket id}) ---------- */
+
+.cert-own h1 {
+  margin-top: 10px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(40px, 6vw, 64px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+.cert-own .vf-preview {
+  margin-top: 20px;
+}
+.cert-own-missing {
+  margin-top: 20px;
+}
+.cert-own-missing h2 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(30px, 4.6vw, 44px);
+  line-height: 1;
+  color: var(--dc-ink);
+}
+.cert-own-missing p {
+  margin-top: 8px;
+}
+.cert-own-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+.cert-own-share {
+  margin-top: 24px;
+  padding: 20px 22px;
+  border-radius: 16px;
+  border: 1px solid var(--dc-line);
+  background: #fff;
+  font-size: 15px;
+}
+.cert-own-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.cert-own-number {
+  margin: 2px 0 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.cert-own-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+}
+.cert-own-link .vf-mono {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  color: var(--dc-ink);
+}
+.cert-own-note {
+  margin-top: 20px;
+  font-size: 15px;
+}
+.cert-own-note strong {
+  color: var(--dc-ink);
+}
+
 /* About's link to the check. */
 .dc-feature-link {
   display: inline-flex;
