@@ -44,6 +44,7 @@ describe("a city's events page", () => {
     expect(kept.title).toBe("Events in Kochi: hackathons, workshops and meetups");
     expect(kept.alternates.canonical).toBe("https://myotherapp.in/events/in/kochi");
     expect(kept.openGraph.locale).toBe("en_IN");
+    expect(kept.alternates.types["application/rss+xml"][0]).toEqual({ url: "https://myotherapp.in/events/rss.xml?near=9.9816,76.2999&radius_km=25&type=in_person", title: "Upcoming events in Kochi on MyOtherApp" });
     expect(kept.robots).toBeUndefined();
     expect(cityEventsMetadata(kochi, { indexable: false }).robots).toEqual({ index: false, follow: true });
   });

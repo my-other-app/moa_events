@@ -7,7 +7,7 @@
  * Every image here is a stable address on the site (/media/..., /og/...),
  * never a presigned S3 link: a crawler keeps what it read for weeks.
  */
-import { APP_STORE_URL, CONTACT_EMAIL, PLAY_STORE_URL, SITE_NAME, SITE_URL } from "@/config";
+import { APP_STORE_URL, CONTACT_EMAIL, PLAY_STORE_URL, SITE_NAME, SITE_URL, SOCIAL_PROFILES } from "@/config";
 import { addressOf, cityOf } from "./cities";
 import { istIso } from "./time";
 
@@ -284,7 +284,7 @@ export function siteJsonLd() {
         { "@type": "State", name: "Kerala" },
       ],
       contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: CONTACT_EMAIL, areaServed: "IN", availableLanguage: ["en"] },
-      sameAs: [PLAY_STORE_URL, APP_STORE_URL].filter(isHttp),
+      sameAs: [...SOCIAL_PROFILES, PLAY_STORE_URL, APP_STORE_URL].filter(isHttp),
     }),
     {
       "@context": "https://schema.org",

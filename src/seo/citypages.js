@@ -18,7 +18,7 @@ import { CITIES_PATH, cityClubsPath, cityEventsPath, isKerala } from "./cities";
 import { demoSettings, isDemoCard, isDemoClub, withoutDemo } from "./demo";
 import { breadcrumbJsonLd, clean, collectionPageJsonLd, itemListJsonLd } from "./jsonld";
 import { SITE_NAME, pageMetadata } from "./metadata";
-import { absoluteUrl, clubPagePath, eventPagePath } from "./urls";
+import { absoluteUrl, clubPagePath, eventPagePath, feeds } from "./urls";
 
 /** "Kochi (Ernakulam, Cochin)": the name, and the first two it also goes by. */
 export const cityAlso = (city) => (city.also.length ? `${city.name} (${city.also.slice(0, 2).join(", ")})` : city.name);
@@ -26,11 +26,16 @@ export const cityAlso = (city) => (city.also.length ? `${city.name} (${city.also
 /** "Kochi, Kerala". */
 export const cityWhere = (city) => `${city.name}, ${city.state}`;
 
-/** The find page for the same place, for "See all": /events?near=…&radius_km=… (the nearest radius it offers, at least the city's). */
+/** The radius the find pages offer that holds the city (the nearest at least its own). */
+const finderRadius = (city) => RADIUS_OPTIONS.find((r) => r >= city.radiusKm) || RADIUS_OPTIONS.at(-1);
+
+/** The find page for the same place, for "See all": /events?near=…&radius_km=…. */
 export function cityFinderPath(city, kind = "events") {
-  const radius = RADIUS_OPTIONS.find((r) => r >= city.radiusKm) || RADIUS_OPTIONS.at(-1);
-  return `/${kind}?near=${city.lat},${city.lng}&radius_km=${radius}`;
+  return `/${kind}?near=${city.lat},${city.lng}&radius_km=${finderRadius(city)}`;
 }
+
+/** The events feed for the same place: in person, around the city. */
+export const cityFeedPath = (city) => feeds.events(`near=${city.lat},${city.lng}&radius_km=${finderRadius(city)}&type=in_person`);
 
 /* ---------- events in a city ---------- */
 
@@ -53,10 +58,10 @@ export function cityEventsIntro(city, { count = 0, more = false, clubs = 0 } = {
   return `${lead}Hackathons, workshops, meetups, talks and fests run by student and community clubs within ${city.radiusKm} km of ${city.name}. ${what}`;
 }
 
-/** /events/in/{city}'s head; `indexable` when it lists at least one real upcoming event. */
+/** /events/in/{city}'s head, with the feed for the place; `indexable` when it lists at least one real upcoming event. */
 export function cityEventsMetadata(city, { indexable }) {
   const { title, description } = cityEventsHead(city);
-  return pageMetadata({ title, description, path: cityEventsPath(city), noindex: !indexable });
+  return pageMetadata({ title, description, path: cityEventsPath(city), noindex: !indexable, rss: { url: cityFeedPath(city), title: `Upcoming events in ${city.name} on ${SITE_NAME}` } });
 }
 
 /** A city as schema.org Place: its name, state and country, and its centre. */
