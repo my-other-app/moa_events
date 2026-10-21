@@ -83,33 +83,34 @@ describe("a post, signed in", () => {
   it("is read as the signed-in person, and Like likes it here — at once, and back again", async () => {
     post.mockResolvedValueOnce({ data: { liked: true, likes: 13 } }).mockResolvedValueOnce({ data: { liked: false, likes: 12 } });
     show();
-    const like = await screen.findByRole("button", { name: "Like" });
+    const like = await screen.findByRole("button", { name: "Like (12 likes)" });
     expect(get).toHaveBeenCalledWith("/api/v1/threads/t1", { userOnly: true });
     expect(like).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(like);
     expect(like).toHaveAttribute("aria-pressed", "true");
-    expect(like).toHaveTextContent("Liked");
-    expect(screen.getByText("13 likes")).toBeInTheDocument();
+    expect(like).toHaveAccessibleName("Liked (13 likes)");
+    expect(like.querySelector(".dc-tcard-count")).toHaveTextContent("13");
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/threads/t1/like"));
 
     fireEvent.click(like);
     await waitFor(() => expect(like).toHaveAttribute("aria-pressed", "false"));
-    expect(screen.getByText("12 likes")).toBeInTheDocument();
+    expect(like).toHaveAccessibleName("Like (12 likes)");
     expect(post).toHaveBeenCalledTimes(2);
-    // Commenting still happens in the app.
-    fireEvent.click(screen.getByRole("button", { name: /^Comment$/ }));
+    // Still one like control, and commenting still happens in the app.
+    expect(screen.getAllByRole("button", { name: /like/i })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /^Comment\b/ }));
     expect(screen.getByRole("dialog", { name: "Do this in the app" })).toBeInTheDocument();
   });
 
   it("puts the like back when it doesn't save", async () => {
     post.mockRejectedValue(Object.assign(new Error("500"), { response: { status: 500 } }));
     show();
-    const like = await screen.findByRole("button", { name: "Like" });
+    const like = await screen.findByRole("button", { name: "Like (12 likes)" });
     fireEvent.click(like);
     expect(await screen.findByText("Your like didn't save. Try again.")).toBeInTheDocument();
     expect(like).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("12 likes")).toBeInTheDocument();
+    expect(like).toHaveAccessibleName("Like (12 likes)");
   });
 
   it("votes in a poll and shows the poll as it now stands", async () => {
@@ -139,8 +140,8 @@ describe("a post, signed in, from the server's HTML", () => {
     thread = { ...post1, liked: true, likes: 13 };
     const { problems, container, unmount } = await hydrate(page("t1"), { inBrowser: () => signInAs() });
     expect(problems.filter((p) => /hydrat|did not match|mismatch/i.test(p))).toEqual([]);
-    await waitFor(() => expect(within(container).getByRole("button", { name: "Liked" })).toHaveAttribute("aria-pressed", "true"));
-    expect(within(container).getByText("13 likes")).toBeInTheDocument();
+    await waitFor(() => expect(within(container).getByRole("button", { name: "Liked (13 likes)" })).toHaveAttribute("aria-pressed", "true"));
+    expect(within(container).getAllByRole("button", { name: /like/i })).toHaveLength(1);
     unmount();
   });
 });
@@ -156,14 +157,14 @@ describe("a post, signed out", () => {
       throw new Error(`unexpected POST ${url}`);
     });
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Like" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Like (12 likes)" }));
     const prompt = screen.getByRole("dialog", { name: "Do this in the app" });
     fireEvent.click(within(prompt).getByRole("button", { name: "Sign in to like it here" }));
     const sheet = await screen.findByRole("dialog", { name: "Sign in to like posts" });
     fireEvent.click(await within(sheet).findByRole("button", { name: "Sign in with Google" }));
 
     await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/threads/t1/like"));
-    expect(await screen.findByRole("button", { name: "Liked" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("button", { name: "Liked (13 likes)" })).toHaveAttribute("aria-pressed", "true");
     // Read as the new reader before liking, so an earlier like isn't undone.
     expect(get.mock.calls.filter(([url]) => url === "/api/v1/threads/t1")).toHaveLength(1);
     expect(post.mock.calls.filter(([url]) => url === "/api/v1/threads/t1/like")).toHaveLength(1);
@@ -171,7 +172,7 @@ describe("a post, signed out", () => {
 
   it("offers only the app in a build without sign-in", async () => {
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "Like" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Like (12 likes)" }));
     const prompt = screen.getByRole("dialog", { name: "Do this in the app" });
     expect(within(prompt).queryByRole("button", { name: /Sign in/ })).toBeNull();
     expect(post).not.toHaveBeenCalled();

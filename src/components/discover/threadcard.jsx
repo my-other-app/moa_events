@@ -44,13 +44,16 @@ export function Poll({ poll, onVote = null }) {
 }
 
 /**
- * A club's post. In a list it is a card that opens the post; on the post's
- * own page (`full`) it shows everything, and the page puts its islands in
- * the slots: `poll` (the poll you can vote in), `likes` (the count that
- * moves with your like) and `actions` (Like, Comment). Without them it is
- * the plain card, rendered on the server or in the browser alike.
+ * A club's post. In a list it is a card that opens the post, its likes and
+ * comments counted under it. On the post's own page (`full`) it shows
+ * everything, and the page puts its islands in the slots: `poll` (the poll
+ * you can vote in) and `actions` (Like and Comment, each carrying its
+ * count). The actions take the counts' place: the post shows one like and
+ * one comment control, never a row of counts drawn like them above a row of
+ * buttons. Without the slots it is the plain card, rendered on the server
+ * or in the browser alike.
  */
-export function ThreadCard({ thread, full = false, headingLevel = 3, poll = null, likes = null, actions = null }) {
+export function ThreadCard({ thread, full = false, headingLevel = 3, poll = null, actions = null }) {
   const t = thread;
   const club = t.club;
   const ago = timeAgo(t.created_at);
@@ -85,17 +88,16 @@ export function ThreadCard({ thread, full = false, headingLevel = 3, poll = null
         </div>
       ) : null}
       {t.poll ? poll || <Poll poll={t.poll} /> : null}
-      <div className="dc-tcard-foot">
-        {likes || (
+      {actions || (
+        <div className="dc-tcard-foot">
           <span className="dc-tcard-stat">
             <Icon name="heart" size={16} /> {plural(t.likes, "like")}
           </span>
-        )}
-        <span className="dc-tcard-stat">
-          <Icon name="comment" size={16} /> {plural(t.comments, "comment")}
-        </span>
-      </div>
-      {actions}
+          <span className="dc-tcard-stat">
+            <Icon name="comment" size={16} /> {plural(t.comments, "comment")}
+          </span>
+        </div>
+      )}
     </article>
   );
 }

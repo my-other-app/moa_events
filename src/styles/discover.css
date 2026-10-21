@@ -1208,6 +1208,15 @@ button.dc-poll-option:hover {
 .dc-tcard-action:hover {
   background: var(--dc-sunken);
 }
+.dc-tcard-count {
+  min-width: 1ch;
+  font-weight: 500;
+  color: var(--dc-muted);
+  font-variant-numeric: tabular-nums;
+}
+.dc-tcard-action[aria-pressed="true"] .dc-tcard-count {
+  color: inherit;
+}
 .dc-threads {
   display: grid;
   gap: 16px;
