@@ -51,7 +51,7 @@
   color: var(--dc-ink);
   font-size: 14px;
   white-space: nowrap;
-  transition: border-color 0.15s;
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-sort:hover {
   border-color: var(--dc-ink);

@@ -49,7 +49,7 @@ export const PollCard = ({ eventId, poll, onChange }) => {
               <span>
                 {c.label}
                 <span className="live-bar" style={{ width: 160 }}>
-                  <span style={{ width: `${c.pct}%` }} />
+                  <span style={{ transform: `scaleX(${Math.min(100, Math.max(0, c.pct)) / 100})` }} />
                 </span>
               </span>
               <span className="live-pct">{c.pct}%</span>

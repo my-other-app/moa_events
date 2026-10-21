@@ -23,7 +23,6 @@
   display: block;
   width: 100%;
   height: 100%;
-  transition: transform 0.5s ease;
 }
 .dc-cover-text {
   position: relative;
@@ -126,15 +125,10 @@
   border: 1px solid var(--dc-line);
   border-radius: 16px;
   background: #fff;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
 }
+/* Its lift, shadow and press: styles/motion.css. */
 .dc-evcard:hover {
-  transform: translateY(-3px);
   border-color: #d1d5db;
-  box-shadow: 0 20px 36px -20px rgba(17, 24, 39, 0.38);
 }
 .dc-evcard-club {
   display: flex;
@@ -167,11 +161,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.35s ease;
-}
-.dc-evcard:hover .dc-evcard-media > img,
-.dc-evcard:hover .dc-cover-art {
-  transform: scale(1.04);
 }
 .dc-evcard-pills {
   position: absolute;
@@ -399,20 +388,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dc-evcard,
-  .dc-evcard-media > img,
   .dc-cover-art,
-  .dc-clubcard,
   .dc-fan-slot {
     transition: none !important;
-  }
-  .dc-evcard:hover,
-  .dc-clubcard:hover {
-    transform: none;
-  }
-  .dc-evcard:hover .dc-evcard-media > img,
-  .dc-evcard:hover .dc-cover-art {
-    transform: none;
   }
   .dc-hero2-livedot {
     animation: none !important;
@@ -471,24 +449,16 @@
 .dc-scope .dc-clubcard {
   height: 100%;
   border-radius: 16px;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
 }
+/* Its lift, shadow and press: styles/motion.css. */
 .dc-scope .dc-clubcard:hover {
-  transform: translateY(-3px);
   border-color: #d1d5db;
-  box-shadow: 0 20px 36px -20px rgba(17, 24, 39, 0.38);
 }
 .dc-clubcard .dc-ccard-cover > .dc-avatar {
   z-index: 1;
   box-shadow:
     0 0 0 3px #fff,
     0 6px 14px -4px rgba(17, 24, 39, 0.3);
-}
-.dc-clubcard:hover .dc-cover-art {
-  transform: scale(1.04);
 }
 .dc-clubcard .dc-ccard-body {
   gap: 8px;
@@ -570,7 +540,7 @@
   font-weight: 600;
   color: var(--dc-ink);
   box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
-  transition: border-color 0.15s;
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-hero2-live:hover {
   border-color: var(--dc-ink);
@@ -657,7 +627,7 @@
   box-shadow:
     0 1px 2px rgba(17, 24, 39, 0.05),
     0 22px 44px -28px rgba(17, 24, 39, 0.4);
-  transition: border-color 0.15s;
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-hero2-search:focus-within {
   border-color: #9ca3af;
@@ -767,8 +737,8 @@
   color: var(--dc-ink);
   white-space: nowrap;
   transition:
-    background-color 0.15s,
-    border-color 0.15s;
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-hero2-cat:hover {
   border-color: var(--dc-ink);
@@ -1133,9 +1103,9 @@
   border-radius: 999px;
   color: var(--dc-text);
   transition:
-    background-color 0.15s,
-    border-color 0.15s,
-    color 0.15s;
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-member-links a:hover {
   border-color: var(--dc-ink);

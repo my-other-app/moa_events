@@ -32,12 +32,13 @@ import Icon from "./icons";
  * person asked for, not errors.
  */
 function useClubFollow(clubId, signedIn) {
-  const [s, setS] = useState({ known: false, on: false, busy: false, error: null, delta: 0 });
+  // `flips`: the reader's own presses, so only those animate (styles/motion.css).
+  const [s, setS] = useState({ known: false, on: false, busy: false, error: null, delta: 0, flips: 0 });
   const acted = useRef(false);
 
   useEffect(() => {
     acted.current = false;
-    setS({ known: false, on: false, busy: false, error: null, delta: 0 });
+    setS({ known: false, on: false, busy: false, error: null, delta: 0, flips: 0 });
     if (!signedIn || clubId === null || clubId === undefined) return undefined;
     let alive = true;
     accountApi.isFollowing(clubId).then(
@@ -54,7 +55,7 @@ function useClubFollow(clubId, signedIn) {
       if (clubId === null || clubId === undefined) return;
       acted.current = true;
       const step = want ? 1 : -1;
-      setS((x) => ({ ...x, known: true, on: want, busy: true, error: null, delta: x.delta + step }));
+      setS((x) => ({ ...x, known: true, on: want, busy: true, error: null, delta: x.delta + step, flips: x.flips + 1 }));
       (want ? accountApi.follow(clubId, currentRef()) : accountApi.unfollow(clubId)).then(
         (changed) => setS((x) => ({ ...x, busy: false, delta: changed ? x.delta : x.delta - step })),
         () =>
@@ -121,12 +122,16 @@ function FollowButton({ ghost = false }) {
       className={`dc-btn ac-follow${follow.on ? " is-on" : ghost ? " dc-btn--ghost" : ""}`}
       aria-pressed={follow.on}
       aria-busy={follow.busy || undefined}
+      data-pop={follow.on && follow.flips ? "" : undefined}
       onClick={() => {
         if (!follow.busy) follow.set(!follow.on);
       }}
     >
       <Icon name={follow.on ? "check" : "plus"} size={18} />
-      {follow.on ? "Following" : "Follow"}
+      {/* A new label for a new state: "Follow" → "Following" slides in when the reader pressed it. */}
+      <span key={follow.on ? "on" : "off"} className={follow.flips ? "ac-follow-label is-swapped" : "ac-follow-label"}>
+        {follow.on ? "Following" : "Follow"}
+      </span>
     </button>
   );
 }

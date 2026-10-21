@@ -62,11 +62,10 @@
   border-radius: var(--dc-radius);
   background: #fff;
   color: var(--dc-text);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+/* Its lift, shadow and press: styles/motion.css. */
 .tp-card:hover {
   border-color: var(--tp, var(--dc-ink));
-  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
 }
 .tp-card:focus-visible {
   outline: 2px solid var(--dc-ink);

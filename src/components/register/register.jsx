@@ -567,13 +567,17 @@ function Flow({ event, club, info, onDone }) {
   }, [ready, want, step.id, hrefFor]);
 
   // A new step starts at the top, with its title focused (or the field that needs fixing).
+  // From the second step shown on, each one comes in with a short slide (`stepping`, styles/motion.css);
+  // the first is simply there.
   const seen = useRef(false);
+  const [stepping, setStepping] = useState(false);
   useEffect(() => {
     if (!ready) return;
     if (!seen.current) {
       seen.current = true;
       return;
     }
+    setStepping(true);
     scrollTop();
     if (focusNext.current) {
       const key = focusNext.current;
@@ -816,10 +820,10 @@ function Flow({ event, club, info, onDone }) {
     <div className="rg-layout">
       {summary}
       <div className="rg-main">
-        <form className="rg-form" noValidate onSubmit={onSubmit} aria-labelledby="rg-step-title">
+        <form className={`rg-form${stepping ? " is-stepping" : ""}`} noValidate onSubmit={onSubmit} aria-labelledby="rg-step-title">
           <Progress steps={steps} index={index} onJump={(id) => goTo(id, { edit: isReview })} />
 
-          <header className="rg-step-head">
+          <header key={step.id} className="rg-step-head">
             <h1 id="rg-step-title" className="rg-h1" ref={heading} tabIndex={-1}>
               <span className="dc-sr">
                 Step {index + 1} of {steps.length}:{" "}

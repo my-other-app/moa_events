@@ -38,7 +38,7 @@
     border: white 2px solid;    
     border-radius: 8px;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background var(--motion-slow) var(--motion-ease-out);
   }
   
   .home-button:hover {

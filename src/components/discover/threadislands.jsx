@@ -8,12 +8,15 @@
  * its poll (the button changes at once, and changes back if the server
  * says no). Everyone else, and commenting, gets the app prompt, with
  * signing in as the other way where the build has it.
+ *
+ * The post has one Like and one Comment, each carrying its count
+ * (<ThreadActions>): no separate row of counts, no second comment button.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { accountApi } from "@/api/account";
 import { discoverApi } from "@/api/discover";
 import { useAuth } from "@/auth/context";
-import { plural } from "@/utils/format";
+import { formatCount, plural } from "@/utils/format";
 import { AppPrompt } from "./dialog";
 import { Poll } from "./threadcard";
 import Icon from "./icons";
@@ -29,11 +32,12 @@ const SIGN_IN_TO = { like: "Sign in to like it here", vote: "Sign in to vote her
 const ReaderContext = createContext(null);
 const useReader = () => useContext(ReaderContext);
 
-/** `thread`: {id, likes, poll} as the server read it. */
+/** `thread`: {id, likes, comments, poll} as the server read it. */
 export function ThreadReader({ thread: initial, children }) {
   const auth = useAuth();
   const signedIn = auth.status === "signed-in";
-  const [t, setT] = useState({ liked: false, likes: initial.likes, poll: initial.poll, readAs: false });
+  // `taps`: the reader's own likes and unlikes here, so only those animate (styles/motion.css).
+  const [t, setT] = useState({ liked: false, likes: initial.likes, poll: initial.poll, readAs: false, taps: 0 });
   const [prompt, setPrompt] = useState(null);
   const [note, setNote] = useState(null);
   const busy = useRef(false);
@@ -43,12 +47,12 @@ export function ThreadReader({ thread: initial, children }) {
   // Read again on signing in or out: whether this reader liked it, and how they voted.
   useEffect(() => {
     if (!signedIn) {
-      setT((x) => (x.readAs ? { liked: false, likes: x.likes, poll: x.poll ? { ...x.poll, voted_option_id: null } : x.poll, readAs: false } : x));
+      setT((x) => (x.readAs ? { liked: false, likes: x.likes, poll: x.poll ? { ...x.poll, voted_option_id: null } : x.poll, readAs: false, taps: x.taps } : x));
       return undefined;
     }
     let alive = true;
     discoverApi.thread(id).then(
-      (fresh) => alive && setT({ liked: fresh.liked, likes: fresh.likes, poll: fresh.poll, readAs: true }),
+      (fresh) => alive && setT((x) => ({ liked: fresh.liked, likes: fresh.likes, poll: fresh.poll, readAs: true, taps: x.taps })),
       () => {
         /* the page as the server read it stands */
       }
@@ -63,7 +67,7 @@ export function ThreadReader({ thread: initial, children }) {
       if (busy.current) return;
       busy.current = true;
       setNote(null);
-      setT((x) => ({ ...x, liked: !now.liked, likes: Math.max(0, now.likes + (now.liked ? -1 : 1)) }));
+      setT((x) => ({ ...x, liked: !now.liked, likes: Math.max(0, now.likes + (now.liked ? -1 : 1)), taps: x.taps + 1 }));
       try {
         const r = await accountApi.toggleLike(id);
         setT((x) => ({ ...x, liked: r.liked, likes: r.likes }));
@@ -126,7 +130,7 @@ export function ThreadReader({ thread: initial, children }) {
   };
 
   return (
-    <ReaderContext.Provider value={{ t, act, note }}>
+    <ReaderContext.Provider value={{ t, act, note, comments: initial.comments }}>
       {children}
       <AppPrompt
         open={Boolean(prompt)}
@@ -151,26 +155,41 @@ export function ThreadPoll() {
   return t.poll ? <Poll poll={t.poll} onVote={(o) => act("vote", o.id)} /> : null;
 }
 
-/** "12 likes", moving with the reader's own like. */
-export function ThreadLikes() {
-  const { t } = useReader();
+/**
+ * A button's count: the number to see (none at 0), the words to hear:
+ * "Like (12 likes)". `bump` changes when the reader's own tap moved it: the
+ * number rolls in again.
+ */
+function Count({ n, one, bump = 0 }) {
   return (
-    <span className="dc-tcard-stat">
-      <Icon name="heart" size={16} /> {plural(t.likes, "like")}
-    </span>
+    <>
+      {n > 0 ? (
+        <span key={bump} className={`dc-tcard-count${bump ? " is-bumped" : ""}`} aria-hidden="true">
+          {formatCount(n)}
+        </span>
+      ) : null}
+      {" "}
+      <span className="dc-sr">{`(${plural(n, one)})`}</span>
+    </>
   );
 }
 
-/** Like and Comment, under the post. */
+/**
+ * Like and Comment, under the post: the post's only like and comment
+ * controls, each with its count (the likes move with the reader's own like).
+ */
 export function ThreadActions() {
-  const { t, act } = useReader();
+  const { t, act, comments } = useReader();
   return (
     <div className="dc-tcard-actions">
-      <button type="button" className="dc-tcard-action" aria-pressed={t.liked} onClick={() => act("like")}>
-        <Icon name="heart" size={16} /> {t.liked ? "Liked" : "Like"}
+      {/* data-pop: liked by this tap, so the heart pops (styles/motion.css). */}
+      <button type="button" className="dc-tcard-action dc-like" aria-pressed={t.liked} data-pop={t.liked && t.taps ? "" : undefined} onClick={() => act("like")}>
+        <Icon name="heart" size={18} /> {t.liked ? "Liked" : "Like"}
+        <Count n={t.likes} one="like" bump={t.taps} />
       </button>
       <button type="button" className="dc-tcard-action" onClick={() => act("comment")}>
-        <Icon name="comment" size={16} /> Comment
+        <Icon name="comment" size={18} /> Comment
+        <Count n={comments} one="comment" />
       </button>
     </div>
   );
@@ -184,16 +203,6 @@ export function ThreadNote() {
       {note}
     </p>
   ) : null;
-}
-
-/** "Add a comment": comments are written in the app. */
-export function CommentButton() {
-  const { act } = useReader();
-  return (
-    <button type="button" className="dc-btn dc-btn--ghost" onClick={() => act("comment")}>
-      <Icon name="comment" size={16} /> Add a comment
-    </button>
-  );
 }
 
 /** The line under "From the clubs": what a reader can do here, signed in or not. */

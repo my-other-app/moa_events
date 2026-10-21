@@ -9,7 +9,7 @@
   font-weight: 400;
   font-size: 20px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--motion-base) var(--motion-ease-out);
 }
 .register-btn:hover {
   background-color: #1e2530;

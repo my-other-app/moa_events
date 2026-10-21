@@ -10,6 +10,28 @@ import wordmark from "@/assets/wordmark-sm.png";
 // "Get the app" opens a dialog: its code comes the first time it is opened.
 const AppPrompt = lazy(() => import("./dialog").then((m) => ({ default: m.AppPrompt })));
 
+/** Whether the page is scrolled past its top: the bar (sticky on a desk) then casts a soft shadow. */
+function useScrolled() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    let frame = 0;
+    const look = () => {
+      frame = 0;
+      setScrolled(window.scrollY > 4);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(look);
+    };
+    look();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+  return scrolled;
+}
+
 /**
  * The bar on top of every public page: the wordmark home, the three ways
  * in (events, clubs, posts) and the page for clubs that run events, a
@@ -21,7 +43,9 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [q, setQ] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [appOpen, setAppOpen] = useState(false);
+  // The app prompt's code comes the first time it is opened; after that it stays, so it can fade away.
+  const [app, setApp] = useState({ loaded: false, open: false });
+  const scrolled = useScrolled();
   const input = useRef(null);
   const inputId = useId();
   const formId = useId();
@@ -38,7 +62,7 @@ export function SiteHeader() {
   };
 
   return (
-    <header className="dc-header dc-scope">
+    <header className={`dc-header dc-scope${scrolled ? " is-scrolled" : ""}`}>
       <div className="dc-wrap dc-header-row">
         <Link to="/" className="dc-brand" aria-label="MyOtherApp home">
           <img src={assetSrc(wordmark)} alt="MyOtherApp" width="108" height="26" />
@@ -75,13 +99,13 @@ export function SiteHeader() {
         <div className="dc-header-account">
           <HeaderAccount />
         </div>
-        <button type="button" className="dc-btn dc-btn--sm dc-header-app" onClick={() => setAppOpen(true)}>
+        <button type="button" className="dc-btn dc-btn--sm dc-header-app" onClick={() => setApp({ loaded: true, open: true })}>
           Get the app
         </button>
       </div>
-      {appOpen ? (
+      {app.loaded ? (
         <Suspense fallback={null}>
-          <AppPrompt open onClose={() => setAppOpen(false)} />
+          <AppPrompt open={app.open} onClose={() => setApp({ loaded: true, open: false })} />
         </Suspense>
       ) : null}
     </header>

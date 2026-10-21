@@ -1,0 +1,457 @@
+/*
+ * Motion: small, quick and the same everywhere. Durations and easings are
+ * index.css's tokens (--motion-*); this sheet comes last, over the
+ * components' own.
+ *
+ * House rules:
+ *   - Only transform and opacity move. Colours (and the club card's shadow)
+ *     fade, which is paint only; nothing animates a size, a margin or
+ *     anything else that lays out the page.
+ *   - Nothing that could be the page's largest paint starts invisible.
+ *     Chrome records no paint at all for opacity 0, so an entrance from 0
+ *     would hold back (or hide) the LCP: entrances start at 0.01, which looks
+ *     the same and is painted on the first frame. The hero and an event's
+ *     poster (eager images) never animate in.
+ *   - Things move inside the space they already hold (transforms), so
+ *     nothing shifts (CLS stays 0).
+ *   - Every moving rule is inside prefers-reduced-motion: no-preference.
+ *     Asking for less motion keeps the colours and states, without travel;
+ *     the tokens are 0 then too.
+ */
+
+/* ---------- keyframes ---------- */
+
+@keyframes motion-rise {
+  from {
+    opacity: 0.01;
+    transform: translateY(var(--motion-rise));
+  }
+}
+@keyframes motion-fade {
+  from {
+    opacity: 0.01;
+  }
+}
+@keyframes motion-drop {
+  from {
+    opacity: 0.01;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+@keyframes motion-modal {
+  from {
+    opacity: 0.01;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+@keyframes motion-step {
+  from {
+    opacity: 0.01;
+    transform: translateX(14px);
+  }
+}
+/* A heart or a tick, pressed: a little bigger, then back. */
+@keyframes motion-pop {
+  40% {
+    transform: scale(1.28);
+  }
+}
+/* A count or a label replaced: the new one comes up from below. */
+@keyframes motion-roll {
+  from {
+    opacity: 0.01;
+    transform: translateY(45%);
+  }
+}
+/* Fixed toasts centred with translateX(-50%) keep it while they come in. */
+@keyframes motion-rise-centred {
+  from {
+    opacity: 0.01;
+    transform: translate(-50%, var(--motion-rise));
+  }
+}
+/* Leaving (utils/presence.js waits for animations named motion-out-*). */
+@keyframes motion-out-fade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes motion-out-drop {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes motion-out-sink {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes motion-out-sheet {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* ---------- links and buttons: colours ---------- */
+
+/* Every link and button fades between its colours (0ms when less motion is asked for). */
+.dc-scope :where(a, button, summary, [role="button"]) {
+  transition: var(--motion-colors);
+}
+/* Underlines fade in rather than snap. */
+.dc-link,
+.dc-footer a,
+.dc-tcard-club a {
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+.dc-link:hover,
+.dc-footer a:hover,
+.dc-tcard-club a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* ---------- the lift's shadow ---------- */
+
+/*
+ * A card under the pointer casts a shadow: a layer under it that fades in
+ * (opacity), rather than a box-shadow that repaints every frame. The club
+ * card clips its cover (overflow: hidden), so its own box-shadow fades.
+ */
+.dc-evcard::before,
+.dc-tcard--clamp::before,
+.tp-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: var(--motion-lift-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--motion-ease-out);
+}
+.tp-card::before {
+  left: -5px;
+}
+@media (hover: hover) {
+  .dc-evcard:hover::before,
+  .dc-tcard--clamp:hover::before,
+  .tp-card:hover::before {
+    opacity: 1;
+  }
+}
+.dc-evcard:has(:focus-visible)::before,
+.dc-tcard--clamp:has(:focus-visible)::before,
+.tp-card:focus-visible::before {
+  opacity: 1;
+}
+
+/* ---------- the like: the heart fills ---------- */
+
+.dc-like svg {
+  fill: transparent;
+  transition: fill var(--motion-fast) var(--motion-ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---------- buttons: hover, press, busy ---------- */
+
+  :is(
+      .dc-btn,
+      .dc-chipbtn,
+      .dc-iconbtn,
+      .dc-tcard-action,
+      .dc-field-go,
+      .dc-where-change,
+      .dc-header-searchtoggle,
+      .dc-searchbox button,
+      .dc-modal-later,
+      .ep-action,
+      .ac-signin,
+      .ac-menu-btn,
+      .tp-chip,
+      button.dc-poll-option,
+      .live-option,
+      .register-btn,
+      .snackbar-close-btn
+    ) {
+    transition:
+      var(--motion-colors),
+      transform var(--motion-fast) var(--motion-ease-out);
+  }
+  :is(
+      .dc-btn,
+      .dc-chipbtn,
+      .dc-iconbtn,
+      .dc-tcard-action,
+      .dc-field-go,
+      .dc-where-change,
+      .dc-header-searchtoggle,
+      .dc-searchbox button,
+      .dc-modal-later,
+      .ep-action,
+      .ac-signin,
+      .ac-menu-btn,
+      .tp-chip,
+      .live-option,
+      .register-btn,
+      .snackbar-close-btn
+    ):active:not(:disabled, [aria-disabled="true"]) {
+    transform: scale(var(--motion-press));
+  }
+  /* Wide rows press less. */
+  button.dc-poll-option:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+  /* Busy: the spinner fades in as the label changes. */
+  .rg-spin {
+    animation:
+      motion-fade var(--motion-base) var(--motion-ease-out) backwards,
+      rg-spin 0.75s linear infinite;
+  }
+  .ac-spin {
+    animation:
+      motion-fade var(--motion-base) var(--motion-ease-out) backwards,
+      ac-spin 0.8s linear infinite;
+  }
+
+  /* ---------- cards: lift, press, focus ---------- */
+
+  :is(.dc-evcard, .dc-tcard--clamp, .tp-card, .dc-scope .dc-clubcard) {
+    transition:
+      var(--motion-colors),
+      transform var(--motion-base) var(--motion-ease-out);
+  }
+  @media (hover: hover) {
+    :is(.dc-evcard, .dc-tcard--clamp, .tp-card, .dc-scope .dc-clubcard):hover {
+      transform: translateY(var(--motion-lift));
+    }
+  }
+  /* Tabbing onto a card lifts it like the pointer does. */
+  :is(.dc-evcard, .dc-tcard--clamp, .dc-scope .dc-clubcard):has(:focus-visible),
+  .tp-card:focus-visible {
+    transform: translateY(var(--motion-lift));
+  }
+  :is(.dc-evcard, .dc-tcard--clamp, .tp-card, .dc-scope .dc-clubcard):active {
+    transform: scale(0.985);
+    transition-duration: var(--motion-fast);
+  }
+
+  /* A card's picture leans in a little under the pointer. */
+  .dc-evcard-media > img,
+  .dc-evcard .dc-cover-art,
+  .dc-ccard-cover img,
+  .dc-clubcard .dc-cover-art,
+  .dc-tcard--clamp .dc-tcard-image img {
+    transition: transform var(--motion-slow) var(--motion-ease-out);
+  }
+  @media (hover: hover) {
+    .dc-evcard:hover .dc-evcard-media > img,
+    .dc-evcard:hover .dc-cover-art,
+    .dc-clubcard:hover .dc-ccard-cover img,
+    .dc-clubcard:hover .dc-cover-art,
+    .dc-tcard--clamp:hover .dc-tcard-image img {
+      transform: scale(1.04);
+    }
+  }
+
+  /* "← All posts": the arrow leads the way. */
+  .dc-back svg {
+    transition: transform var(--motion-fast) var(--motion-ease-out);
+  }
+  .dc-back:hover svg {
+    transform: translateX(-3px);
+  }
+
+  /* ---------- images: a lazy one fades in as it arrives (components/discover/img.jsx) ---------- */
+
+  img[data-fade="wait"] {
+    opacity: 0.01;
+  }
+  img[data-fade="in"] {
+    animation: motion-fade var(--motion-slow) var(--motion-ease-out);
+  }
+
+  /* ---------- lists: the first cards come in, one after another ---------- */
+
+  /*
+   * Only the first eight of a list, and never what "Load more" adds (those
+   * come after the first page). The delay is capped at five steps (200ms).
+   */
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist, .tp-grid) > :nth-child(-n + 8) {
+    animation: motion-rise var(--motion-slow) var(--motion-ease-out) backwards;
+  }
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist, .tp-grid) > :nth-child(2) {
+    animation-delay: var(--motion-stagger);
+  }
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist, .tp-grid) > :nth-child(3) {
+    animation-delay: calc(var(--motion-stagger) * 2);
+  }
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist, .tp-grid) > :nth-child(4) {
+    animation-delay: calc(var(--motion-stagger) * 3);
+  }
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist, .tp-grid) > :nth-child(5) {
+    animation-delay: calc(var(--motion-stagger) * 4);
+  }
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist, .tp-grid) > :nth-child(n + 6):nth-child(-n + 8) {
+    animation-delay: calc(var(--motion-stagger) * 5);
+  }
+  /*
+   * Waiting: skeletons come up softly and a beat late, so a quick answer
+   * never flashes them; the cards that replace them rise in (above): a
+   * cross-fade from the one to the other.
+   */
+  :is(.dc-grid, .dc-rail--cards, .dc-threads, .dc-rowlist)[role="status"] > *,
+  .dc-calview-skel,
+  .me-skel,
+  .rg-skel-progress {
+    animation: motion-fade var(--motion-base) var(--motion-ease-out) calc(var(--motion-stagger) * 3) backwards;
+  }
+
+  /* ---------- the like: the heart pops, the count rolls ---------- */
+
+  .dc-like[data-pop] svg {
+    animation: motion-pop var(--motion-slow) var(--motion-ease-pop);
+  }
+  .dc-tcard-count.is-bumped {
+    animation: motion-roll var(--motion-base) var(--motion-ease-out) backwards;
+  }
+
+  /* ---------- polls: the bars glide to their new shares ---------- */
+
+  .dc-poll-bar,
+  .live-bar > span {
+    transition:
+      transform var(--motion-slow) var(--motion-ease-out),
+      background-color var(--motion-slow) var(--motion-ease-out);
+  }
+
+  /* ---------- follow and register: the new state comes in ---------- */
+
+  .ac-follow[data-pop] svg {
+    animation: motion-pop var(--motion-slow) var(--motion-ease-pop);
+  }
+  .ac-follow-label.is-swapped {
+    animation: motion-roll var(--motion-base) var(--motion-ease-out) backwards;
+  }
+  /* "You're registered", "waiting for payment", and the like, said under the button. */
+  .ep-cta-mine,
+  .ep-cta-also {
+    animation: motion-rise var(--motion-base) var(--motion-ease-out) backwards;
+  }
+
+  /* ---------- toasts and notes ---------- */
+
+  .ac-thread-note,
+  .ac-follow-err,
+  .dc-where-note,
+  .dc-banner,
+  .me-notice,
+  .live-banner,
+  .cp-note {
+    animation: motion-rise var(--motion-base) var(--motion-ease-out) backwards;
+  }
+  .ac-signedout {
+    animation: motion-rise-centred var(--motion-slow) var(--motion-ease-out) backwards;
+  }
+  .snackbar {
+    animation: fadeIn var(--motion-slow) var(--motion-ease-out);
+  }
+
+  /* ---------- menus and popovers: they drop in, and fold away ---------- */
+
+  .ac-menu-panel {
+    transform-origin: top right;
+    animation: motion-drop var(--motion-base) var(--motion-ease-out) backwards;
+  }
+  .ac-menu-panel[data-leaving] {
+    animation: motion-out-drop var(--motion-fast) var(--motion-ease-in) forwards;
+    pointer-events: none;
+  }
+  .ep-cal-menu:not([hidden]),
+  .dc-where-pop {
+    transform-origin: top left;
+    animation: motion-drop var(--motion-base) var(--motion-ease-out) backwards;
+  }
+
+  /* ---------- dialogs: up and in, then down and out (components/discover/dialog.jsx) ---------- */
+
+  .dc-modal-backdrop {
+    animation: motion-fade var(--motion-base) var(--motion-ease-out) backwards;
+  }
+  .dc-modal {
+    animation: motion-modal var(--motion-base) var(--motion-ease-out) backwards;
+  }
+  .dc-modal-backdrop[data-leaving] {
+    animation: motion-out-fade var(--motion-fast) var(--motion-ease-in) forwards;
+    pointer-events: none;
+  }
+  .dc-modal-backdrop[data-leaving] .dc-modal {
+    animation: motion-out-sink var(--motion-fast) var(--motion-ease-in) forwards;
+  }
+  @media (max-width: 599px) {
+    /* The phone's sign-in sheet goes back down the way it came up. */
+    .dc-modal-backdrop[data-leaving] .ac-sheet.dc-modal {
+      animation: motion-out-sheet var(--motion-base) var(--motion-ease-in) forwards;
+    }
+  }
+
+  /* ---------- registration: one step slides in after another ---------- */
+
+  .rg-form.is-stepping :is(.rg-step-head, .rg-fields, .rg-merch, .rg-review) {
+    animation: motion-step var(--motion-slow) var(--motion-ease-out) backwards;
+  }
+  .rg-form.is-stepping :is(.rg-fields, .rg-merch, .rg-review) {
+    animation-delay: var(--motion-stagger);
+  }
+  /* The form takes over from its skeleton with a fade. */
+  .rg-form {
+    animation: motion-fade var(--motion-base) var(--motion-ease-out) backwards;
+  }
+}
+
+/* ---------- the header ---------- */
+
+/* On a desk the bar stays on top; once the page moves under it, a soft shadow fades in below it. */
+@media (min-width: 768px) {
+  .dc-header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 1px);
+    height: 12px;
+    background: linear-gradient(rgba(17, 24, 39, 0.09), rgba(17, 24, 39, 0));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-base) var(--motion-ease-out);
+  }
+  .dc-header.is-scrolled::after {
+    opacity: 1;
+  }
+}
+
+/* On a phone the search opens under the bar: it drops in, and folds away (where the browser can animate display). */
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  .dc-header-search {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition:
+      opacity var(--motion-base) var(--motion-ease-out),
+      transform var(--motion-base) var(--motion-ease-out),
+      display var(--motion-base) allow-discrete;
+  }
+  .dc-header-search.is-open {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    .dc-header-search.is-open {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+}

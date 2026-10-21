@@ -88,13 +88,46 @@ describe("one post", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Not now" }));
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Like" }));
+    fireEvent.click(screen.getByRole("button", { name: "Like (1 like)" }));
     dialog = screen.getByRole("dialog", { name: "Do this in the app" });
     expect(within(dialog).getByText(/Liking a post/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add a comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Comment (2 comments)" }));
     expect(within(screen.getByRole("dialog")).getByText(/Comments are written in the MyOtherApp app/)).toBeInTheDocument();
+  });
+
+  // The owner saw "two Like and Comment buttons" on a post's page: a row of
+  // counts drawn with the same heart and speech bubble sat above the Like and
+  // Comment row, and "Add a comment" repeated Comment under the comments.
+  it("has one Like and one Comment, carrying the counts: nothing else on the page reads as liking or commenting", () => {
+    const { container } = show(<ThreadView thread={parseThread(post)} comments={COMMENTS} />);
+    const like = screen.getByRole("button", { name: "Like (12 likes)" });
+    const comment = screen.getByRole("button", { name: "Comment (2 comments)" });
+    expect(screen.getAllByRole("button", { name: /like/i })).toEqual([like]);
+    expect(screen.getAllByRole("button", { name: /comment/i })).toEqual([comment]);
+    expect(like.querySelector(".dc-tcard-count")).toHaveTextContent("12");
+    expect(comment.querySelector(".dc-tcard-count")).toHaveTextContent("2");
+
+    // No other words about likes or comments in the post, and one heart and one speech bubble.
+    const card = container.querySelector("article");
+    const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+    const outside = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.parentElement.closest("button") && /\b(likes?|liked|comments?)\b/i.test(n.data)) outside.push(n.data);
+    }
+    expect(outside).toEqual([]);
+    expect(card.querySelectorAll("svg")).toHaveLength(2);
+    expect(like.querySelectorAll("svg")).toHaveLength(1);
+    expect(comment.querySelectorAll("svg")).toHaveLength(1);
+  });
+
+  it("counts the comments it shows, and shows no 0 on a button", () => {
+    show(<ThreadView thread={parseThread({ ...post, likes: 0 })} comments={COMMENTS.slice(0, 1)} />);
+    const like = screen.getByRole("button", { name: "Like (0 likes)" });
+    expect(like.querySelector(".dc-tcard-count")).toBeNull();
+    expect(screen.getByRole("button", { name: "Comment (1 comment)" }).querySelector(".dc-tcard-count")).toHaveTextContent("1");
+    expect(screen.getByRole("heading", { name: "Comments (1)" })).toBeInTheDocument();
   });
 
   it("still shows the post when its comments couldn't be read", () => {

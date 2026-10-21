@@ -6,3 +6,39 @@ body {
   color: #333;
   background-color: #fff;
 }
+
+/*
+ * Motion tokens: every transition and animation on the site takes its
+ * duration and easing from here (the rules are in styles/motion.css).
+ * Quick and quiet: 150–250ms, easing out. Asking for less motion
+ * (prefers-reduced-motion: reduce) zeroes every one of them, and the moving
+ * rules themselves only apply without that preference.
+ */
+:root {
+  --motion-fast: 150ms; /* colours, presses, small state changes */
+  --motion-base: 200ms; /* hover lifts, menus, toasts, swaps */
+  --motion-slow: 250ms; /* entrances, image fades, bars filling */
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in: cubic-bezier(0.55, 0, 1, 0.45); /* leaving */
+  --motion-ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1); /* a small overshoot: the heart, the follow tick */
+  --motion-stagger: 40ms; /* between cards coming in */
+  --motion-lift: -2px; /* a card under the pointer */
+  --motion-press: 0.97; /* a button or card being pressed */
+  --motion-rise: 8px; /* how far things come in from */
+  --motion-lift-shadow: 0 18px 32px -18px rgba(17, 24, 39, 0.34);
+  /* The colour half of a transition, for anything that also moves. */
+  --motion-colors:
+    color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out), border-color var(--motion-fast) var(--motion-ease-out),
+    text-decoration-color var(--motion-fast) var(--motion-ease-out), box-shadow var(--motion-fast) var(--motion-ease-out), opacity var(--motion-fast) var(--motion-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+    --motion-stagger: 0ms;
+    --motion-lift: 0px;
+    --motion-press: 1;
+    --motion-rise: 0px;
+  }
+}

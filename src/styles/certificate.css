@@ -136,7 +136,10 @@
     letter-spacing: 2px;
     border-radius: 12px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition:
+        transform var(--motion-base) var(--motion-ease-out),
+        box-shadow var(--motion-base) var(--motion-ease-out),
+        filter var(--motion-base) var(--motion-ease-out);
 }
 
 .cert-download-button:hover {
