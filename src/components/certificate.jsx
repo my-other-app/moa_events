@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { eventsApi } from "@/api/events";
-import { API_BASE_URL as SITE_API_BASE_URL } from "@/config";
+import { API_BASE_URL as SITE_API_BASE_URL, SITE_URL } from "@/config";
+import { certificateNumberOf, verifyPath } from "@/utils/certcode";
 import { QRCodeCanvas } from "qrcode.react";
 import Download from "@/components/download";
 
@@ -58,6 +59,9 @@ const Certificate = ({ ticketid }) => {
     const borderColor = style?.border_color || accent;
     const showQr = style?.show_qr_code !== false;
     const showId = style?.show_certificate_id !== false;
+    // The certificate's number and the public check's address, never the
+    // ticket id: a certificate gets shared, and the ticket id is the door's QR.
+    const number = certificateNumberOf(ticketid, ticketData?.certificate_no);
 
     if (loading) {
         return (
@@ -191,7 +195,7 @@ const Certificate = ({ ticketid }) => {
                         {/* QR Code */}
                         {showQr && (
                             <div className="cert-preview-qr">
-                                <QRCodeCanvas value={`certificate:${ticketid}`} size={80} level="H" includeMargin={true} />
+                                <QRCodeCanvas value={`${SITE_URL}${verifyPath(number)}`} size={80} level="H" includeMargin={true} />
                             </div>
                         )}
 
@@ -200,7 +204,7 @@ const Certificate = ({ ticketid }) => {
                             {showId && (
                                 <div>
                                     <div className="cert-footer-label" style={{ color: secondaryText }}>Certificate ID</div>
-                                    <div className="cert-footer-value">{ticketid}</div>
+                                    <div className="cert-footer-value">{number}</div>
                                 </div>
                             )}
                             <div style={{ textAlign: "right" }}>
