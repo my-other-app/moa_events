@@ -13,7 +13,8 @@ export function Poll({ poll, onVote = null }) {
         const mine = poll.voted_option_id !== null && poll.voted_option_id === o.id;
         const inner = (
           <>
-            <span className="dc-poll-bar" style={{ width: `${o.share}%` }} aria-hidden="true" />
+            {/* A full-width bar scaled to the share: a vote moves it without moving anything else. */}
+            <span className="dc-poll-bar" style={{ transform: `scaleX(${Math.min(100, Math.max(0, o.share)) / 100})` }} aria-hidden="true" />
             <span>
               {o.label}
               {mine ? " · your vote" : ""}
