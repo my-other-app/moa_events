@@ -77,6 +77,11 @@ describe(AASA, () => {
     ["/topics", true],
     // The live room stays on the web.
     ["/events/hack-night-04/live", false],
+    // So do the city pages, which the app has no screen for.
+    ["/events/in", false],
+    ["/events/in/kochi", false],
+    ["/clubs/in/kochi", false],
+    ["/events/indie-night", true],
     // Feeds, the server's own addresses, web-only pages.
     ["/events/rss.xml", false],
     ["/clubs/circuit-society/rss.xml", false],

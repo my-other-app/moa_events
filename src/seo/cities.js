@@ -106,6 +106,23 @@ const BY_SLUG = new Map(CITIES.map((c) => [c.slug, c]));
 /** The city a page address names ("kochi"), or null. */
 export const cityBySlug = (slug) => BY_SLUG.get(String(slug ?? "").toLowerCase()) || null;
 
+/** "Navi Mumbai" → "navi-mumbai". */
+export const slugify = (name) =>
+  String(name ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const BY_ANY_NAME = new Map(CITIES.flatMap((c) => [c.name, ...c.also].map((n) => [slugify(n), c])));
+
+/**
+ * The city an address names by any of its names ("cochin", "trivandrum",
+ * "bangalore", "KOCHI"), or null: the page answers those with a 308 to the
+ * city's own slug.
+ */
+export const cityByAnySlug = (slug) => cityBySlug(slug) || BY_ANY_NAME.get(slugify(slug)) || null;
+
 export const isKerala = (city) => city?.state === KERALA;
 
 /* ---------- addresses ---------- */

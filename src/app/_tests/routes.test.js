@@ -103,6 +103,12 @@ describe("which file answers which address", () => {
     ["/sitemap.xml", "sitemap.xml/route.js"],
     ["/sitemaps/events-1.xml", "sitemaps/[name]/route.js"],
     ["/sitemaps/topics.xml", "sitemaps/[name]/route.js"],
+    ["/sitemaps/cities.xml", "sitemaps/[name]/route.js"],
+    // The city pages: "in" is a word of the site's own, never an event's or a club's slug.
+    ["/events/in", "events/in/page.jsx"],
+    ["/events/in/kochi", "events/in/[city]/page.jsx"],
+    ["/clubs/in", "clubs/in/page.jsx"],
+    ["/clubs/in/kochi", "clubs/in/[city]/page.jsx"],
     ["/robots.txt", null],
     ["/media/events/hack-night-04/poster", "media/[...path]/route.jsx"],
     ["/og/events/hack-night-04", "og/events/[slug]/route.jsx"],

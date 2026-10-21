@@ -35,6 +35,9 @@ export function SiteFooter() {
               <li>
                 <Link to="/events?type=online">Online events</Link>
               </li>
+              <li>
+                <Link to="/events/in">Events by city</Link>
+              </li>
               {topics ? (
                 <li>
                   <Link to="/topics">Topics</Link>

@@ -33,6 +33,9 @@
  *   - /play, /api, /og, /media, /for-clubs, /pricing: web-only pages and the
  *     server's own addresses. They sit outside the claimed paths anyway;
  *     they are listed so a wider claim later can't take them.
+ *   - /events/in and /clubs/in/…: the city pages ("Events in Kochi") are
+ *     the site's own; the app has no screen for them (its router would
+ *     read /events/in as an event called "in").
  *   - the home page, the policies, /about and /me: not claimed.
  *
  * Android's intent filters cannot leave a path out, so there the app is
@@ -63,6 +66,10 @@ export const APP_PATHS = [
 
 /** The paths that stay in the browser, checked first (the first match wins). */
 export const BROWSER_PATHS = [
+  ["/events/in", "The city pages are the site's own"],
+  ["/events/in/*", "The city pages are the site's own"],
+  ["/clubs/in", "The city pages are the site's own"],
+  ["/clubs/in/*", "The city pages are the site's own"],
   ["/events/*/live", "The live room is the web page in the app too"],
   ["/events/*/live/*", "The live room is the web page in the app too"],
   ["/events/rss.xml", "A feed"],
