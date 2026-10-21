@@ -1,5 +1,7 @@
+import { demoSettings, isDemoSitemapRow } from "@/seo/demo";
 import { PAGE_SIZE, entriesFor, parseSitemapName, staticEntries, topicEntries, urlsetXml } from "@/seo/sitemap";
 import { ApiError } from "@/server/api";
+import { getDemoEventSlugs } from "@/server/demo";
 import { getSitemapPage, getSitemapSource } from "@/server/discover";
 import { getTopics } from "@/server/topics";
 
@@ -9,6 +11,10 @@ import { getTopics } from "@/server/topics";
  * API's paged sitemap when it has one; from its single list (page 1 only)
  * when not. topics.xml is /topics and each topic's page; 404 while the API
  * has no topics.
+ *
+ * The made-up demo clubs and their events are left out (src/seo/demo.js):
+ * a club by its slug, an event by its club when the row says it, else by
+ * the listed clubs' events (read alongside, cached as long).
  */
 const XML = { "Content-Type": "application/xml; charset=utf-8" };
 const KEEP = "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400";
@@ -26,14 +32,16 @@ export async function GET(request, { params }) {
       const found = await getTopics();
       return found ? answer(urlsetXml(topicEntries(found.topics))) : missing();
     }
-    const source = await getSitemapSource();
+    const settings = demoSettings();
+    const [source, eventSlugs] = await Promise.all([getSitemapSource(), which.kind === "events" ? getDemoEventSlugs(settings) : new Set()]);
+    const skip = (row) => isDemoSitemapRow(which.kind, row, { settings, eventSlugs });
     if (source.paged) {
       const page = await getSitemapPage(which.kind, which.page);
       if (!page) return missing();
-      return answer(urlsetXml(entriesFor(which.kind, page.items).slice(0, PAGE_SIZE)));
+      return answer(urlsetXml(entriesFor(which.kind, page.items, { skip }).slice(0, PAGE_SIZE)));
     }
     if (which.page !== 1) return missing();
-    return answer(urlsetXml(entriesFor(which.kind, source[which.kind]).slice(0, PAGE_SIZE)));
+    return answer(urlsetXml(entriesFor(which.kind, source[which.kind], { skip }).slice(0, PAGE_SIZE)));
   } catch (e) {
     if (!(e instanceof ApiError)) throw e;
     return new Response("The sitemap can't be read right now", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Retry-After": "120", "Cache-Control": "no-store" } });

@@ -15,6 +15,8 @@ npm run build && npm start
 node scripts/check-seo.mjs http://localhost:3000   # what a crawler sees: HTML, JSON-LD, 308s, 404s, sitemap, feeds
 ```
 
+Search (titles, structured data, the city pages, the demo clubs, Search Console): **[docs/SEO.md](docs/SEO.md)**.
+
 Node 20.9 or newer. The API allows only the site's own origins, so pages that call it from the browser (the client pages) need a local API, or the browser's CORS checks off, on localhost; server-rendered pages work as they are.
 
 ## Settings
@@ -33,7 +35,22 @@ Set these on the Vercel project (Production and Preview). `NEXT_PUBLIC_*` values
 | `API_SITE_TOKEN` | (new, optional) | Sent to the API as `X-Site-Token` on every server read, for it to tell the site's server from a visitor; the API counts all site reads in one bucket for the token. With it, reads made for one visitor also send `X-Visitor-IP` (their address, from Vercel's `X-Forwarded-For`), used only to place them. Never sent from the browser | not sent |
 | `ANDROID_APP_SHA256` | (new) | The Android app's signing-certificate SHA-256 fingerprints, comma-separated, for `/.well-known/assetlinks.json`. Use the **Play App Signing** key's (Play Console → Test and release → App integrity → App signing); add the upload key's as well to test a locally signed build. Colons and case don't matter. Read at build, so set it, then deploy | unset: `assetlinks.json` is `[]`, and Android opens the links in the browser |
 
+| `DEMO_NOINDEX` | (new, optional) | `off` turns off everything below about the demo clubs: their pages are indexed and listed again. Server only; redeploy after changing it | on |
+| `DEMO_CLUB_SLUGS` | (new, optional) | The demo clubs' slugs, comma-separated; replaces the built-in list of eight (`""`: none, so only `is_demo` and a `demo.myotherapp.in` address count) | the eight seeded clubs |
+
 `MOA_API_URL` (the old link-preview function's) is still read by the server as a last fallback; it can be removed.
+
+## Demo clubs and search engines
+
+Production has eight made-up showcase clubs (contact addresses at `*.demo.myotherapp.in`: `borrow-checkers-kochi`, `neural-tide`, `thattukada-design-club`, `pooram-sound-society`, `founders-verandah`, `sulaimani-striders`, `kandal-kootam`, `respawn-room`) with their events and posts. People can see and open all of it. Search engines are told to leave it alone, because invented events with Event structured data would mislead searchers and make the site look spammy:
+
+- the club's page, each of its events' pages and each of its posts say `<meta name="robots" content="noindex, follow">`;
+- they are left out of the sitemaps, the ItemLists on `/events`, `/clubs`, the topic pages and the city pages;
+- a find page or a city page that shows only demo content is `noindex` too.
+
+One helper decides (`src/seo/demo.js`). A club is demo when the API says `is_demo: true` (once it sends it), when its contact address (or an event's contact address) is at `demo.myotherapp.in`, or when its slug is in `DEMO_CLUB_SLUGS` (default: the eight above). Events and posts carry only their club's slug, so the list is what catches them until the API sends `is_demo`.
+
+**When real clubs replace the demo:** delete the demo clubs, or set `DEMO_NOINDEX=off` on the Vercel project and redeploy. Nothing else changes.
 
 ## App links
 

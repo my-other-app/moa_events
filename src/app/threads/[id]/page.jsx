@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { SitePage } from "@/components/discover/chrome";
 import { ThreadView } from "@/components/discover/threadspage";
 import { JsonLd } from "@/seo/JsonLd.jsx";
+import { isDemoThread, unlessDemo } from "@/seo/demo";
 import { threadMetadata } from "@/seo/metadata";
 import { stableThread } from "@/seo/stabilize";
 import { threadStructuredData } from "@/seo/structured";
@@ -13,7 +14,8 @@ import { getComments, getThreadPage } from "@/server/discover";
  * counts and its comments are in the HTML, read as nobody, with its
  * DiscussionForumPosting and BreadcrumbList structured data. Liking and
  * voting are islands that read the post again as the signed-in reader.
- * A post that is gone → ./not-found.jsx (a real 404).
+ * A post that is gone → ./not-found.jsx (a real 404). A made-up demo
+ * club's post says noindex, follow (src/seo/demo.js).
  */
 export const revalidate = 60;
 export const dynamicParams = true;
@@ -26,7 +28,7 @@ export async function generateMetadata({ params }) {
   const { id } = await params;
   const thread = await getThreadPage(id);
   if (!thread) return { title: "Post not found", robots: { index: false, follow: true } };
-  return threadMetadata(thread);
+  return unlessDemo(threadMetadata(thread), isDemoThread(thread));
 }
 
 export default async function Thread({ params }) {

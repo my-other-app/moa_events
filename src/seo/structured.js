@@ -5,6 +5,7 @@
  */
 import { SITE_URL } from "@/config";
 import { eventUrl, summary } from "@/utils/eventpage";
+import { demoSettings, isDemoCard, isDemoClub, withoutDemo } from "./demo";
 import { breadcrumbJsonLd, clubJsonLd, collectionPageJsonLd, discussionPostingJsonLd, eventJsonLd, itemListJsonLd } from "./jsonld";
 import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
 import { absoluteUrl, clubPagePath, eventPagePath, eventRefOf, media, ogImage, topicPagePath } from "./urls";
@@ -74,14 +75,22 @@ export function clubStructuredData(data) {
   return [ld, crumbs];
 }
 
-/** An ItemList of the events a find page shows, in its order. `path` is the page's own address ("/events?type=online"). */
-export function eventsListStructuredData(items, { name, path }) {
-  return itemListJsonLd({ name, url: absoluteUrl(path), items: items.map((e) => ({ url: absoluteUrl(eventPagePath(e)), name: e.name })) });
+/**
+ * An ItemList of the events a find page shows, in its order, the made-up
+ * demo clubs' left out (src/seo/demo.js); null when none is left. `path` is
+ * the page's own address ("/events?type=online").
+ */
+export function eventsListStructuredData(items, { name, path, id = null, settings = demoSettings() }) {
+  const real = withoutDemo(items, isDemoCard, settings);
+  if (!real.length) return null;
+  return itemListJsonLd({ id, name, url: absoluteUrl(path), items: real.map((e) => ({ url: absoluteUrl(eventPagePath(e)), name: e.name })) });
 }
 
-/** An ItemList of the clubs a find page shows (those with an address of their own). */
-export function clubsListStructuredData(items, { name, path }) {
-  return itemListJsonLd({ name, url: absoluteUrl(path), items: items.filter((c) => c.slug).map((c) => ({ url: absoluteUrl(clubPagePath(c)), name: c.name })) });
+/** An ItemList of the clubs a find page shows (those with an address of their own, demo clubs left out); null when none is left. */
+export function clubsListStructuredData(items, { name, path, id = null, settings = demoSettings() }) {
+  const real = withoutDemo(items, isDemoClub, settings).filter((c) => c.slug);
+  if (!real.length) return null;
+  return itemListJsonLd({ id, name, url: absoluteUrl(path), items: real.map((c) => ({ url: absoluteUrl(clubPagePath(c)), name: c.name })) });
 }
 
 /* ---------- topics ---------- */
@@ -98,10 +107,12 @@ export function topicsStructuredData(topics) {
 
 /**
  * A topic's page: [CollectionPage (about the topic), ItemList of the events
- * it shows, BreadcrumbList Home › Topics › Topic]. Its address is always the
- * topic's own (canonical), whatever interest is picked.
+ * it shows (the demo clubs' left out), BreadcrumbList Home › Topics ›
+ * Topic]. Its address is always the topic's own (canonical), whatever
+ * interest is picked.
  */
-export function topicStructuredData(topic, events = [], { interest = null } = {}) {
+export function topicStructuredData(topic, shown = [], { interest = null, settings = demoSettings() } = {}) {
+  const events = withoutDemo(shown, isDemoCard, settings);
   const url = absoluteUrl(topicPagePath(topic));
   const list = `${url}#events`;
   const name = interest ? `${interest.name} events` : `${topic.name} events`;

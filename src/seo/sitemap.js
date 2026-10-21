@@ -37,13 +37,13 @@ export const xml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
 const PREFIX = { events: "/events", clubs: "/clubs" };
 const PRIORITY = { events: "0.7", clubs: "0.6" };
 
-/** The addresses for rows of {slug, updated_at}: each slug once, bad ones left out. */
-export function entriesFor(kind, rows, { siteUrl = SITE_URL } = {}) {
+/** The addresses for rows of {slug, updated_at}: each slug once, bad ones and those `skip` says (demo content) left out. */
+export function entriesFor(kind, rows, { siteUrl = SITE_URL, skip = () => false } = {}) {
   const seen = new Set();
   const out = [];
   for (const row of Array.isArray(rows) ? rows : []) {
     const slug = row && typeof row.slug === "string" ? row.slug.trim() : "";
-    if (!SLUG.test(slug) || seen.has(slug)) continue;
+    if (!SLUG.test(slug) || seen.has(slug) || skip(row)) continue;
     seen.add(slug);
     out.push({ loc: `${siteUrl}${PREFIX[kind]}/${encodeURIComponent(slug)}`, lastmod: w3c(row.updated_at), priority: PRIORITY[kind] });
   }
