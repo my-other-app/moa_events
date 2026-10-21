@@ -37,7 +37,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--dc-text);
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 .rg-back:hover {
   background: var(--dc-sunken);
@@ -166,7 +166,7 @@
 }
 .rg-sum-chev {
   color: var(--dc-muted);
-  transition: transform 0.2s;
+  transition: transform var(--motion-base) var(--motion-ease-out);
 }
 .rg-sum.is-open .rg-sum-chev {
   transform: rotate(180deg);
@@ -361,15 +361,26 @@
   min-width: 0;
 }
 .rg-progress-bar {
+  position: relative;
   display: block;
   height: 4px;
+  overflow: hidden;
   border-radius: 999px;
   background: var(--dc-line);
-  transition: background-color 0.25s;
 }
-.rg-progress .is-done .rg-progress-bar,
-.rg-progress .is-on .rg-progress-bar {
+/* The fill: it sweeps across as a step is reached (a transform, so nothing re-lays out). */
+.rg-progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: var(--dc-primary);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--motion-slow) var(--motion-ease-out);
+}
+.rg-progress .is-done .rg-progress-bar::after,
+.rg-progress .is-on .rg-progress-bar::after {
+  transform: none;
 }
 .rg-progress-label {
   display: inline-flex;
@@ -478,8 +489,8 @@
   -webkit-appearance: none;
   appearance: none;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 .rg-input::placeholder {
   color: #9ca3af;
@@ -588,9 +599,9 @@
   color: var(--dc-ink);
   cursor: pointer;
   transition:
-    border-color 0.15s,
-    background-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 .rg-choice:hover {
   border-color: var(--rg-field-hover);
@@ -687,8 +698,8 @@
   border-radius: 16px;
   background: #fff;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 .rg-merch-item.is-picked {
   border-color: var(--dc-ink);
@@ -776,8 +787,8 @@
   color: var(--dc-ink);
   cursor: pointer;
   transition:
-    border-color 0.15s,
-    background-color 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
 }
 .rg-size:hover {
   border-color: var(--rg-field-hover);
@@ -859,7 +870,7 @@
   height: 40px;
   border-radius: 999px;
   color: var(--dc-ink);
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 .rg-stepper button:hover:not(:disabled) {
   background: var(--dc-sunken);
@@ -893,7 +904,7 @@
   font-size: 15px;
   font-weight: 600;
   color: var(--dc-text);
-  transition: background-color 0.2s;
+  transition: background-color var(--motion-base) var(--motion-ease-out);
 }
 .rg-merch-total strong {
   color: var(--dc-ink);
@@ -945,7 +956,7 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--dc-link);
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 .rg-edit:hover {
   background: var(--dc-link-soft);
@@ -1128,8 +1139,8 @@
   font-weight: 700;
   color: var(--dc-ink);
   transition:
-    border-color 0.15s,
-    background-color 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-scope .rg-bar-back:hover:not(:disabled) {
   border-color: var(--dc-ink);

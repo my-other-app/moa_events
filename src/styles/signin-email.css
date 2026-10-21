@@ -103,8 +103,8 @@
   -webkit-appearance: none;
   appearance: none;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 .ac-input::placeholder {
   color: #9ca3af;
@@ -211,8 +211,8 @@
   box-shadow: inset 0 0 0 1.5px var(--ac-field);
   color: var(--dc-ink);
   transition:
-    background-color 0.15s,
-    box-shadow 0.15s;
+    background-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out);
 }
 .ac-rules li.is-met {
   color: var(--dc-ink);
@@ -287,9 +287,9 @@
   -webkit-appearance: none;
   appearance: none;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s,
-    background-color 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    box-shadow var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
 }
 .dc-scope .ac-code-box.is-filled {
   border-color: var(--ac-field-hover);

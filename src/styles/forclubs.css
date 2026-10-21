@@ -456,8 +456,8 @@
   background: var(--dc-sunken);
   color: var(--dc-ink);
   transition:
-    transform 0.2s,
-    background-color 0.2s;
+    transform var(--motion-base) var(--motion-ease-out),
+    background-color var(--motion-base) var(--motion-ease-out);
 }
 .fc-qa[open] .fc-qa-icon {
   transform: rotate(45deg);

@@ -19,7 +19,7 @@
   font-weight: 600;
   color: var(--dc-ink);
   white-space: nowrap;
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 .ac-signin:hover {
   background: var(--dc-sunken);
@@ -60,7 +60,7 @@
   color: var(--dc-ink);
   font-size: 15px;
   font-weight: 600;
-  transition: background-color 0.15s;
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 .ac-menu-btn:hover,
 .ac-menu-btn[aria-expanded="true"] {
@@ -80,7 +80,7 @@
 }
 .ac-menu-chev {
   color: var(--dc-muted);
-  transition: transform 0.15s;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 .ac-menu-btn[aria-expanded="true"] .ac-menu-chev {
   transform: rotate(180deg);
@@ -311,7 +311,7 @@
     max-width: none;
     border-radius: 18px 18px 0 0;
     padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-    animation: ac-up 0.22s ease-out both;
+    animation: ac-up var(--motion-slow) var(--motion-ease-out) backwards;
   }
 }
 
@@ -791,7 +791,7 @@
 @keyframes ac-up {
   from {
     transform: translateY(24px);
-    opacity: 0;
+    opacity: 0.01;
   }
 }
 @media (prefers-reduced-motion: reduce) {

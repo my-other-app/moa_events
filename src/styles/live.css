@@ -130,7 +130,8 @@
   display: block;
   height: 100%;
   background: #14b8a6;
-  transition: width 0.4s ease;
+  /* Full width, scaled to the share: the results move without layout (styles/motion.css times it). */
+  transform-origin: left center;
 }
 
 .live-words {

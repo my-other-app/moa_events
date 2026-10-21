@@ -97,8 +97,8 @@
   font-weight: 700;
   color: var(--dc-text);
   transition:
-    background-color 0.15s,
-    color 0.15s;
+    background-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
 }
 .pr-cycle button:hover {
   color: var(--dc-ink);

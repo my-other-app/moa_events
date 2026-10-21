@@ -283,7 +283,7 @@ a.ep-chip:hover {
 .ep-club-go {
   flex: 0 0 auto;
   color: var(--dc-muted);
-  transition: transform 0.15s;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 a.ep-club:hover .ep-club-name {
   text-decoration: underline;
@@ -398,8 +398,8 @@ a.ep-club:hover .ep-club-go {
   font-weight: 600;
   color: var(--dc-ink);
   transition:
-    border-color 0.15s,
-    background-color 0.15s;
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
 }
 .ep-action:hover,
 .ep-action[aria-expanded="true"] {
@@ -426,8 +426,8 @@ a.ep-club:hover .ep-club-go {
   transform: translateY(-4px);
   pointer-events: none;
   transition:
-    opacity 0.15s,
-    transform 0.15s;
+    opacity var(--motion-fast) var(--motion-ease-out),
+    transform var(--motion-fast) var(--motion-ease-out);
 }
 .ep-toast.is-on {
   opacity: 1;
