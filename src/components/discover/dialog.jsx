@@ -4,6 +4,7 @@ import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import logoIcon from "@/assets/logo-icon.png";
 import { assetSrc } from "@/utils/asset";
+import { usePresence } from "@/utils/presence";
 import { StoreButtons } from "./stores";
 import Icon from "./icons";
 
@@ -11,10 +12,14 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input, select, textarea, [ta
 
 /**
  * A small dialog: Escape and the backdrop close it, Tab stays inside, and
- * focus goes back to whatever opened it.
+ * focus goes back to whatever opened it. It comes up, and goes, with a short
+ * fade (styles/motion.css); focus and the page's scroll come back the moment
+ * it closes, not when the fade ends.
  */
 export function Dialog({ open, onClose, labelledBy, className, backdropClassName, children }) {
   const box = useRef(null);
+  const backdrop = useRef(null);
+  const { mounted, leaving } = usePresence(open, backdrop);
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
@@ -53,10 +58,13 @@ export function Dialog({ open, onClose, labelledBy, className, backdropClassName
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!mounted) return null;
   return createPortal(
     <div
+      ref={backdrop}
       className={`dc-scope ${backdropClassName}`}
+      data-leaving={leaving ? "" : undefined}
+      inert={leaving || undefined}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close.current?.();
       }}

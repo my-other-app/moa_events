@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/auth/context";
 import { initials } from "@/utils/cover";
+import { usePresence } from "@/utils/presence";
 import Icon from "../discover/icons";
 
 /** The signed-in person's face: their photo, or their initials on the site's yellow. */
@@ -27,6 +28,9 @@ function AccountMenu({ user, onSignOut }) {
   const panelId = useId();
   const wrap = useRef(null);
   const button = useRef(null);
+  const panel = useRef(null);
+  // The panel drops in, and folds away (styles/motion.css) before it goes.
+  const { mounted, leaving } = usePresence(open, panel);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -68,8 +72,8 @@ function AccountMenu({ user, onSignOut }) {
         </span>
         <Icon name="chevronDown" size={16} className="ac-menu-chev" />
       </button>
-      {open ? (
-        <div id={panelId} className="ac-menu-panel">
+      {mounted ? (
+        <div ref={panel} id={panelId} className="ac-menu-panel" data-leaving={leaving ? "" : undefined} inert={leaving || undefined}>
           <div className="ac-menu-who">
             <UserAvatar user={user} size={40} />
             <div>

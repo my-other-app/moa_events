@@ -42,13 +42,17 @@ async function copyText(text) {
 
 /** Share through the phone's own sheet; where there is none, copy the link and say so. */
 export function ShareButton({ title, text, url }) {
-  const [said, setSaid] = useState("");
+  // The line stays while the toast fades away (styles/motion.css), then goes, so the next one is announced again.
+  const [said, setSaid] = useState({ line: "", on: false });
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
   const say = (line) => {
-    setSaid(line);
+    setSaid({ line, on: true });
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setSaid(""), 2600);
+    timer.current = setTimeout(() => {
+      setSaid((x) => ({ ...x, on: false }));
+      timer.current = setTimeout(() => setSaid({ line: "", on: false }), 400);
+    }, 2600);
   };
   const share = async () => {
     const data = { title, text, url };
@@ -68,11 +72,11 @@ export function ShareButton({ title, text, url }) {
         <EpIcon name="share" size={17} />
         Share
       </button>
-      <span className={`ep-toast${said ? " is-on" : ""}`} role="status" aria-live="polite">
-        {said ? (
+      <span className={`ep-toast${said.on ? " is-on" : ""}`} role="status" aria-live="polite">
+        {said.line ? (
           <>
             <EpIcon name="check" size={14} />
-            {said}
+            {said.line}
           </>
         ) : null}
       </span>
