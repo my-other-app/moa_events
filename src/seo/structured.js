@@ -5,7 +5,7 @@
  */
 import { SITE_URL } from "@/config";
 import { eventUrl, summary } from "@/utils/eventpage";
-import { demoSettings, isDemoCard, isDemoClub, withoutDemo } from "./demo";
+import { demoSettings, isDemoCard, isDemoClub, isDemoThread, withoutDemo } from "./demo";
 import { breadcrumbJsonLd, clubJsonLd, collectionPageJsonLd, discussionPostingJsonLd, eventJsonLd, itemListJsonLd } from "./jsonld";
 import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
 import { absoluteUrl, clubPagePath, eventPagePath, eventRefOf, media, ogImage, topicPagePath } from "./urls";
@@ -131,6 +131,21 @@ export function topicStructuredData(topic, shown = [], { interest = null, settin
       [TOPICS_TITLE, absoluteUrl("/topics")],
       [topic.name, url],
     ]),
+  ];
+}
+
+/**
+ * /threads: [CollectionPage, ItemList of the posts it shows (each its own
+ * page, named by its first line; the demo clubs' left out)]. Without a
+ * real post, the CollectionPage alone.
+ */
+export function threadsStructuredData(threads, { name, description, settings = demoSettings() }) {
+  const url = absoluteUrl("/threads");
+  const list = `${url}#posts`;
+  const real = withoutDemo(threads, isDemoThread, settings);
+  return [
+    collectionPageJsonLd({ name, description, url, list: real.length ? list : null }),
+    ...(real.length ? [itemListJsonLd({ id: list, name, url, items: real.map((t) => ({ url: absoluteUrl(`/threads/${encodeURIComponent(t.id)}`), name: threadHeadline(t) })) })] : []),
   ];
 }
 
