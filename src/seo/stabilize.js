@@ -106,6 +106,7 @@ export function stableHome(home) {
     online: home.online.map(stableCard),
     popular: home.popular.map(stableCard),
     clubs: home.clubs.map(stableClubCard),
+    clubs_more: (home.clubs_more || []).map(stableClubCard),
     threads: home.threads.map(stableThread),
   };
 }

@@ -561,6 +561,8 @@ export function parseHome(d) {
     popular: list(o.popular, parseEvent),
     categories: list(o.categories, parseCategory),
     clubs: list(o.clubs, parseClub),
+    // Placed: the nearest clubs further than 50 km (the API's `clubs` are those within it).
+    clubs_more: list(o.clubs_more, parseClub),
     threads: list(o.threads, parseThread),
     stats: { upcoming_events: n(s.upcoming_events), clubs: n(s.clubs), cities: n(s.cities) },
   };
