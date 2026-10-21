@@ -29,6 +29,7 @@ import "@/styles/pages.css";
 import "@/styles/forclubs.css";
 import "@/styles/pricing.css";
 import "@/styles/topics.css";
+import "@/styles/verify.css";
 import "@/styles/motion.css";
 
 /*

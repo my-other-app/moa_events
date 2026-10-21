@@ -33,6 +33,7 @@ export const RESERVED = new Set([
   "feedback",
   "tickets",
   "certificates",
+  "verify",
   "register",
   "api",
   "assets",

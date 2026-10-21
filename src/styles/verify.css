@@ -1,0 +1,622 @@
+/*
+ * The certificate check: /verify and /verify/{number}. The discovery pages'
+ * language (discover.css tokens: Bebas Neue headings, DM Sans, ink greys,
+ * slate, the pale yellow), with one colour per answer: green for genuine,
+ * amber for revoked, red for not found, grey for "try again".
+ */
+
+:root {
+  --vf-good: #16a34a;
+  --vf-good-ink: #166534;
+  --vf-good-bg: #f0fdf4;
+  --vf-good-line: #bbf7d0;
+  --vf-warn: #d97706;
+  --vf-warn-ink: #92400e;
+  --vf-warn-bg: #fffbeb;
+  --vf-warn-line: #fde68a;
+  --vf-bad: #dc2626;
+  --vf-bad-ink: #991b1b;
+  --vf-bad-bg: #fef2f2;
+  --vf-bad-line: #fecaca;
+  --vf-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.vf-tone--valid {
+  --vf-c: var(--vf-good);
+  --vf-ink: var(--vf-good-ink);
+  --vf-bg: var(--vf-good-bg);
+  --vf-line: var(--vf-good-line);
+}
+.vf-tone--revoked {
+  --vf-c: var(--vf-warn);
+  --vf-ink: var(--vf-warn-ink);
+  --vf-bg: var(--vf-warn-bg);
+  --vf-line: var(--vf-warn-line);
+}
+.vf-tone--notfound {
+  --vf-c: var(--vf-bad);
+  --vf-ink: var(--vf-bad-ink);
+  --vf-bg: var(--vf-bad-bg);
+  --vf-line: var(--vf-bad-line);
+}
+.vf-tone--muted {
+  --vf-c: var(--dc-muted);
+  --vf-ink: var(--dc-ink);
+  --vf-bg: var(--dc-sunken);
+  --vf-line: var(--dc-line);
+}
+
+.vf-wrap {
+  max-width: 960px;
+  padding-top: 28px;
+  padding-bottom: 56px;
+}
+@media (min-width: 768px) {
+  .vf-wrap {
+    padding-top: 48px;
+    padding-bottom: 72px;
+  }
+}
+.vf-mono {
+  font-family: var(--vf-mono);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- the landing ---------- */
+
+.vf-hero {
+  max-width: 720px;
+}
+.vf-hero h1 {
+  margin-top: 10px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(44px, 7vw, 76px);
+  line-height: 0.92;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+  text-wrap: balance;
+}
+.vf-lede {
+  max-width: 600px;
+  margin-top: 14px;
+  font-size: 18px;
+}
+
+/* ---------- the box ---------- */
+
+.vf-form {
+  margin-top: 24px;
+}
+.vf-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.vf-field {
+  display: flex;
+  gap: 8px;
+}
+.dc-scope .vf-field input {
+  flex: 1;
+  min-width: 0;
+  height: 54px;
+  padding: 0 16px;
+  border-radius: var(--dc-radius);
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px #d1d5db;
+  font-family: var(--vf-mono);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  transition: var(--motion-colors);
+}
+.dc-scope .vf-field input::placeholder {
+  color: #9ca3af;
+}
+.dc-scope .vf-field input:hover {
+  box-shadow: inset 0 0 0 1.5px var(--dc-muted);
+}
+.dc-scope .vf-field input:focus {
+  box-shadow: inset 0 0 0 2px var(--dc-primary);
+}
+.dc-scope .vf-field input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 2px var(--vf-bad);
+}
+.vf-field .dc-btn {
+  min-height: 54px;
+  padding: 12px 26px 10px;
+  font-size: 22px;
+}
+.vf-note {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--dc-muted);
+}
+.vf-note--error {
+  color: var(--vf-bad-ink);
+  font-weight: 600;
+}
+
+/* ---------- how to read it, where the number is ---------- */
+
+.vf-guide {
+  display: grid;
+  gap: 16px;
+  margin-top: 44px;
+}
+@media (min-width: 820px) {
+  .vf-guide {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.vf-card {
+  padding: 22px;
+  border-radius: 16px;
+  border: 1px solid var(--dc-line);
+  background: #fff;
+}
+.vf-card h2 {
+  margin-bottom: 16px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+.vf-card > p {
+  margin-top: 16px;
+  font-size: 15px;
+}
+
+/* A certificate in CSS: the number on the pale yellow, the QR beside it. */
+.vf-sketch {
+  position: relative;
+  padding: 16px 16px 34px;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+}
+.vf-sketch-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5%;
+  aspect-ratio: 1.414;
+  padding: 6% 7% 5%;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.12);
+  outline: 1px solid var(--dc-line);
+  outline-offset: -8px;
+}
+.vf-sketch-club,
+.vf-sketch-line {
+  width: 60%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--dc-line);
+}
+.vf-sketch-club {
+  width: 26%;
+}
+.vf-sketch-title {
+  font-family: var(--dc-display);
+  font-size: clamp(18px, 3.2vw, 26px);
+  line-height: 1;
+  letter-spacing: 0.1em;
+  color: var(--dc-ink);
+}
+.vf-sketch-line--name {
+  width: 44%;
+  height: 10px;
+  background: #9ca3af;
+}
+.vf-sketch-line--short {
+  width: 36%;
+}
+.vf-sketch-foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 4%;
+  width: 100%;
+  margin-top: auto;
+}
+.vf-sketch-club-name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-right: auto;
+}
+.vf-sketch-club-name span {
+  width: 52px;
+  height: 6px;
+  border-radius: 3px;
+  background: #9ca3af;
+}
+.vf-sketch-club-name span + span {
+  width: 40px;
+  background: var(--dc-line);
+}
+.vf-sketch-qr {
+  flex: none;
+  width: 13%;
+  aspect-ratio: 1;
+  border: 2px solid var(--dc-ink);
+  background: repeating-conic-gradient(var(--dc-ink) 0 25%, #fff 0 50%) 0 0 / 34% 34%;
+  box-shadow: 0 0 0 3px var(--dc-accent);
+}
+.vf-sketch-no {
+  padding: 3px 6px 2px;
+  border-radius: 3px;
+  background: var(--dc-accent);
+  box-shadow: 0 0 0 3px var(--dc-accent);
+  font-family: var(--vf-mono);
+  font-size: clamp(9px, 1.5vw, 12px);
+  font-weight: 700;
+  color: var(--dc-ink);
+  white-space: nowrap;
+}
+/* What the yellow marks, under the sheet. */
+.vf-sketch-tags {
+  position: absolute;
+  right: calc(16px + 7%);
+  bottom: 9px;
+  display: flex;
+  gap: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dc-ink);
+}
+.vf-sketch-tags span::before {
+  content: "\2191\00a0";
+}
+
+.vf-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.vf-legend li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.vf-legend-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--vf-c);
+  color: #fff;
+}
+.vf-legend h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--vf-ink);
+}
+.vf-legend p {
+  margin-top: 2px;
+  font-size: 14px;
+}
+.vf-private {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+  font-size: 14px;
+}
+.vf-private strong {
+  color: var(--dc-ink);
+}
+
+/* Only here: say it plainly, on every page of the check. */
+.vf-trust {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 28px;
+  padding: 14px 16px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-primary);
+  font-size: 14px;
+  color: #e5e7eb;
+}
+.vf-trust svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--dc-accent);
+}
+.vf-trust strong {
+  color: #fff;
+}
+
+/* ---------- a result ---------- */
+
+.vf-back {
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.vf-back a::before {
+  content: "\2190\00a0";
+}
+.vf-result {
+  padding: 22px;
+  border-radius: 18px;
+  border: 1.5px solid var(--vf-line);
+  background: var(--vf-bg);
+}
+@media (min-width: 768px) {
+  .vf-result {
+    padding: 32px 36px;
+  }
+}
+.vf-verdict {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.vf-verdict-badge {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--vf-c);
+  color: #fff;
+}
+@media (min-width: 768px) {
+  .vf-verdict-badge {
+    width: 76px;
+    height: 76px;
+  }
+  .vf-verdict-badge svg {
+    width: 38px;
+    height: 38px;
+  }
+}
+.vf-verdict-kicker {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vf-ink);
+}
+.vf-verdict h1 {
+  margin-top: 4px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: clamp(38px, 6.4vw, 64px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+  text-wrap: balance;
+}
+.vf-verdict p:not(.vf-verdict-kicker) {
+  max-width: 640px;
+  margin-top: 10px;
+  font-size: 16px;
+}
+.vf-facts {
+  display: grid;
+  gap: 1px;
+  margin: 22px 0 0;
+  border: 1px solid var(--vf-line);
+  border-radius: 12px;
+  background: var(--vf-line);
+  overflow: hidden;
+}
+.vf-facts > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 16px;
+  background: #fff;
+}
+@media (min-width: 600px) {
+  .vf-facts > div {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 16px;
+    align-items: baseline;
+  }
+}
+.vf-facts dt {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.vf-facts dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.vf-checked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vf-ink);
+}
+
+.vf-preview {
+  margin: 28px 0 0;
+}
+.vf-preview img {
+  width: 100%;
+  height: auto;
+  min-height: 120px;
+  border-radius: 10px;
+  background: var(--dc-sunken);
+  box-shadow: 0 0 0 1px var(--dc-line), var(--dc-shadow);
+}
+.vf-preview figcaption {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--dc-muted);
+}
+
+/* ---------- checking a file ---------- */
+
+.vf-filecheck {
+  margin-top: 28px;
+  padding: 22px;
+  border-radius: 16px;
+  border: 1px solid var(--dc-line);
+  background: #fff;
+}
+.vf-filecheck-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.vf-filecheck-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--dc-accent);
+  color: var(--dc-ink);
+}
+.vf-filecheck h2 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+.vf-filecheck-head p {
+  margin-top: 6px;
+  font-size: 15px;
+}
+.dc-scope .vf-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 24px 16px;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+  text-align: center;
+  cursor: pointer;
+  transition: var(--motion-colors);
+}
+.vf-drop:hover,
+.vf-drop.is-over {
+  border-color: var(--dc-primary);
+  background: #fff;
+}
+.vf-drop:focus-within {
+  outline: 3px solid var(--dc-link);
+  outline-offset: 2px;
+}
+.vf-drop strong {
+  color: var(--dc-ink);
+}
+.vf-drop small {
+  font-size: 12px;
+  color: var(--dc-muted);
+}
+.vf-filecheck-out {
+  margin-top: 14px;
+}
+.vf-filecheck-working {
+  font-size: 14px;
+  color: var(--dc-muted);
+}
+.vf-filecheck-said {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--dc-radius);
+  border: 1px solid var(--vf-line);
+  background: var(--vf-bg);
+}
+.vf-filecheck-said > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--vf-c);
+}
+.vf-filecheck-title {
+  font-weight: 700;
+  color: var(--vf-ink);
+}
+.vf-filecheck-said p:not(.vf-filecheck-title) {
+  margin-top: 2px;
+  font-size: 14px;
+}
+.vf-filecheck-name {
+  font-weight: 600;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+
+.vf-again {
+  margin-top: 36px;
+  padding-top: 28px;
+  border-top: 1px solid var(--dc-line);
+}
+.vf-again h2 {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+.vf-again .vf-form {
+  margin-top: 14px;
+}
+
+/* About's link to the check. */
+.dc-feature-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+@media (max-width: 479px) {
+  .vf-field {
+    flex-direction: column;
+  }
+  .dc-scope .vf-field input {
+    flex: none;
+    width: 100%;
+  }
+  .vf-field .dc-btn {
+    width: 100%;
+  }
+  .vf-verdict {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+/* The answer arrives: the card rises, the badge pops. Travel only when asked for. */
+@media (prefers-reduced-motion: no-preference) {
+  .vf-result {
+    animation: motion-rise var(--motion-slow) var(--motion-ease-out) both;
+  }
+  .vf-verdict-badge {
+    animation: motion-pop var(--motion-slow) var(--motion-ease-pop) var(--motion-fast) both;
+  }
+}
