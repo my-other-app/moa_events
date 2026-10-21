@@ -28,7 +28,8 @@ beforeEach(() => {
     if (url.pathname === "/api/v1/discover/events/hack-night-04") return { body: eventWithPoster() };
     if (url.pathname === "/api/v1/discover/events/quiet-evening") return { body: sparseEvent() };
     if (url.pathname === "/api/v1/discover/events/boom") return new TypeError("fetch failed");
-    if (url.pathname === "/api/v1/discover/clubs/circuit-society") return { body: { club: { id: 3, slug: "circuit-society", name: "Circuit Society", logo: `https://b.s3.amazonaws.com/l.png?Expires=${posterExpires}` } } };
+    if (url.pathname === "/api/v1/discover/clubs/circuit-society")
+      return { body: { club: { id: 3, slug: "circuit-society", name: "Circuit Society", logo: `https://b.s3.amazonaws.com/l.png?Expires=${posterExpires}`, cover: `https://b.s3.amazonaws.com/c.jpg?Expires=${posterExpires}` } } };
     return { status: 404, body: {} };
   });
   vi.stubGlobal("fetch", fetch);
@@ -70,6 +71,14 @@ describe("a stable image address", () => {
   it("finds a speaker's photo and a club's logo", async () => {
     expect((await get("/media/events/hack-night-04/speakers/1/photo")).headers.get("location")).toContain("/a.jpg");
     expect((await get("/media/clubs/circuit-society/logo")).headers.get("location")).toContain("/l.png");
+  });
+
+  it("finds a club's cover (a club's cover is its picture, not an event's drawn one)", async () => {
+    const res = await get("/media/clubs/circuit-society/cover?size=medium");
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/c.jpg");
+    // Never looked up as an event.
+    expect(fetch.calls.map((c) => new URL(c.url).pathname)).toEqual(["/api/v1/discover/clubs/circuit-society"]);
   });
 
   it("is a 404 for nonsense, an unknown event, or an image the thing doesn't have", async () => {

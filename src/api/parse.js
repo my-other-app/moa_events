@@ -269,6 +269,29 @@ const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
 const list = (v, fn) => (Array.isArray(v) ? v.map(fn).filter(Boolean) : []);
 const idOf = (v) => (typeof v === "number" || (typeof v === "string" && v !== "") ? v : null);
 
+/** A short lower-case word from the API ("cancelled", "in_person"), or null. */
+const word = (v) => (typeof v === "string" && /^[a-z_]{1,32}$/i.test(v.trim()) ? v.trim().toLowerCase() : null);
+const flag = (v) => (v === true ? true : null);
+
+/**
+ * Fields newer APIs send, kept only when they are there, so an answer
+ * without them parses exactly as before: {key: read} where read(value)
+ * gives the value to keep or null.
+ */
+function optional(o, fields) {
+  const out = {};
+  for (const [key, read] of Object.entries(fields)) {
+    const v = read(o[key], o);
+    if (v !== null && v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
+/** Marked as made-up showcase content by the API (`is_demo`), once it says so (see src/seo/demo.js). */
+const DEMO = { is_demo: flag };
+/** How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js). */
+const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag };
+
 const SOURCES = new Set(["browser", "ip", "none"]);
 const STATUSES = new Set(["upcoming", "closing_soon", "full", "live", "ended"]);
 
@@ -291,7 +314,7 @@ export function parseClubRef(c) {
   if (!o) return null;
   const name = str(o.name);
   if (!name && idOf(o.id) === null) return null;
-  return { id: idOf(o.id), name: name || "A club", slug: str(o.slug), logo: o.logo || null };
+  return { id: idOf(o.id), name: name || "A club", slug: str(o.slug), logo: o.logo || null, ...optional(o, DEMO) };
 }
 
 /* ---------- topics ---------- */
@@ -410,6 +433,7 @@ export function parseEvent(e) {
     updated_at: str(o.updated_at),
     summary: typeof o.summary === "string" && o.summary.trim() ? o.summary.replace(/\r\n?/g, "\n").trim() : null,
     topics: list(o.topics, parseTopicRef),
+    ...optional(o, EVENT_STATE),
   };
 }
 
@@ -446,6 +470,7 @@ export function parseClub(c) {
     contact_email: str(o.contact_email),
     socials: socials(o.socials),
     events_held: n(o.events_held, null),
+    ...optional(o, DEMO),
   };
 }
 
@@ -669,6 +694,14 @@ export function parseEventDetail(e) {
     published_at: isoOrNull(o.published_at),
     created_at: isoOrNull(o.created_at),
     updated_at: isoOrNull(o.updated_at),
+    ...optional(o, {
+      ...EVENT_STATE,
+      previous_starts_at: isoOrNull,
+      // The venue's address in parts, once the API has them (`locality` or `city`).
+      locality: (v, all) => str(v) || str(all.city),
+      region: str,
+      postal_code: (v) => (typeof v === "string" || typeof v === "number" ? str(String(v)) : null),
+    }),
   };
 }
 
@@ -726,11 +759,24 @@ export function parseEventPage(d) {
   };
 }
 
+/**
+ * A sitemap row: {slug, updated_at}, and, when the API says them, whose it
+ * is (`club`: the club's slug, from `club_slug` or `club`) and `is_demo`.
+ */
+const sitemapRow = (r) => {
+  const o = obj(r);
+  if (!str(o?.slug)) return null;
+  return {
+    slug: o.slug,
+    updated_at: isoOrNull(o.updated_at),
+    ...optional(o, { club: (v, all) => str(all.club_slug) || str(obj(v)?.slug) || str(v), is_demo: flag }),
+  };
+};
+
 /** What the sitemap lists: every public event and club, by slug. */
 export function parseSitemap(d) {
   const o = obj(d) || {};
-  const rows = (v) => list(v, (r) => (str(obj(r)?.slug) ? { slug: r.slug, updated_at: isoOrNull(r.updated_at) } : null));
-  return { events: rows(o.events), clubs: rows(o.clubs) };
+  return { events: list(o.events, sitemapRow), clubs: list(o.clubs, sitemapRow) };
 }
 
 const KINDS = new Set(["events", "clubs"]);
@@ -755,6 +801,6 @@ export function parseSitemapIndex(d) {
 /** One page of the paged sitemap (GET /discover/sitemap/{kind}/{page}). */
 export function parseSitemapPage(d) {
   const o = obj(d) || {};
-  const rows = list(o.items, (r) => (str(obj(r)?.slug) ? { slug: r.slug, updated_at: isoOrNull(r.updated_at) } : null));
+  const rows = list(o.items, sitemapRow);
   return { kind: KINDS.has(o.kind) ? o.kind : null, page: Math.max(1, Math.floor(n(o.page, 1))), pages: Math.max(1, Math.floor(n(o.pages, 1))), items: rows };
 }

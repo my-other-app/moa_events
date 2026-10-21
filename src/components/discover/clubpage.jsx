@@ -136,7 +136,7 @@ export function ClubView({ data }) {
       </Suspense>
       <div className="dc-wrap">
         <div className="dc-club-cover">
-          <Img src={imageUrl(club.cover, "original")} alt="" loading="eager" fallback={<ClubCover club={{ id: club.id, slug: club.slug, name: club.name }} w={240} h={80} />} />
+          <Img src={imageUrl(club.cover, "original")} alt="" loading="eager" fetchPriority="high" fallback={<ClubCover club={{ id: club.id, slug: club.slug, name: club.name }} w={240} h={80} />} />
         </div>
         <div className="dc-club-id">
           <Avatar name={club.name} src={club.logo} size={104} alt={`${club.name} logo`} />

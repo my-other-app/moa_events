@@ -33,6 +33,8 @@ describe("/events/{slug}", () => {
     expect(route.generateStaticParams()).toEqual([]);
     const meta = await route.generateMetadata({ params: params({ slug: "hack-night-04" }) });
     expect(meta.alternates.canonical).toBe("https://myotherapp.in/events/hack-night-04");
+    // Its club's feed, for readers and crawlers alike.
+    expect(meta.alternates.types?.["application/rss+xml"]?.[0]?.url).toBe("https://myotherapp.in/clubs/circuit-society/rss.xml");
     const result = await outcome(() => route.default({ params: params({ slug: "hack-night-04" }) }));
     expect(result.value).toBeTruthy();
     expect(fetch.calls[0].url).toBe(`${API}/hack-night-04`);

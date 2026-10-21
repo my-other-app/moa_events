@@ -64,7 +64,7 @@ export function eventFactsLine(event, club) {
   return `${facts}${club ? `. Hosted by ${club.name} on ${SITE_NAME}.` : `. On ${SITE_NAME}.`}`;
 }
 
-/** An event's page: its canonical /events/{slug}, its own share picture. `page` is the raw parsed page. */
+/** An event's page: its canonical /events/{slug}, its own share picture, and its club's feed. `page` is the raw parsed page. */
 export function eventMetadata(page) {
   const { event, club } = page;
   const description = summary(event.about) || summary(eventFactsLine(event, club));
@@ -79,6 +79,7 @@ export function eventMetadata(page) {
       height: 630,
       alt: [event.name, when ? `${when} IST` : null, event.is_online ? "Online" : event.location_name].filter(Boolean).join(" · "),
     },
+    rss: club?.slug ? { url: feeds.club(club.slug), title: `Upcoming events from ${club.name}` } : null,
   });
 }
 

@@ -1,11 +1,15 @@
 import { SitePage } from "@/components/discover/chrome";
+import { CityLinks } from "@/components/discover/citypage";
 import { EventsView } from "@/components/discover/eventspage";
 import { JsonLd } from "@/seo/JsonLd.jsx";
+import { isDemoCard, realTotal } from "@/seo/demo";
 import { eventsFeedQuery, eventsHead, eventsIndexing, paramsOf, topicChoice } from "@/seo/listings";
 import { listingMetadata } from "@/seo/metadata";
 import { feedTitle } from "@/seo/rss";
 import { eventsListStructuredData } from "@/seo/structured";
+import { citiesWithEvents } from "@/seo/citypages";
 import { feeds } from "@/seo/urls";
+import { getCitySummaries } from "@/server/cities";
 import { listEvents } from "@/server/listings";
 import { getTopicsOrNull } from "@/server/topics";
 import { requestVisitor } from "@/server/visitor";
@@ -20,7 +24,10 @@ import { requestVisitor } from "@/server/visitor";
  * ?price=, ?when=) are indexed, each with its own canonical; ?topic= alone
  * has the topic's page as its canonical; every other mix is "noindex,
  * follow" (src/seo/listings.js). Its HTML depends on the address alone, so
- * the edge keeps it a minute (next.config.mjs).
+ * the edge keeps it a minute (next.config.mjs). A filter whose results are
+ * all the made-up demo clubs' counts as empty (src/seo/demo.js), and the
+ * ItemList leaves those out. Below the list, "Browse by city": the city
+ * pages (/events/in/{city}) that have upcoming events, as plain links.
  *
  * Topics: the list's own facet names them (the Topic filter); the topics
  * and their interests are read only when one is picked (?topic=,
@@ -51,7 +58,7 @@ export async function generateMetadata({ searchParams }) {
   return listingMetadata({
     title,
     description,
-    indexing: eventsIndexing(data.state, { total: data.page.total, categoryName: names.categoryName, topicSlug: data.topics.topicSlug }),
+    indexing: eventsIndexing(data.state, { total: realTotal(data.page, isDemoCard), categoryName: names.categoryName, topicSlug: data.topics.topicSlug }),
     rss: {
       url: feeds.events(feed),
       title: feedTitle({ filters: data.state.filters, categoryName: names.categoryName, topicName: names.interestName || names.topicName, near: Boolean(data.state.near) }),
@@ -64,11 +71,13 @@ export default async function Events({ searchParams }) {
   const { state, page, search, topics } = data;
   const names = namesOf(data);
   const { heading } = eventsHead(state, names);
-  const path = eventsIndexing(state, { total: page.total, categoryName: names.categoryName, topicSlug: topics.topicSlug }).path || `/events${search ? `?${search}` : ""}`;
+  const path = eventsIndexing(state, { total: realTotal(page, isDemoCard), categoryName: names.categoryName, topicSlug: topics.topicSlug }).path || `/events${search ? `?${search}` : ""}`;
+  const cities = state.calendar ? [] : citiesWithEvents(await getCitySummaries().catch(() => []));
   return (
     <SitePage>
       {state.calendar ? null : <JsonLd data={eventsListStructuredData(page.items, { name: heading, path })} />}
       <EventsView state={state} page={page} heading={heading} topics={topics} />
+      <CityLinks summaries={cities} />
     </SitePage>
   );
 }

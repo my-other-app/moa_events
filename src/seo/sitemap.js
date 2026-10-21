@@ -4,6 +4,8 @@
  *
  *   /sitemaps/pages.xml        the site's fixed pages
  *   /sitemaps/topics.xml       /topics and every topic's page (only when the API has topics)
+ *   /sitemaps/cities.xml       the city pages worth indexing (/events/in/{city}, /clubs/in/{city}, the hub;
+ *                              only while there are some)
  *   /sitemaps/events-{n}.xml   public events, page n
  *   /sitemaps/clubs-{n}.xml    public clubs, page n
  *
@@ -37,13 +39,13 @@ export const xml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
 const PREFIX = { events: "/events", clubs: "/clubs" };
 const PRIORITY = { events: "0.7", clubs: "0.6" };
 
-/** The addresses for rows of {slug, updated_at}: each slug once, bad ones left out. */
-export function entriesFor(kind, rows, { siteUrl = SITE_URL } = {}) {
+/** The addresses for rows of {slug, updated_at}: each slug once, bad ones and those `skip` says (demo content) left out. */
+export function entriesFor(kind, rows, { siteUrl = SITE_URL, skip = () => false } = {}) {
   const seen = new Set();
   const out = [];
   for (const row of Array.isArray(rows) ? rows : []) {
     const slug = row && typeof row.slug === "string" ? row.slug.trim() : "";
-    if (!SLUG.test(slug) || seen.has(slug)) continue;
+    if (!SLUG.test(slug) || seen.has(slug) || skip(row)) continue;
     seen.add(slug);
     out.push({ loc: `${siteUrl}${PREFIX[kind]}/${encodeURIComponent(slug)}`, lastmod: w3c(row.updated_at), priority: PRIORITY[kind] });
   }
@@ -97,12 +99,14 @@ const newest = (rows) => rows.map((r) => r?.updated_at).filter(Boolean).sort().p
 /**
  * The index's entries for a sitemap source (src/server/discover.js's
  * getSitemapSource): the fixed pages, the topics (`topics`: true when the
- * API has some), then every page of events and clubs. Null source (the API
+ * API has some), the cities (`cities`: true when a city page is worth
+ * indexing), then every page of events and clubs. Null source (the API
  * is down): the fixed pages (and the topics) only.
  */
-export function indexEntries(source, { siteUrl = SITE_URL, topics = false } = {}) {
+export function indexEntries(source, { siteUrl = SITE_URL, topics = false, cities = false } = {}) {
   const out = [{ loc: `${siteUrl}/sitemaps/pages.xml` }];
   if (topics) out.push({ loc: `${siteUrl}/sitemaps/topics.xml` });
+  if (cities) out.push({ loc: `${siteUrl}/sitemaps/cities.xml` });
   if (!source) return out;
   if (source.paged) {
     for (const p of source.pages) {
@@ -117,11 +121,12 @@ export function indexEntries(source, { siteUrl = SITE_URL, topics = false } = {}
   return out;
 }
 
-/** "events-3.xml" → {kind: "events", page: 3}; "pages.xml" → {kind: "pages"}; "topics.xml" → {kind: "topics"}; anything else → null. */
+/** "events-3.xml" → {kind: "events", page: 3}; "pages.xml", "topics.xml", "cities.xml" → {kind}; anything else → null. */
 export function parseSitemapName(name) {
   const s = decodeURIComponent(String(name || ""));
   if (s === "pages.xml") return { kind: "pages", page: 1 };
   if (s === "topics.xml") return { kind: "topics", page: 1 };
+  if (s === "cities.xml") return { kind: "cities", page: 1 };
   const m = /^(events|clubs)-([1-9]\d{0,5})\.xml$/.exec(s);
   return m ? { kind: m[1], page: Number(m[2]) } : null;
 }

@@ -21,6 +21,14 @@ export const CLUBS_URL = "https://club-dashboard.myotherapp.in";
 
 export const CONTACT_EMAIL = "support@myotherapp.in";
 
+/**
+ * MyOtherApp's own profiles elsewhere (Instagram, LinkedIn, X, YouTube, …),
+ * absolute links. They go into the site's Organization structured data
+ * (sameAs), which is how Google ties the brand's profiles to the site.
+ * Empty until the profiles exist; see docs/SEO.md.
+ */
+export const SOCIAL_PROFILES = [];
+
 export const SITE_NAME = "MyOtherApp";
 
 /** The site's own address: canonical links and the links people share start here. */

@@ -7,6 +7,7 @@ import { JsonLd } from "@/seo/JsonLd.jsx";
 import { stableHome } from "@/seo/stabilize";
 import { readOr } from "@/server/build";
 import { getHome } from "@/server/discover";
+import { preconnectMedia } from "@/server/hints";
 import { everyoneHome } from "@/utils/home";
 
 /*
@@ -29,6 +30,7 @@ export const metadata = pageMetadata({ absoluteTitle: HOME_TITLE, path: "/", rss
 
 export default async function Home() {
   const data = await readOr(getHome(), everyoneHome(parseHome({})));
+  preconnectMedia(...[...data.this_week, ...data.popular, ...data.online].map((e) => e.poster), ...data.clubs.map((c) => c.logo));
   return (
     <SitePage>
       <JsonLd data={siteJsonLd()} />

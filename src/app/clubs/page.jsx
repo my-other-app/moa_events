@@ -1,6 +1,7 @@
 import { SitePage } from "@/components/discover/chrome";
 import { ClubsView } from "@/components/discover/clubspage";
 import { JsonLd } from "@/seo/JsonLd.jsx";
+import { isDemoClub, realTotal } from "@/seo/demo";
 import { clubsHead, clubsIndexing, paramsOf, topicChoice } from "@/seo/listings";
 import { listingMetadata } from "@/seo/metadata";
 import { clubsListStructuredData } from "@/seo/structured";
@@ -13,7 +14,8 @@ import { requestVisitor } from "@/server/visitor";
  * heading, the interest chips, the count and the first twelve clubs are in
  * the HTML, with an ItemList of them; filters, the place and "Load more"
  * are islands. /clubs, /clubs?interest= and /clubs?topic= alone are
- * indexed; any other mix is "noindex, follow".
+ * indexed (unless all they show is the made-up demo clubs, src/seo/demo.js);
+ * any other mix is "noindex, follow".
  *
  * Topics (the Topic filter, and a picked topic's interests as the chips)
  * come from the topics list, read alongside (cached five minutes); an API
@@ -37,7 +39,7 @@ export async function generateMetadata({ searchParams }) {
   const data = await load(searchParams);
   const names = namesOf(data);
   const { title, description } = clubsHead(data.state, names);
-  return listingMetadata({ title, description, indexing: clubsIndexing(data.state, { total: data.page.total, interestName: names.interestName, topicSlug: data.topics.topicSlug }) });
+  return listingMetadata({ title, description, indexing: clubsIndexing(data.state, { total: realTotal(data.page, isDemoClub), interestName: names.interestName, topicSlug: data.topics.topicSlug }) });
 }
 
 export default async function Clubs({ searchParams }) {
@@ -45,7 +47,7 @@ export default async function Clubs({ searchParams }) {
   const { state, page, search, topics } = data;
   const names = namesOf(data);
   const { heading } = clubsHead(state, names);
-  const path = clubsIndexing(state, { total: page.total, interestName: names.interestName, topicSlug: topics.topicSlug }).path || `/clubs${search ? `?${search}` : ""}`;
+  const path = clubsIndexing(state, { total: realTotal(page, isDemoClub), interestName: names.interestName, topicSlug: topics.topicSlug }).path || `/clubs${search ? `?${search}` : ""}`;
   return (
     <SitePage>
       <JsonLd data={clubsListStructuredData(page.items, { name: heading, path })} />

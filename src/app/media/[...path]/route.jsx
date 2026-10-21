@@ -52,7 +52,8 @@ export async function GET(request, { params }) {
   if (!target) return status(404, "Not found", "public, max-age=3600, s-maxage=3600");
   const size = request.nextUrl.searchParams.get("size");
   try {
-    if (target.what === "cover") return await cover(target.ref);
+    // Only an event's cover is drawn here; a club's cover is its own picture, looked up below.
+    if (target.source === "event" && target.what === "cover") return await cover(target.ref);
     const load = LOADERS[target.source];
     let data = await load(target.ref, false);
     let url = data ? target.pick(data, size) : null;

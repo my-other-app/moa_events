@@ -5,14 +5,23 @@
  */
 import { SITE_URL } from "@/config";
 import { eventUrl, summary } from "@/utils/eventpage";
+import { demoSettings, isDemoCard, isDemoClub, isDemoThread, withoutDemo } from "./demo";
 import { breadcrumbJsonLd, clubJsonLd, collectionPageJsonLd, discussionPostingJsonLd, eventJsonLd, itemListJsonLd } from "./jsonld";
 import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
 import { absoluteUrl, clubPagePath, eventPagePath, eventRefOf, media, ogImage, topicPagePath } from "./urls";
 
-/** The event's pictures: the poster (or its drawn cover), then its share picture. */
+/** The shapes Google asks of an event's pictures (src/og/layouts.jsx's EVENT_FRAMES). */
+export const EVENT_IMAGE_RATIOS = ["16x9", "4x3", "1x1"];
+
+/**
+ * The event's pictures: the poster (or its drawn cover) as it is, then the
+ * same at 16:9, 4:3 and 1:1 (the whole poster on its drawn art; made by
+ * /og/events/{slug}?ratio=), each 1200 pixels wide.
+ */
 export function eventImages(page) {
   const ref = eventRefOf(page.event);
-  return [absoluteUrl(page.event.poster ? media.eventPoster(ref) : media.eventCover(ref)), absoluteUrl(ogImage.event(ref, eventOgVersion(page)))];
+  const v = eventOgVersion(page);
+  return [absoluteUrl(page.event.poster ? media.eventPoster(ref) : media.eventCover(ref)), ...EVENT_IMAGE_RATIOS.map((r) => absoluteUrl(ogImage.event(ref, v, r)))];
 }
 
 /**
@@ -66,14 +75,22 @@ export function clubStructuredData(data) {
   return [ld, crumbs];
 }
 
-/** An ItemList of the events a find page shows, in its order. `path` is the page's own address ("/events?type=online"). */
-export function eventsListStructuredData(items, { name, path }) {
-  return itemListJsonLd({ name, url: absoluteUrl(path), items: items.map((e) => ({ url: absoluteUrl(eventPagePath(e)), name: e.name })) });
+/**
+ * An ItemList of the events a find page shows, in its order, the made-up
+ * demo clubs' left out (src/seo/demo.js); null when none is left. `path` is
+ * the page's own address ("/events?type=online").
+ */
+export function eventsListStructuredData(items, { name, path, id = null, settings = demoSettings() }) {
+  const real = withoutDemo(items, isDemoCard, settings);
+  if (!real.length) return null;
+  return itemListJsonLd({ id, name, url: absoluteUrl(path), items: real.map((e) => ({ url: absoluteUrl(eventPagePath(e)), name: e.name })) });
 }
 
-/** An ItemList of the clubs a find page shows (those with an address of their own). */
-export function clubsListStructuredData(items, { name, path }) {
-  return itemListJsonLd({ name, url: absoluteUrl(path), items: items.filter((c) => c.slug).map((c) => ({ url: absoluteUrl(clubPagePath(c)), name: c.name })) });
+/** An ItemList of the clubs a find page shows (those with an address of their own, demo clubs left out); null when none is left. */
+export function clubsListStructuredData(items, { name, path, id = null, settings = demoSettings() }) {
+  const real = withoutDemo(items, isDemoClub, settings).filter((c) => c.slug);
+  if (!real.length) return null;
+  return itemListJsonLd({ id, name, url: absoluteUrl(path), items: real.map((c) => ({ url: absoluteUrl(clubPagePath(c)), name: c.name })) });
 }
 
 /* ---------- topics ---------- */
@@ -90,10 +107,12 @@ export function topicsStructuredData(topics) {
 
 /**
  * A topic's page: [CollectionPage (about the topic), ItemList of the events
- * it shows, BreadcrumbList Home › Topics › Topic]. Its address is always the
- * topic's own (canonical), whatever interest is picked.
+ * it shows (the demo clubs' left out), BreadcrumbList Home › Topics ›
+ * Topic]. Its address is always the topic's own (canonical), whatever
+ * interest is picked.
  */
-export function topicStructuredData(topic, events = [], { interest = null } = {}) {
+export function topicStructuredData(topic, shown = [], { interest = null, settings = demoSettings() } = {}) {
+  const events = withoutDemo(shown, isDemoCard, settings);
   const url = absoluteUrl(topicPagePath(topic));
   const list = `${url}#events`;
   const name = interest ? `${interest.name} events` : `${topic.name} events`;
@@ -112,6 +131,21 @@ export function topicStructuredData(topic, events = [], { interest = null } = {}
       [TOPICS_TITLE, absoluteUrl("/topics")],
       [topic.name, url],
     ]),
+  ];
+}
+
+/**
+ * /threads: [CollectionPage, ItemList of the posts it shows (each its own
+ * page, named by its first line; the demo clubs' left out)]. Without a
+ * real post, the CollectionPage alone.
+ */
+export function threadsStructuredData(threads, { name, description, settings = demoSettings() }) {
+  const url = absoluteUrl("/threads");
+  const list = `${url}#posts`;
+  const real = withoutDemo(threads, isDemoThread, settings);
+  return [
+    collectionPageJsonLd({ name, description, url, list: real.length ? list : null }),
+    ...(real.length ? [itemListJsonLd({ id: list, name, url, items: real.map((t) => ({ url: absoluteUrl(`/threads/${encodeURIComponent(t.id)}`), name: threadHeadline(t) })) })] : []),
   ];
 }
 

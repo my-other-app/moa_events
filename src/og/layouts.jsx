@@ -61,6 +61,29 @@ export function EventCoverPanel({ event, w, h }) {
   );
 }
 
+/**
+ * The sizes of an event's picture for search engines, by aspect ratio:
+ * Google asks for 16:9, 4:3 and 1:1 for an event's rich result.
+ */
+export const EVENT_FRAMES = { "16x9": [1200, 675], "4x3": [1200, 900], "1x1": [1200, 1200] };
+
+/**
+ * An event's picture at one of those sizes: the whole poster, centred on
+ * the art drawn for it (nothing of the poster cropped), or, without a
+ * poster, the drawn cover itself at that size.
+ */
+export function EventFrame({ event, poster, w, h }) {
+  if (!poster) return <EventCoverPanel event={event} w={w} h={h} />;
+  const look = coverLook({ id: event.id, category: event.category });
+  const pad = Math.round(Math.min(w, h) * 0.04);
+  return (
+    <div style={{ display: "flex", position: "relative", width: w, height: h, overflow: "hidden" }}>
+      <Art look={look} w={w} h={h} />
+      <img src={poster} alt="" width={w - 2 * pad} height={h - 2 * pad} style={{ position: "absolute", top: pad, left: pad, objectFit: "contain" }} />
+    </div>
+  );
+}
+
 function Glyph({ name, size = 30, color = INK_2 }) {
   const paths = {
     calendar: (

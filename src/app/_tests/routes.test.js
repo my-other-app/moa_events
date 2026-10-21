@@ -103,6 +103,12 @@ describe("which file answers which address", () => {
     ["/sitemap.xml", "sitemap.xml/route.js"],
     ["/sitemaps/events-1.xml", "sitemaps/[name]/route.js"],
     ["/sitemaps/topics.xml", "sitemaps/[name]/route.js"],
+    ["/sitemaps/cities.xml", "sitemaps/[name]/route.js"],
+    // The city pages: "in" is a word of the site's own, never an event's or a club's slug.
+    ["/events/in", "events/in/page.jsx"],
+    ["/events/in/kochi", "events/in/[city]/page.jsx"],
+    ["/clubs/in", "clubs/in/page.jsx"],
+    ["/clubs/in/kochi", "clubs/in/[city]/page.jsx"],
     ["/robots.txt", null],
     ["/media/events/hack-night-04/poster", "media/[...path]/route.jsx"],
     ["/og/events/hack-night-04", "og/events/[slug]/route.jsx"],
@@ -132,6 +138,16 @@ describe("which file answers which address", () => {
     for (const word of ["/events", "/clubs", "/topics", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms"]) {
       expect((await resolve(word)).file).not.toMatch(/^\[ref\]/);
     }
+  });
+
+  it("sends a city's other names to its page, before any page renders (308)", async () => {
+    expect(await resolve("/events/in/cochin")).toEqual({ redirect: "/events/in/kochi", permanent: true });
+    expect(await resolve("/events/in/trivandrum")).toEqual({ redirect: "/events/in/thiruvananthapuram", permanent: true });
+    expect(await resolve("/clubs/in/calicut")).toEqual({ redirect: "/clubs/in/kozhikode", permanent: true });
+    expect(await resolve("/events/in/navi-mumbai")).toEqual({ redirect: "/events/in/mumbai", permanent: true });
+    // A city's own address, and anything else, is the page's.
+    expect((await resolve("/events/in/kochi")).file).toBe("events/in/[city]/page.jsx");
+    expect((await resolve("/events/in/cochin-extra")).file).toBe("events/in/[city]/page.jsx");
   });
 
   it("sends /me to the tickets, for now", async () => {

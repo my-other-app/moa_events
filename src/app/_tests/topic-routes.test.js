@@ -16,6 +16,8 @@ import { validateBreadcrumbs, validateItemList, validateRss } from "@/seo/valida
  *           category, "arts", with no slug and the icon "string": no topics anywhere
  */
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+// The city links under /events read every city's events; these tests are about the topic reads.
+vi.mock("@/server/cities", () => ({ getCitySummaries: async () => [] }));
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 
 const DEV = {

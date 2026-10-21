@@ -12,6 +12,8 @@ import { validateItemList } from "@/seo/validate";
  */
 let requestHeaders = new Headers();
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
+// The city links under /events read every city's events; these tests are about the list's own read.
+vi.mock("@/server/cities", () => ({ getCitySummaries: async () => [] }));
 
 const S3 = "https://b.s3.amazonaws.com/p.png?Signature=x&Expires=1";
 const card = (id, over = {}) => ({ id, slug: `event-${id}`, name: `Event ${id}`, poster: S3, starts_at: "2026-10-30T12:30:00Z", status: "upcoming", ...over });

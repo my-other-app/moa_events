@@ -6,6 +6,7 @@
  *     get the small server-made page from /api/share instead (see BOT_PAGES);
  *     server-rendered pages need no such help and are not listed;
  *   - /me → /me/tickets, and /events/{id} handed to the old-address page;
+ *   - a city's other names to its page (/events/in/cochin → /events/in/kochi);
  *   - metadata always in <head>, never streamed into <body> (canonical tags
  *     only count in the head);
  *   - the find pages (/events, /clubs) and a topic's page (/topics/{slug})
@@ -14,6 +15,7 @@
  *   - the OG fonts traced into the functions that read them.
  */
 import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
+import { cityRedirects } from "./src/seo/cities.js";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -45,7 +47,7 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    return [{ source: "/me", destination: "/me/tickets", permanent: false }];
+    return [{ source: "/me", destination: "/me/tickets", permanent: false }, ...cityRedirects()];
   },
   async rewrites() {
     return {

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeFetch, outcome } from "@/test/next";
 import { html, jsonLdOf } from "@/test/html";
-import { validateBreadcrumbs, validateDiscussionPosting } from "@/seo/validate";
+import { validateBreadcrumbs, validateDiscussionPosting, validateItemList } from "@/seo/validate";
 
 /* /threads and /threads/{id} on the server: statically regenerated, read as nobody. */
 const S3 = "https://b.s3.amazonaws.com/k.jpg?Signature=x&Expires=1";
@@ -37,6 +37,22 @@ describe("/threads", () => {
     expect(out).not.toMatch(/Signature=|Expires=/);
     expect(Object.fromEntries(new URL(fetch.calls[0].url).searchParams)).toEqual({ offset: "0", limit: "12" });
   });
+
+  it("is a CollectionPage of the posts, with an ItemList of each post's page", async () => {
+    const route = await import("../threads/page.jsx");
+    const [page, list] = jsonLdOf(html(await route.default()));
+    expect(page).toMatchObject({ "@type": "CollectionPage", "@id": "https://myotherapp.in/threads", name: "Threads from the clubs", inLanguage: "en-IN", mainEntity: { "@id": "https://myotherapp.in/threads#posts" } });
+    expect(validateItemList(list)).toEqual({ errors: [], warnings: [] });
+    expect(list.itemListElement).toEqual([{ "@type": "ListItem", position: 1, url: "https://myotherapp.in/threads/t1", name: "Kits are in!" }]);
+  });
+
+  it("lists no demo club's post, and then is the CollectionPage alone", async () => {
+    vi.stubGlobal("fetch", fakeFetch(() => ({ body: { items: [{ ...POST, club: { ...club, slug: "neural-tide" } }], total: 1 } })));
+    const route = await import("../threads/page.jsx");
+    const lds = jsonLdOf(html(await route.default()));
+    expect(lds.map((l) => l["@type"])).toEqual(["CollectionPage"]);
+    expect(lds[0]).not.toHaveProperty("mainEntity");
+  });
 });
 
 describe("/threads/{id}", () => {
@@ -54,7 +70,13 @@ describe("/threads/{id}", () => {
     const [post, crumbs] = jsonLdOf(out);
     expect(validateDiscussionPosting(post)).toEqual({ errors: [], warnings: [] });
     expect(validateBreadcrumbs(crumbs).errors).toEqual([]);
-    expect(post).toMatchObject({ headline: "Kits are in!", commentCount: 2, author: { name: "Circuit Society" } });
+    expect(post).toMatchObject({ headline: "Kits are in!", commentCount: 2, author: { "@type": "Organization", name: "Circuit Society", url: "https://myotherapp.in/clubs/circuit-society" } });
+    // When, and how many liked it and commented, as Google's forum-post result reads them.
+    expect(post.datePublished).toBe("2026-10-15T15:30:00+05:30");
+    expect(post.interactionStatistic).toEqual([
+      { "@type": "InteractionCounter", interactionType: "https://schema.org/LikeAction", userInteractionCount: 12 },
+      { "@type": "InteractionCounter", interactionType: "https://schema.org/CommentAction", userInteractionCount: 2 },
+    ]);
     // Read as nobody: no one's token goes, cached a minute under the post's tag.
     expect(fetch.calls[0].init.headers).toEqual({ Accept: "application/json" });
     expect(fetch.calls[0].init.next).toEqual({ revalidate: 60, tags: ["thread:t1"] });

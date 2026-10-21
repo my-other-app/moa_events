@@ -104,3 +104,14 @@ describe("a page's images, before it is cached", () => {
     expect(page.partners[0].logo).toBe("/media/clubs/c/partners/0/logo");
   });
 });
+
+describe("where the pictures come from (for <link rel=preconnect>)", () => {
+  it("is the origin of the first picture link, in any shape the API sends it", async () => {
+    const { mediaOrigin } = await import("./media");
+    expect(mediaOrigin("https://bucket.s3.amazonaws.com/a/p.jpeg?Signature=x&Expires=1")).toBe("https://bucket.s3.amazonaws.com");
+    expect(mediaOrigin(null, { medium: "https://media.myotherapp.in/clubs/logos/v-1.medium.png" })).toBe("https://media.myotherapp.in");
+    // Stable addresses (same origin) and junk are skipped; nothing found is null.
+    expect(mediaOrigin("/media/events/x/poster", "javascript:alert(1)", "http://plain.example/x.png")).toBeNull();
+    expect(mediaOrigin()).toBeNull();
+  });
+});

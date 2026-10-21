@@ -14,6 +14,9 @@
  * addresses are kept and which say noindex), the posts (a post's
  * DiscussionForumPosting), the static pages (the plans' structured data),
  * /api/near as Vercel would ask it, and that bots get the real pages.
+ * Then search for India: lang en-IN, the city pages (/events/in/…), the
+ * demo clubs kept out of search (noindex, follow; out of the sitemaps),
+ * the manifest and the icons.
  * Prints what it found; exits 1 if anything failed.
  * The validators are src/seo/validate.js, the same the tests use.
  */
@@ -78,6 +81,9 @@ async function checkEvent(slug) {
   ok(Boolean(doc.querySelectorAll(".ep-fact-main")[1]?.textContent), "the venue is in the HTML", doc.querySelectorAll(".ep-fact-main")[1]?.textContent);
   const og = (p) => doc.querySelector(`meta[property="og:${p}"]`)?.getAttribute("content");
   ok(og("url") === canonical && og("site_name") === "MyOtherApp" && og("locale") === "en_IN", "Open Graph url, site_name, locale");
+  ok(doc.documentElement.getAttribute("lang") === "en-IN", '<html lang="en-IN">', doc.documentElement.getAttribute("lang"));
+  const robots = doc.querySelector('meta[name="robots"]')?.getAttribute("content");
+  console.log(`        robots: ${robots || "index, follow"}${robots ? " (a demo club's event, src/seo/demo.js)" : ""}`);
   ok(/\/og\/events\//.test(og("image") || "") && og("image:width") === "1200" && og("image:height") === "630", "og:image is the 1200x630 share picture", og("image"));
   ok(doc.querySelector('meta[name="twitter:card"]')?.getAttribute("content") === "summary_large_image", "Twitter card");
   ok(!/X-Amz-Signature|Signature=|Expires=\d/.test(html), "no presigned (expiring) S3 link anywhere in the HTML");
@@ -87,6 +93,13 @@ async function checkEvent(slug) {
   ok(Boolean(event), "an Event in JSON-LD");
   if (event) {
     report("Event JSON-LD", validateEvent(event));
+    const ratios = (event.image || []).map((u) => new URL(u).searchParams.get("ratio")).filter(Boolean);
+    ok(JSON.stringify(ratios) === JSON.stringify(["16x9", "4x3", "1x1"]), "its pictures at 16:9, 4:3 and 1:1", ratios.join(" "));
+    ok(/\+05:30$/.test(event.startDate) && (!event.offers || event.offers.priceCurrency === "INR"), "India time and rupees", `${event.startDate} ${event.offers?.priceCurrency || ""}`);
+    for (const ratio of ratios) {
+      const pic = await get(new URL(event.image.find((u) => u.includes(`ratio=${ratio}`))).pathname + new URL(event.image.find((u) => u.includes(`ratio=${ratio}`))).search);
+      ok(pic.status === 200 && /^image\//.test(pic.headers.get("content-type") || ""), `the ${ratio} picture renders`, `${pic.status} ${pic.headers.get("content-type")} ${(await pic.arrayBuffer()).byteLength} bytes`);
+    }
     const about = (doc.querySelector("#about")?.textContent || "").replace(/\s+/g, " ");
     if (about) ok(about.includes(event.description.replace(/\s+/g, " ").replace(/…$/, "").slice(0, 60)), "the description is in the HTML", `"${event.description.slice(0, 60)}…"`);
     else console.log("        (no description of its own: the page shows its facts)");
@@ -219,8 +232,10 @@ async function checkList(kind) {
     report("ItemList JSON-LD", validateItemList(list));
     const last = (u) => decodeURIComponent(String(u).split("/").pop());
     const cards = [...p.doc.querySelectorAll(kind === "events" ? ".dc-evcard-link" : ".dc-ccard-name a")].map((a) => last(a.getAttribute("href")));
-    ok(cards.length > 0 && JSON.stringify(listUrls(list).map(last)) === JSON.stringify(cards), "the ItemList is the results in the HTML, in order", `${cards.length} in the HTML`);
-  } else ok(false, "an ItemList in JSON-LD");
+    // The demo clubs' results are left out of it (src/seo/demo.js): the rest, in the same order.
+    const listed = listUrls(list).map(last);
+    ok(listed.length > 0 && JSON.stringify(cards.filter((c) => listed.includes(c))) === JSON.stringify(listed), "the ItemList is the (real) results in the HTML, in order", `${listed.length} of ${cards.length} in the HTML`);
+  } else console.log("        (no ItemList: every result shown is a demo club's)");
   ok(!PRESIGNED.test(p.html), "no presigned (expiring) S3 link anywhere in the HTML");
   ok(!/km away/.test(p.html), "a list about no place shows no distances");
   // One browsing filter alone is kept, at its own address; a mix is not.
@@ -228,7 +243,8 @@ async function checkList(kind) {
   if (chip) {
     const href = chip.getAttribute("href");
     const one = await page(href);
-    ok(one.canonical === `${SITE}${href}` && !one.robots, `${href} is kept, at its own canonical`, `${one.canonical} | ${one.robots || "index"} | <h1> ${one.h1}`);
+    const onlyDemo = one.robots === "noindex, follow" && !one.lds.some((l) => l["@type"] === "ItemList");
+    ok((one.canonical === `${SITE}${href}` && !one.robots) || onlyDemo, `${href} is kept, at its own canonical (noindex when it shows only demo clubs')`, `${one.canonical} | ${one.robots || "index"} | <h1> ${one.h1}`);
   } else console.log("        (no chips to try a single filter with)");
   const mixed = await page(kind === "events" ? "/events?type=online&price=free&utm_source=check" : "/clubs?q=a&sort=newest");
   ok(mixed.robots === "noindex, follow" && !mixed.canonical, "a mix of filters is noindex, follow, with no canonical", `${mixed.robots} | ${mixed.canonical}`);
@@ -248,6 +264,7 @@ async function checkThreads() {
   console.log("\nThe posts /threads");
   const p = await page("/threads");
   ok(p.canonical === `${SITE}/threads`, "canonical", p.canonical);
+  ok(p.lds.some((l) => l["@type"] === "CollectionPage"), "a CollectionPage in JSON-LD (with an ItemList of the real posts, when there are any)", p.lds.map((l) => l["@type"]).join(" "));
   ok(!PRESIGNED.test(p.html), "no presigned (expiring) S3 link anywhere in the HTML");
   const first = p.doc.querySelector('a[href^="/threads/"]')?.getAttribute("href");
   ok(Boolean(first) || Boolean(p.doc.querySelector(".dc-state")), "the first posts are in the HTML", first || "no posts yet");
@@ -288,7 +305,43 @@ async function checkStatic() {
   }
 }
 
+async function checkIndia() {
+  console.log("\nSearch in India: the city pages, the demo clubs, the manifest and icons");
+  const hub = await page("/events/in");
+  ok(hub.h1 === "Events by city" && hub.canonical === `${SITE}/events/in`, "/events/in: its <h1> and canonical", `${hub.h1} | ${hub.robots || "index"}`);
+  const cities = [...hub.doc.querySelectorAll('a[href^="/events/in/"]')].map((a) => a.getAttribute("href"));
+  ok(cities.length > 0, "…links the cities with upcoming events", cities.join(" "));
+  for (const path of cities.slice(0, 3)) {
+    const c = await page(path);
+    ok(/^Events in .+: hackathons, workshops and meetups$/.test(c.h1) && c.canonical === `${SITE}${path}`, `${path}: its <h1>, canonical`, `${c.h1} | ${c.robots || "index"}`);
+    ok(c.doc.documentElement.getAttribute("lang") === "en-IN", `${path}: lang en-IN`);
+    const types = c.lds.map((l) => l["@type"]);
+    ok(types.includes("CollectionPage") && types.includes("BreadcrumbList"), `${path}: CollectionPage and BreadcrumbList`, types.join(" "));
+    const list = c.lds.find((l) => l["@type"] === "ItemList");
+    if (list) report(`${path}: ItemList`, validateItemList(list));
+    ok(Boolean(list) === !c.robots, `${path}: indexed exactly when it lists a real event`, `${c.robots || "index"}, ${list ? list.itemListElement.length : 0} in the ItemList`);
+    const crumbs = c.lds.find((l) => l["@type"] === "BreadcrumbList");
+    if (crumbs) report(`${path}: BreadcrumbList`, validateBreadcrumbs(crumbs));
+    ok(Boolean(c.doc.querySelector('nav[aria-label="Breadcrumb"]')), `${path}: visible breadcrumbs`);
+  }
+  const alias = await get("/events/in/cochin");
+  ok(alias.status === 308 && new URL(alias.headers.get("location"), base).pathname === "/events/in/kochi", "/events/in/cochin → 308 /events/in/kochi", `${alias.status} ${alias.headers.get("location")}`);
+  ok((await get("/events/in/atlantis")).status === 404, "an unknown city is a 404");
+  const sitemap = parseXml(await (await get("/sitemaps/cities.xml")).text());
+  console.log(`        cities.xml: ${texts(sitemap, "loc").map((l) => new URL(l).pathname).join(" ") || "(empty: no city page has a real event)"}`);
+  const manifest = await get("/manifest.webmanifest");
+  const m = await manifest.json().catch(() => null);
+  ok(manifest.status === 200 && m?.lang === "en-IN" && m.icons?.length >= 3, "/manifest.webmanifest", `${manifest.status} ${m?.name}`);
+  for (const icon of ["/favicon.ico", "/icon-192.png", "/apple-touch-icon.png", ...(m?.icons || []).map((i) => i.src)]) {
+    const r = await get(icon);
+    ok(r.status === 200 && /^image\//.test(r.headers.get("content-type") || ""), `${icon} is an image`, `${r.status} ${r.headers.get("content-type")} ${(await r.arrayBuffer()).byteLength} bytes`);
+  }
+}
+
+const texts = (doc, tag) => [...doc.getElementsByTagName(tag)].map((el) => el.textContent);
+
 await checkHome();
+await checkIndia();
 await checkList("events");
 await checkList("clubs");
 await checkThreads();
