@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { plansResponse, trialPlansResponse } from "@/test/plansFixture";
+import { plansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
@@ -259,5 +259,35 @@ describe("with the free trial (the backend's trial_pricing)", () => {
     );
     expect(screen.getByRole("link", { name: /^Start free: 14 days of Pro, no card/ })).toHaveAttribute("href", `${SIGNUP}?plan=pro&cycle=monthly`);
     expect(screen.getByText(/Every new club gets 14 days of Pro free, no card needed\. Then pick the plan that fits, or keep a free plan for small events\./)).toBeInTheDocument();
+  });
+});
+
+
+describe("with the monthly messages (the backend's message_quotas)", () => {
+  const quotaData = () => parsePlans(quotaPlansResponse());
+  const cellsOf = (table, rowName) =>
+    within(within(table).getByRole("rowheader", { name: rowName }).closest("tr"))
+      .getAllByRole("cell")
+      .map((td) => td.textContent);
+
+  it("puts each plan's emails and WhatsApp on its card, and what an extra one costs", () => {
+    show(quotaData());
+    const starter = within(card("Starter"));
+    expect(starter.getByText("1,000 emails / 50 WhatsApp a month")).toBeInTheDocument();
+    expect(starter.getByText("Extra: ₹0.10 per email, ₹1 per WhatsApp")).toBeInTheDocument();
+    expect(within(card("Growth")).getByText("5,000 emails / 250 WhatsApp a month")).toBeInTheDocument();
+    expect(within(card("Pro")).getByText("20,000 emails / 1,000 WhatsApp a month")).toBeInTheDocument();
+    const ent = within(card("Enterprise"));
+    expect(ent.getByText("Custom email and WhatsApp limits")).toBeInTheDocument();
+    expect(ent.queryByText(/^Extra:/)).toBeNull();
+  });
+
+  it("compares the limits and the extra prices, Free never billed", () => {
+    show(quotaData());
+    const table = screen.getByRole("table");
+    expect(cellsOf(table, "Emails a month")).toEqual(["200", "1,000", "5,000", "20,000", "Custom"]);
+    expect(cellsOf(table, "WhatsApp messages a month")).toEqual(["—Not included", "50", "250", "1,000", "Custom"]);
+    expect(cellsOf(table, "Each extra email")).toEqual(["—Not included", "₹0.10", "₹0.10", "₹0.10", "Custom"]);
+    expect(cellsOf(table, "Each extra WhatsApp message")).toEqual(["—Not included", "₹1", "₹1", "₹1", "Custom"]);
   });
 });
