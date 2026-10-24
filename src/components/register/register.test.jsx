@@ -742,3 +742,84 @@ describe("the form didn't load", () => {
     expect(eventsApi.fetchEvent).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("the WhatsApp box", () => {
+  const box = () => screen.queryByRole("checkbox", { name: /Send my ticket and event reminders on WhatsApp/ });
+
+  it("shows once a phone number is typed, unticked, and sends nothing extra while it stays so", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA77", pay_amount: 0, full_name: "Asha Rao", email: "asha@example.org" });
+    show(free);
+    await heading(/Your details/);
+    expect(box()).toBeNull();
+    fillDetails();
+    expect(box()).not.toBeChecked();
+    go();
+    await heading(/Review and/);
+    expect(screen.queryByText("WhatsApp")).toBeNull();
+    go();
+    await heading(/You.re in/);
+    expect(eventsApi.registerForEvent.mock.calls[0][1]).not.toHaveProperty("whatsapp_opt_in");
+  });
+
+  it("ticked, says so on the review and asks for WhatsApp with the registration", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA77", pay_amount: 0, full_name: "Asha Rao", email: "asha@example.org" });
+    show(free);
+    await heading(/Your details/);
+    fillDetails();
+    fireEvent.click(box());
+    expect(box()).toBeChecked();
+    go();
+    await heading(/Review and/);
+    expect(screen.getByText("WhatsApp")).toBeInTheDocument();
+    go();
+    await heading(/You.re in/);
+    expect(eventsApi.registerForEvent).toHaveBeenCalledWith("124", {
+      full_name: "Asha Rao",
+      email: "asha@example.org",
+      phone: "98765 43210",
+      additional_details: {},
+      whatsapp_opt_in: true,
+    });
+  });
+
+  it("goes when the number is cleared, and is not sent without one", async () => {
+    show(free);
+    await heading(/Your details/);
+    fillDetails();
+    fireEvent.click(box());
+    fireEvent.change(field(/^Phone number/), { target: { value: "" } });
+    expect(box()).toBeNull();
+  });
+
+  it("ticked, wants a number WhatsApp can reach before going on; unticked, any phone number will do", async () => {
+    show(free);
+    await heading(/Your details/);
+    // A landline is a phone number; with WhatsApp asked for, it is not enough.
+    fillDetails({ phone: "080 2233 445" });
+    fireEvent.click(box());
+    go();
+    expect(await screen.findByText(/WhatsApp needs a mobile number/)).toBeInTheDocument();
+    fireEvent.click(box());
+    go();
+    expect(await heading(/Review and/)).toBeInTheDocument();
+    expect(eventsApi.registerForEvent).not.toHaveBeenCalled();
+  });
+
+  it("puts the server's WHATSAPP_NUMBER refusal beside the phone number", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(
+      Object.assign(new Error("Registration failed"), {
+        status: 422,
+        data: { message: "To get your ticket on WhatsApp, enter a mobile number WhatsApp can reach, or untick the box.", error_code: "WHATSAPP_NUMBER", errors: { phone: "x" } },
+      }),
+    );
+    show(free);
+    await heading(/Your details/);
+    fillDetails();
+    fireEvent.click(box());
+    go();
+    await heading(/Review and/);
+    go();
+    await heading(/Your details/);
+    expect(await screen.findByText(/WhatsApp can't reach this number/)).toBeInTheDocument();
+  });
+});

@@ -30,13 +30,14 @@ import {
   suggestEmail,
   validateAnswers,
   validateDetails,
+  wantsWhatsapp,
 } from "@/utils/register";
 import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
 import { SitePage } from "../discover/chrome";
 import { CalendarButton, EpIcon } from "../discover/eventparts";
 import Icon from "../discover/icons";
-import { QuestionField, TextField } from "./fields";
+import { CheckField, QuestionField, TextField } from "./fields";
 import { PayNote, Spinner, useFinishPayment } from "./finishpayment";
 import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
@@ -465,6 +466,8 @@ function Flow({ event, club, info, onDone }) {
   const [values, setValues] = useState(() => withAccount(draft?.values || EMPTY, accountEmail, accountName, accountPhone));
   const [answers, setAnswers] = useState(() => draft?.answers || {});
   const [picks, setPicks] = useState(() => draft?.picks || {});
+  // "Send my ticket and event reminders on WhatsApp": unticked until the guest ticks it.
+  const [whatsapp, setWhatsapp] = useState(() => draft?.whatsapp === true);
   const [touched, setTouched] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [phase, setPhase] = useState("idle");
@@ -506,8 +509,8 @@ function Flow({ event, club, info, onDone }) {
 
   // What was typed, kept for the tab.
   useEffect(() => {
-    saveDraft(eventId, { values, answers, picks });
-  }, [eventId, values, answers, picks]);
+    saveDraft(eventId, { values, answers, picks, whatsapp });
+  }, [eventId, values, answers, picks, whatsapp]);
 
   const ready = info.status === "ready" && items !== null;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
@@ -521,7 +524,8 @@ function Flow({ event, club, info, onDone }) {
   const pays = total === null || total > 0;
   const lines = useMemo(() => orderLines({ fee, items: shelf, picks }), [fee, shelf, picks]);
 
-  const detailErrors = useMemo(() => validateDetails(values), [values]);
+  const byWhatsapp = wantsWhatsapp(values, whatsapp);
+  const detailErrors = useMemo(() => validateDetails(values, { whatsapp: byWhatsapp }), [values, byWhatsapp]);
   const answerErrors = useMemo(() => {
     const raw = validateAnswers(questions, answers);
     return Object.fromEntries(Object.entries(raw).map(([k, v]) => [`q:${k}`, v]));
@@ -715,7 +719,7 @@ function Flow({ event, club, info, onDone }) {
       busy.current = false;
       setPhase("idle");
     };
-    const payload = buildPayload({ values, questions, answers, ref: currentRef(), items: shelf, picks });
+    const payload = buildPayload({ values, questions, answers, ref: currentRef(), items: shelf, picks, whatsapp });
     let stage = "register";
     let responseData = null;
     try {
@@ -917,6 +921,18 @@ function Flow({ event, club, info, onDone }) {
                 error={errorFor("phone")}
                 inputProps={{ type: "tel", autoComplete: "tel", inputMode: "tel", enterKeyHint: "done", placeholder: "98765 43210" }}
               />
+              {values.phone.trim() ? (
+                <CheckField
+                  name="whatsapp"
+                  label="Send my ticket and event reminders on WhatsApp"
+                  value={whatsapp ? "Yes" : ""}
+                  option="Yes"
+                  onChange={(v) => {
+                    setWhatsapp(v === "Yes");
+                    changed("phone");
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
 
@@ -953,6 +969,12 @@ function Flow({ event, club, info, onDone }) {
                     <dt>Phone</dt>
                     <dd>{values.phone}</dd>
                   </div>
+                  {byWhatsapp ? (
+                    <div>
+                      <dt>WhatsApp</dt>
+                      <dd>Your ticket and reminders, there too</dd>
+                    </div>
+                  ) : null}
                 </dl>
               </ReviewBlock>
               {questions.length ? (

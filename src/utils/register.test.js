@@ -14,6 +14,7 @@ import {
   suggestEmail,
   validateAnswer,
   validateDetails,
+  whatsappNumber,
 } from "./register";
 
 const q = (field_type, over = {}) => parseQuestions([{ key: "k", label: "Label", field_type, ...over }])[0];
@@ -338,5 +339,48 @@ describe("the ticket just made, kept for a reload", () => {
     expect(loadDone("124")).toBeNull();
     sessionStorage.setItem("moa.register.done.124", "{not json");
     expect(loadDone("124")).toBeNull();
+  });
+});
+
+describe("WhatsApp", () => {
+  it("reads a number as the server does: India without a country code, anyone with one", () => {
+    expect(whatsappNumber("98765 43210")).toBe("+919876543210");
+    expect(whatsappNumber("098765-43210")).toBe("+919876543210");
+    expect(whatsappNumber("919876543210")).toBe("+919876543210");
+    expect(whatsappNumber("+91 98765 43210")).toBe("+919876543210");
+    expect(whatsappNumber("0091 9876543210")).toBe("+919876543210");
+    expect(whatsappNumber("(+1) 650-555-1234")).toBe("+16505551234");
+    for (const bad of ["", null, "12345", "5876543210", "+91 5876543210", "080 2233 445", "98765O4321", "+0123456789"]) {
+      expect(whatsappNumber(bad)).toBeNull();
+    }
+  });
+
+  it("wants a number WhatsApp can reach only when the box is ticked", () => {
+    const values = { name: "Asha Rao", email: "asha@example.org", phone: "080 2233 445" };
+    expect(validateDetails(values)).toEqual({});
+    expect(validateDetails(values, { whatsapp: true }).phone).toMatch(/WhatsApp needs a mobile number/);
+    expect(validateDetails({ ...values, phone: "98765 43210" }, { whatsapp: true })).toEqual({});
+  });
+
+  it("asks for it in the payload only when ticked with a number in", () => {
+    const values = { name: "Asha Rao", email: "asha@example.org", phone: "98765 43210" };
+    expect(buildPayload({ values, questions: [], answers: {}, ref: null, whatsapp: true })).toEqual({
+      full_name: "Asha Rao",
+      email: "asha@example.org",
+      phone: "98765 43210",
+      additional_details: {},
+      whatsapp_opt_in: true,
+    });
+    expect(buildPayload({ values, questions: [], answers: {}, ref: null, whatsapp: false })).not.toHaveProperty("whatsapp_opt_in");
+    expect(buildPayload({ values: { ...values, phone: " " }, questions: [], answers: {}, ref: null, whatsapp: true })).not.toHaveProperty("whatsapp_opt_in");
+  });
+
+  it("puts the server's WHATSAPP_NUMBER beside the phone number", () => {
+    const error = { status: 422, data: { message: "To get your ticket on WhatsApp...", error_code: "WHATSAPP_NUMBER", errors: { phone: "x" } } };
+    expect(describeRegisterError(error)).toEqual({
+      kind: "fields",
+      fields: { phone: "WhatsApp can't reach this number. Enter a mobile number, or untick the WhatsApp box." },
+      message: null,
+    });
   });
 });

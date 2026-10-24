@@ -76,8 +76,42 @@ const digits = (s) => String(s || "").replace(/\D/g, "");
 
 export const isEmail = (s) => EMAIL.test(String(s || "").trim());
 
-/** Your details: a name the server accepts (3–100 letters), an email the ticket can reach, a phone number. */
-export function validateDetails(values) {
+/* ---------- WhatsApp ---------- */
+
+const INDIAN_MOBILE = /^[6-9]\d{9}$/;
+
+/**
+ * The number WhatsApp would be sent to, as the server reads it
+ * (app/core/whatsapp.py `normalise`), or null when it can't be: "98765 43210"
+ * → "+919876543210". Without a country code it is taken as Indian: ten
+ * digits from 6 to 9, or those after a 0 or 91. With one, 7 to 15 digits,
+ * and an Indian mobile after +91.
+ */
+export function whatsappNumber(phone) {
+  let s = String(phone || "").trim().replace(/[\s\-().\u00a0/]/g, "");
+  if (!s) return null;
+  if (s.startsWith("00")) s = `+${s.slice(2)}`;
+  if (s.startsWith("+")) {
+    const d = s.slice(1);
+    if (!/^\d+$/.test(d)) return null;
+    if (d.startsWith("91")) return INDIAN_MOBILE.test(d.slice(2)) ? `+${d}` : null;
+    return d.length >= 7 && d.length <= 15 && !d.startsWith("0") ? `+${d}` : null;
+  }
+  if (!/^\d+$/.test(s)) return null;
+  if (s.length === 11 && s.startsWith("0")) s = s.slice(1);
+  else if (s.length === 12 && s.startsWith("91")) s = s.slice(2);
+  return INDIAN_MOBILE.test(s) ? `+91${s}` : null;
+}
+
+/** Whether the WhatsApp box applies: ticked, with a phone number typed (the box only shows then). */
+export const wantsWhatsapp = (values, whatsapp) => Boolean(whatsapp && String(values?.phone || "").trim());
+
+/**
+ * Your details: a name the server accepts (3–100 letters), an email the
+ * ticket can reach, a phone number -- one WhatsApp can reach, when the
+ * WhatsApp box is ticked.
+ */
+export function validateDetails(values, { whatsapp = false } = {}) {
   const errors = {};
   const name = String(values.name || "").trim();
   if (!name) errors.name = "Enter your full name.";
@@ -92,6 +126,7 @@ export function validateDetails(values) {
   const n = digits(phone).length;
   if (!phone) errors.phone = "Enter your phone number.";
   else if (/[^\d\s()+.-]/.test(phone) || n < 10 || n > 15) errors.phone = "Enter a 10-digit mobile number, or include your country code.";
+  else if (whatsapp && !whatsappNumber(phone)) errors.phone = "WhatsApp needs a mobile number: 10 digits, or with your country code. Or untick the WhatsApp box.";
   return errors;
 }
 
@@ -200,7 +235,8 @@ export function stepsFor({ questions = [], items = [] } = {}) {
  * sent it: the three details as typed, the answers (or `{}` for an event
  * that asks nothing), the tracking link's code when there is one, and the
  * shelf picks. Unanswered optional questions are left out, as an untouched
- * field always was.
+ * field always was. `whatsapp_opt_in: true` goes only when the WhatsApp box
+ * is ticked with a phone number in.
  *
  * `store` goes whenever the event has a shelf, as `[]` when nothing is
  * picked. The server re-places a registration's order only when `store` is
@@ -208,7 +244,7 @@ export function stepsFor({ questions = [], items = [] } = {}) {
  * earlier picks on the way back to pay. An event with nothing on its shelf
  * still sends no `store`, as it never did.
  */
-export function buildPayload({ values, questions, answers, ref, items = [], picks = {} }) {
+export function buildPayload({ values, questions, answers, ref, items = [], picks = {}, whatsapp = false }) {
   let details = {};
   if (questions.length > 0) {
     details = undefined;
@@ -225,6 +261,8 @@ export function buildPayload({ values, questions, answers, ref, items = [], pick
     ...(ref ? { ref } : {}),
   };
   if (items.length > 0) payload.store = picksToPayload(items, picks);
+  // Only when ticked: unticked is the server's default, and the form's old shape stays as it was.
+  if (wantsWhatsapp(values, whatsapp)) payload.whatsapp_opt_in = true;
   return payload;
 }
 
@@ -357,6 +395,9 @@ export function describeRegisterError(error, questionKeys = []) {
       message: said ? sentence(said) : "Something in your order has sold out.",
     };
   }
+  if (code === "WHATSAPP_NUMBER") {
+    return { kind: "fields", fields: { phone: "WhatsApp can't reach this number. Enter a mobile number, or untick the WhatsApp box." }, message: null };
+  }
   if (code === "CLUB_EMAIL") {
     return { kind: "fields", fields: { email: said || "This email belongs to a club's account. Register with your own email." }, message: null };
   }
@@ -393,6 +434,7 @@ export function loadDraft(eventId) {
       values: { name: "", email: "", phone: "", ...strings(d.values) },
       answers: strings(d.answers),
       picks: d.picks && typeof d.picks === "object" ? d.picks : {},
+      whatsapp: d.whatsapp === true,
     };
   } catch {
     return null;
