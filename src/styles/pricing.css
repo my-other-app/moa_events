@@ -321,6 +321,15 @@
 .is-featured .pr-plan-limits li {
   color: #fff;
 }
+/* What a message past the month's limits costs, under the limits. */
+.pr-plan-extra {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--dc-muted);
+}
+.is-featured .pr-plan-extra {
+  color: #9ca3af;
+}
 .pr-plan-adds {
   margin-top: 20px;
 }

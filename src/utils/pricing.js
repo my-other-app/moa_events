@@ -47,6 +47,9 @@ function parsePlan(p) {
     trialDays: count(o.trial_days) ?? 0,
     contactSales: o.contact_sales === true,
     featured: o.featured === true,
+    /** Each email / WhatsApp message past the monthly limit, in paise; null when the API doesn't say. */
+    emailOverage: count(o.email_overage_paise) ?? null,
+    whatsappOverage: count(o.whatsapp_overage_paise) ?? null,
     limits,
     features,
   };
@@ -101,6 +104,26 @@ export function formatMoney(paise, currency = "INR") {
     moneyFormats.set(currency, f);
   }
   return moneyFormats.get(currency).format(rupees);
+}
+
+const paisaFormats = new Map();
+
+/** "₹0.10", "₹1", "₹1.50" from paise: a per-message price, to the paisa. */
+export function formatPaisa(paise, currency = "INR") {
+  const value = (Number(paise) || 0) / 100;
+  const exact = !Number.isInteger(value);
+  const key = `${currency}:${exact}`;
+  if (!paisaFormats.has(key)) {
+    const digits = exact ? 2 : 0;
+    let f;
+    try {
+      f = new Intl.NumberFormat("en-IN", { style: "currency", currency, minimumFractionDigits: digits, maximumFractionDigits: digits });
+    } catch {
+      f = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+    paisaFormats.set(key, f);
+  }
+  return paisaFormats.get(key).format(value);
 }
 
 /** 1000 → "1,000", 150000 → "1,50,000". */
@@ -207,7 +230,23 @@ export const LIMITS = [
   { key: "announcements_per_month", row: "Announcements a month", one: "announcement a month", many: "announcements a month", unlimited: "Unlimited announcements" },
   { key: "merch_items_per_event", row: "Merch items per event", one: "merch item per event", many: "merch items per event", unlimited: "Unlimited merch items", needs: "merch" },
   { key: "website_templates", row: "Website templates", one: "website template", many: "website templates", unlimited: "Every website template", needs: "website" },
+  { key: "emails_per_month", row: "Emails a month", one: "email a month", many: "emails a month", unlimited: "Unlimited emails" },
+  { key: "whatsapp_per_month", row: "WhatsApp messages a month", one: "WhatsApp message a month", many: "WhatsApp messages a month", unlimited: "Unlimited WhatsApp messages" },
 ];
+
+/**
+ * The monthly message limits: every email and WhatsApp message a club sends
+ * (tickets, certificates, reminders, announcements). Past them a paid plan
+ * pays the overage price for each; Free pauses announcements instead.
+ */
+export const MESSAGE_LIMITS = ["emails_per_month", "whatsapp_per_month"];
+
+/** The table's rows for what an extra message costs, after the limits. */
+const OVERAGE_ROWS = [
+  { key: "email_overage", label: "Each extra email", field: "emailOverage" },
+  { key: "whatsapp_overage", label: "Each extra WhatsApp message", field: "whatsappOverage" },
+];
+const OVERAGE_BY_KEY = new Map(OVERAGE_ROWS.map((r) => [r.key, r]));
 const LIMIT_BY_KEY = new Map(LIMITS.map((l) => [l.key, l]));
 
 /**
@@ -254,7 +293,16 @@ export function headlineLimits(plan, keys = HEADLINE_LIMITS) {
  * null (a dash) for none, not stated, or a limit on a feature the plan
  * doesn't have.
  */
-export function planLimitCell(plan, key) {
+export function planLimitCell(plan, key, currency = "INR") {
+  const overage = OVERAGE_BY_KEY.get(key);
+  if (overage) {
+    // Only a paid plan is billed for more; Enterprise's are agreed with the club.
+    const kind = planKind(plan);
+    if (kind === "contact") return "Custom";
+    return kind === "paid" && plan[overage.field] !== null && plan[overage.field] !== undefined ? formatPaisa(plan[overage.field], currency) : null;
+  }
+  // Enterprise's message limits are set club by club (unlimited until they are).
+  if (MESSAGE_LIMITS.includes(key) && planKind(plan) === "contact" && (plan.limits[key] === null || plan.limits[key] === undefined)) return "Custom";
   const needs = LIMIT_BY_KEY.get(key)?.needs;
   if (needs && !includes(plan, needs)) return null;
   return limitCell(key, plan.limits[key]);
@@ -265,7 +313,42 @@ export function limitRows(plans) {
   const keys = new Set(plans.flatMap((p) => Object.keys(p.limits)).filter((k) => !HIDDEN_LIMITS.has(k)));
   const known = LIMITS.filter((l) => keys.has(l.key));
   const extra = [...keys].filter((k) => !LIMIT_BY_KEY.has(k)).map(limitSpec);
-  return [...known, ...extra].map(({ key, row }) => ({ key, label: row }));
+  const rows = [...known, ...extra].map(({ key, row }) => ({ key, label: row }));
+  // What an extra message costs, once the plans have message limits and prices.
+  const priced = MESSAGE_LIMITS.some((k) => keys.has(k));
+  const overage = priced ? OVERAGE_ROWS.filter((r) => plans.some((p) => p[r.field] !== null && p[r.field] !== undefined)) : [];
+  return [...rows, ...overage.map(({ key, label }) => ({ key, label }))];
+}
+
+/**
+ * A plan's monthly messages in one line: "1,000 emails / 50 WhatsApp a
+ * month", "200 emails a month" (no WhatsApp), "Custom email and WhatsApp
+ * limits" (Enterprise), or null when the plan states neither.
+ */
+export function messagesLine(plan) {
+  if (!MESSAGE_LIMITS.some((k) => k in plan.limits)) return null;
+  const e = plan.limits.emails_per_month;
+  const w = plan.limits.whatsapp_per_month;
+  const none = (v) => v === null || v === undefined;
+  if (planKind(plan) === "contact" && none(e) && none(w)) return "Custom email and WhatsApp limits";
+  const email = none(e) ? "Unlimited emails" : e > 0 ? `${formatNumber(e)} ${e === 1 ? "email" : "emails"}` : null;
+  const whatsapp = none(w) ? "unlimited WhatsApp" : w > 0 ? `${formatNumber(w)} WhatsApp` : null;
+  if (email && whatsapp) return `${email} / ${whatsapp} a month`;
+  if (email) return `${email} a month`;
+  return whatsapp ? `${whatsapp.charAt(0).toUpperCase()}${whatsapp.slice(1)} a month` : null;
+}
+
+/**
+ * What a message past the monthly limits costs: "Extra: ₹0.10 per email, ₹1
+ * per WhatsApp". A paid plan only: Free has no card to charge (its
+ * announcements pause at the limit instead), Enterprise agrees its own.
+ */
+export function overageLine(plan, currency = "INR") {
+  if (planKind(plan) !== "paid") return null;
+  const parts = [];
+  if (plan.emailOverage !== null && plan.emailOverage !== undefined) parts.push(`${formatPaisa(plan.emailOverage, currency)} per email`);
+  if (plan.whatsappOverage !== null && plan.whatsappOverage !== undefined) parts.push(`${formatPaisa(plan.whatsappOverage, currency)} per WhatsApp`);
+  return parts.length ? `Extra: ${parts.join(", ")}` : null;
 }
 
 /* ---------- features ---------- */
@@ -409,10 +492,13 @@ export function plansJsonLd(data, { url, siteUrl, description }) {
   }
   for (const p of data.plans) {
     const kind = planKind(p);
-    if (kind === "free") offers.push(offer(p.name, 0, "P1M"));
+    // What a month's messages include, and what more of them costs: plain text on each offer.
+    const about = [messagesLine(p), overageLine(p, currency)].filter(Boolean).join(". ");
+    const described = (o) => (about ? { ...o, description: about } : o);
+    if (kind === "free") offers.push(described(offer(p.name, 0, "P1M")));
     if (kind !== "paid") continue;
-    if (p.monthly > 0) offers.push(offer(`${p.name}, monthly`, p.monthly, "P1M"));
-    if (p.yearly > 0) offers.push(offer(`${p.name}, yearly`, p.yearly, "P1Y"));
+    if (p.monthly > 0) offers.push(described(offer(`${p.name}, monthly`, p.monthly, "P1M")));
+    if (p.yearly > 0) offers.push(described(offer(`${p.name}, yearly`, p.yearly, "P1Y")));
   }
   const out = {
     "@context": "https://schema.org",
@@ -439,7 +525,10 @@ export function planSummary(plan, currency = "INR") {
         : [plan.monthly > 0 ? `${formatMoney(plan.monthly, currency)} a month` : null, plan.yearly > 0 ? `${formatMoney(plan.yearly, currency)} a year` : null]
             .filter(Boolean)
             .join(" or ");
-  const limits = headlineLimits(plan).join(", ");
+  const limits = [...headlineLimits(plan), messagesLine(plan)].filter(Boolean).join(", ");
   const sentence = (t) => (/[.!?…]$/.test(t) ? t : `${t}.`);
-  return [price, plan.tagline, limits ? `${limits.charAt(0).toUpperCase()}${limits.slice(1)}` : null].filter(Boolean).map(sentence).join(" ");
+  return [price, plan.tagline, limits ? `${limits.charAt(0).toUpperCase()}${limits.slice(1)}` : null, overageLine(plan, currency)]
+    .filter(Boolean)
+    .map(sentence)
+    .join(" ");
 }
