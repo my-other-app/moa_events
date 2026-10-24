@@ -2,9 +2,6 @@
  * The public site at https://myotherapp.in, on Next.js (App Router).
  *
  * Routing lives in src/app. What is configured here:
- *   - link-preview bots asking for a page that is still drawn in the browser
- *     get the small server-made page from /api/share instead (see BOT_PAGES);
- *     server-rendered pages need no such help and are not listed;
  *   - /me → /me/tickets, and /events/{id} handed to the old-address page;
  *   - a city's other names to its page (/events/in/cochin → /events/in/kochi);
  *   - metadata always in <head>, never streamed into <body> (canonical tags
@@ -18,7 +15,6 @@
  *     code is in the address);
  *   - the OG fonts traced into the functions that read them.
  */
-import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
 import { cityRedirects } from "./src/seo/cities.js";
 
 /**
@@ -79,11 +75,6 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        ...BOT_PAGES.map(({ source, path }) => ({
-          source,
-          has: [{ type: "header", key: "user-agent", value: BOT_UA }],
-          destination: `/api/share${path}`,
-        })),
         // /events/{id}: an id is never the canonical address. The old-address
         // page (/{id}) answers it with a 308 to /events/{slug}, query kept.
         { source: "/events/:id(\\d+)", destination: "/:id" },

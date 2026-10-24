@@ -3,7 +3,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import nextConfig from "../../../next.config.mjs";
-import { BOT_PAGES, isBot } from "@/seo/bots";
+import { isBot } from "@/seo/bots";
 
 /*
  * Which file answers which address, by Next's file routing (a static folder
@@ -58,11 +58,6 @@ async function resolve(url, { ua = "Mozilla/5.0" } = {}) {
     const m = compile(r.source).exec(path);
     if (!m) continue;
     if (r.has && !r.has.every((h) => h.type === "header" && new RegExp(`^${h.value}$`).test(ua))) continue;
-    if (r.destination.startsWith("/api/share/")) {
-      // The bot's page goes to /api/share/{the same path}.
-      let i = 0;
-      return { file: "api/share/[...path]/route.js", share: true, to: r.destination.replace(/:\w+/g, () => m[++i]) };
-    }
     path = r.destination.replace(/:(\w+)/g, () => m[1]);
   }
   const hit = match(ROOT, path.split("/").filter(Boolean));
@@ -161,7 +156,7 @@ describe("which file answers which address", () => {
 });
 
 describe("what link-preview bots get", () => {
-  it("is the real page for the server-rendered ones", async () => {
+  it("is the same page a person gets: every page is rendered on the server", async () => {
     for (const url of [
       "/events/hack-night-04",
       "/clubs/circuit-society",
@@ -185,18 +180,15 @@ describe("what link-preview bots get", () => {
       "/for-clubs",
       "/pricing",
     ]) {
-      expect((await resolve(url, { ua: BOT })).share).toBeUndefined();
-      expect((await resolve(url, { ua: WHATSAPP })).share).toBeUndefined();
+      const page = await resolve(url);
+      expect(page.file || page.redirect).toBeTruthy();
+      expect(await resolve(url, { ua: BOT })).toEqual(page);
+      expect(await resolve(url, { ua: WHATSAPP })).toEqual(page);
     }
   });
 
-  it("is the small preview page for any still drawn in the browser (none are left)", async () => {
-    expect(BOT_PAGES).toEqual([]);
-    for (const url of BOT_PAGES.map((p) => p.path)) {
-      expect(await resolve(url, { ua: BOT })).toEqual({ file: "api/share/[...path]/route.js", share: true, to: `/api/share${url}` });
-      expect((await resolve(url)).share).toBeUndefined();
-    }
-    expect(BOT_PAGES.map((p) => p.source)).not.toContain("/events/:slug");
+  it("has no separate preview page any more", async () => {
+    expect(await resolve("/api/share/events/hack-night-04", { ua: BOT })).toEqual({ file: null });
     expect(isBot(BOT)).toBe(true);
     expect(isBot(WHATSAPP)).toBe(true);
     expect(isBot("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)")).toBe(false);

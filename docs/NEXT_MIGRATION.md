@@ -1,15 +1,14 @@
 # The site on Next.js: what is where, and how to port the rest
 
-The public site moved from a Vite single-page app to Next.js 16 (App Router). Step 1 built the foundation and server-rendered the pages search engines care most about: every event and every club. Step 2 server-rendered the rest of the public site: the home page, find events, find clubs, the posts and the site's own pages (about, privacy, terms, for clubs, pricing). The signed-in and transactional pages (registration, `/me/*`, the live room, the competition, play, feedback, tickets, certificates) are ported separately; until then they render in the browser exactly as before, at the same address. This document is the map, and the one pattern for porting the rest.
+The public site moved from a Vite single-page app to Next.js 16 (App Router). Step 1 built the foundation and server-rendered the pages search engines care most about: every event and every club. Step 2 server-rendered the rest of the public site: the home page, find events, find clubs, the posts and the site's own pages (about, privacy, terms, for clubs, pricing). The signed-in and transactional pages (registration, `/me/*`, the live room, the competition, play, feedback, tickets, certificates) were ported after that ("The signed-in flows" below): every page is now rendered on the server. This document is the map, and the one pattern for adding a page.
 
 ## How it fits together
 
 ```
 src/app/                    routes (Next's file routing)
   layout.jsx                <html>, fonts (next/font), every stylesheet once, <Providers> (sign-in, ?ref=)
-  _client/pages.jsx         ClientPage: the not-yet-ported pages, mounted in the browser (ssr: false)
   _tests/                   route-level tests (private folder: not a route)
-src/server/                 server-only: reading the API (api.js, discover.js), old addresses, feeds, the bots' preview page,
+src/server/                 server-only: reading the API (api.js, discover.js), old addresses, feeds,
                             the server half of the signed-in flows (eventscoped.js, flows.js)
 src/seo/                    pure: addresses, metadata, JSON-LD, stable media, sitemap, robots, RSS, validators
 src/og/                     the share pictures (next/og): layouts, fonts, fetching images
@@ -24,7 +23,7 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 
 ## Every route
 
-**SSR + ISR** = rendered on the server, cached, regenerated in the background at most once a minute (`revalidate = 60`); a failed regeneration keeps serving the last good copy. **Dynamic** = rendered per request. **Static** = rendered once at build. **Client** = the page's component renders in the browser (`ClientPage`, `ssr: false`); its `<head>` (title, description, canonical, Open Graph) is still server-rendered. **+ client component** = the page's interactive part is a `"use client"` component the server renders for the first paint and the browser hydrates (see "The signed-in flows" below).
+**SSR + ISR** = rendered on the server, cached, regenerated in the background at most once a minute (`revalidate = 60`); a failed regeneration keeps serving the last good copy. **Dynamic** = rendered per request. **Static** = rendered once at build. **+ client component** = the page's interactive part is a `"use client"` component the server renders for the first paint and the browser hydrates (see "The signed-in flows" below).
 
 | Address | Kind | File | Notes |
 | --- | --- | --- | --- |
@@ -54,7 +53,6 @@ Images: the API's posters, logos and photos are presigned S3 links that die with
 | `/robots.txt` | Metadata route | `robots.js` | |
 | `/media/...` | Route handler | `media/[...path]/route.jsx` | stable image addresses (307) and the drawn cover (PNG) |
 | `/og/events/{slug}`, `/og/clubs/{slug}`, `/og/topics/{slug}` | Route handler | `og/…/route.jsx` | 1200×630 share pictures, `?v=` changes with what they show |
-| `/api/share/{path}` (or `?path=`) | Route handler | `api/share/[...path]/route.js` | the preview page bots get for client pages (below); only the registration, live and competition pages still use it |
 | `/api/revalidate` | Route handler | `api/revalidate/route.js` | `POST`, `Bearer REVALIDATE_SECRET`: `{events, clubs, sitemap}` |
 | anything else | 404 | `not-found.jsx` | the old 404 page; clubs have their own (`clubs/[slug]/not-found.jsx`) |
 
@@ -82,7 +80,7 @@ The site's own words (`events`, `clubs`, `about`, …) have their own routes, wh
 
 ## Link-preview bots
 
-WhatsApp, Telegram, Slack, X, LinkedIn, Facebook, Discord and search engines read the HTML they are sent. Server-rendered pages need no help. For **client pages** (now only registration, the live room and the competition under `/events/{slug}/`), next.config.mjs rewrites a bot's request (by user agent) to `/api/share/{the same path}`, which answers with the page's title, description, picture and words. The list is `BOT_PAGES` in `src/seo/bots.js`. **When you port a page, delete its line there.** When the last one goes, delete `src/server/share`, `src/app/api/share` and `src/seo/bots.js`.
+WhatsApp, Telegram, Slack, X, LinkedIn, Facebook, Discord and search engines read the HTML they are sent. Every page is rendered on the server with its head (title, description, canonical, Open Graph), so bots get the same page as people. The preview page they were once sent for pages drawn in the browser (`/api/share`, and next.config's rewrites to it) is gone; `src/seo/bots.js` keeps `isBot`, which the live room's stream uses to stay closed for a bot.
 
 ## Porting a page: the one pattern
 
@@ -96,7 +94,7 @@ The event and club pages are the worked examples (`events/[slug]/page.jsx` + `co
 3. **Stabilise images** before rendering: `stableClubPage(data)`, `stableCard(card)`, `stableThread(t)` (src/seo/stabilize.js). Add a `media` address and a `mediaTarget` case for any new kind of image.
 4. **Metadata**: `export const metadata = pageMetadata({...})` or `generateMetadata` returning `pageMetadata(...)` / a builder like `eventMetadata`. It sets the title (the template adds " · MyOtherApp"), description, canonical on https://myotherapp.in, Open Graph (1200×630 picture, `en_IN`, site name) and the Twitter card. `noindex: true` for a person's pages and the steps of a flow.
 5. **Structured data**: build it in a pure function in `src/seo` (like `eventStructuredData`), render `<JsonLd data={...} />`, and test it with `src/seo/validate.js`.
-6. **Remove the client mount**: the page's line in `src/app/_client/pages.jsx`, its `BOT_PAGES` line, and any `usePageMeta` / `useShareMeta` / `useJsonLd` calls left in the component (the server sets the head now).
+6. **The head is the server's**: never set the title, description or JSON-LD from an effect in the browser (the old client hooks for that are gone).
 7. **Tests**: render the view with plain data inside `<MemoryRouter>` (as `eventpage.test.jsx` does) and test the route's server behaviour with a fake fetch (as `_tests/event-routes.test.js` does). Then `npm run build`, `npm start`, and `node scripts/check-seo.mjs`.
 8. **Measure**: the HTML (`curl -s localhost:3000/x | wc -c`; aim under ~100 KB), and that the browser console shows no hydration warning.
 
@@ -122,9 +120,9 @@ Each is a server `page.jsx` (the head, a real 404, the 308s, the props) renderin
 
 To move signing in to the server later (the BFF/proxy-auth plan in docs/ARCHITECTURE_PLAN.md), the session must move to an httpOnly cookie first; then these pages can render the signed-in state on the server and `ready` goes away.
 
-## What to remove when the last client page is ported
+## Left from the port
 
-`src/app/_client/pages.jsx`, the bot rewrites (`src/seo/bots.js`, next.config's `beforeFiles` bot entries), `src/server/share` and `src/app/api/share`, `src/utils/meta.js`, and `react-router-dom` (a dev dependency kept only for the tests' router; the shim can then call `next/navigation` without the adapter). The shim's history `state` (`navigate(..., {state})`, `useLocation().state`) was there for the registration form only, which no longer uses it: it can go now.
+The client mount, the bots' preview page (`/api/share`, `src/server/share`, the bot rewrites) and the client head hooks (`src/utils/meta.js`) are gone. Still to go: `react-router-dom` (a dev dependency kept only for the tests' router; the shim can then call `next/navigation` without the adapter). The shim's history `state` (`navigate(..., {state})`, `useLocation().state`) was there for the registration form only, which no longer uses it: it can go now.
 
 ## Near you on the home page
 
