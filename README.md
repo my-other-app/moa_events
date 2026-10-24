@@ -36,6 +36,26 @@ Set these on the Vercel project (Production and Preview). `NEXT_PUBLIC_*` values
 | `ANDROID_APP_SHA256` | The Android app's signing-certificate SHA-256 fingerprints, comma-separated, for `/.well-known/assetlinks.json`. Use the **Play App Signing** key's (Play Console → Test and release → App integrity → App signing); add the upload key's as well to test a locally signed build. Colons and case don't matter. Read at build, so set it, then deploy | unset: `assetlinks.json` is `[]`, and Android opens the links in the browser |
 | `DEMO_NOINDEX` | `off` turns off everything below about the demo clubs: their pages are indexed and listed again. Server only; redeploy after changing it | on |
 | `DEMO_CLUB_SLUGS` | The demo clubs' slugs, comma-separated; replaces the built-in list of eight (`""`: none, so only `is_demo` and a `demo.myotherapp.in` address count) | the eight seeded clubs |
+| `NEXT_PUBLIC_SENTRY_DSN` | The Sentry project's DSN: turns error tracking on, in the browser and on the server (see below). Unset, Sentry is off and its code is never loaded | off |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | The environment events are filed under | Vercel's `production` / `preview`; `local` for any other build |
+| `NEXT_PUBLIC_SENTRY_RELEASE` | The release events are filed under | `moa-events@<commit>` |
+| `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | The share of page loads and server requests traced, 0 to 1 | `0.05` |
+| `NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_RATE` | The share of sessions that hit an error recorded as a replay (every word, input and picture masked), 0 to 1 | `0`: no replay |
+| `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Build only, all three or none: the source maps (browser and server) are uploaded to Sentry for the release, then deleted from the build so they are never served; a failed upload is logged and the build goes on. The token is an organization auth token (Sentry → Settings → Auth Tokens) | not uploaded |
+
+`.env.example` lists them all, for a local `.env.local`.
+
+## Error tracking (Sentry)
+
+Off until `NEXT_PUBLIC_SENTRY_DSN` is set on the Vercel project (Production, and Preview if wanted), then redeploy. Without it nothing is loaded, nothing listens and nothing is sent; `src/sentry/sentry.test.js` holds that.
+
+- **Browser**: the SDK is its own chunk (about 80 KB), fetched three seconds after the page's load event, when the browser is idle (`src/sentry/lazy.js`, started from `src/instrumentation-client.js`), so it never competes with the page for its first paint or LCP (an event's poster often lands just after the load event). Errors thrown before it arrives are held and sent once it is in; web vitals are read back from the browser. Errors a page's error boundary catches are sent from `app/error.jsx` and `app/global-error.jsx`. The browser adds no trace headers to requests: on Next's own prefetches they cost a throttled mobile about 2 s of main-thread work after load (Lighthouse, home page).
+- **Server**: `src/instrumentation.js` starts it in `register()` and sends every error Next catches while rendering a page or running a route (`onRequestError`).
+- **What is kept out** (`src/sentry/options.js`): `sendDefaultPii` is off; no cookies, no request bodies, no user, and only the `User-Agent`, `Accept`, `Accept-Language`, `Content-Type`, `Host` and `Referer` headers (so no `Authorization`, no addresses); emails and phone numbers are masked in every message, breadcrumb, URL and context; the codes in `/tickets/…`, `/certificates/…`, `/verify/…` and `/feedback/…/…` addresses become `[code]`. No session replay unless its rate is set.
+- **Noise dropped**: the API refusing `localhost` (CORS, while the site runs on a developer's machine), bots' 404s and their page loads, Next's `notFound()` / `redirect()`, cancelled requests, ResizeObserver warnings, browser extensions.
+- **In Sentry's project settings**, also turn on Security & Privacy → "Prevent Storing of IP Addresses" (and keep the default data scrubber on): browsers' addresses are otherwise read off the connection by Sentry itself.
+
+The site has no Edge routes or middleware, so only the Node runtime is set up. `@sentry/nextjs` is on 10.x; 11.x (September 2026) changes what is collected by default (`dataCollection` replaces `sendDefaultPii`), so moving to it means re-checking the list above.
 
 ## Demo clubs and search engines
 

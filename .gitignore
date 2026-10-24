@@ -21,6 +21,7 @@ node_modules
 *.sln
 *.sw?
 .env*
+!.env.example
 .vercel
 
 # Next.js
