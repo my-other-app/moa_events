@@ -1,25 +1,25 @@
 import { CLUBS_URL } from "@/config";
 import { FOR_CLUBS } from "@/content/forclubs";
 import { formatCount } from "@/utils/format";
-import { cheapestPaid, formatMoney, loginUrl, signupUrl, yearlyOffer } from "@/utils/pricing";
+import { cheapestPaid, formatMoney, freePlan, loginUrl, startFreeLabel, startFreeUrl, yearlyOffer } from "@/utils/pricing";
 import { Avatar } from "./bits";
 import { ClubFaq, ClubsCta } from "./clubsparts";
 import { HeroFan, PhaseArt } from "./forclubsart";
 import { Pricing } from "./pricing";
 import Icon from "./icons";
 
-/** Where "Start free" goes: the dashboard's sign-up, on the Free plan. */
-const START_FREE_URL = signupUrl(CLUBS_URL, "free", "monthly");
-
-/** The facts under the buttons, from the plans themselves: a free plan, the lowest price, the trial. */
+/** The facts under the buttons, from the plans themselves: the free trial, the lowest price, a free plan after. */
 function PlanFacts({ data }) {
   if (!data) return null;
   const facts = [];
-  if (data.plans.some((p) => p.monthly === 0 && !p.contactSales)) facts.push("A free plan to start on");
+  if (data.trial) facts.push(`${data.trial.days} days of ${data.trial.planName} free, no card needed`);
   const from = cheapestPaid(data);
   if (from) facts.push(`Paid plans from ${formatMoney(from, data.currency)} a month`);
-  const trial = data.plans.find((p) => p.featured && p.trialDays > 0) || data.plans.find((p) => p.trialDays > 0 && p.monthly > 0);
-  if (trial) facts.push(`Try ${trial.name} free for ${trial.trialDays} days`);
+  if (freePlan(data)) facts.push(data.trial ? "A free plan for small events after the trial" : "A free plan to start on");
+  if (!data.trial) {
+    const trial = data.plans.find((p) => p.featured && p.trialDays > 0) || data.plans.find((p) => p.trialDays > 0 && p.monthly > 0);
+    if (trial) facts.push(`Try ${trial.name} free for ${trial.trialDays} days`);
+  }
   if (!facts.length) return null;
   return (
     <ul className="fc-facts">
@@ -129,8 +129,8 @@ export function ForClubsView({ plans = null, home = null }) {
             </h1>
             <p className="dc-hero2-lede">{FOR_CLUBS.lede}</p>
             <div className="fc-hero-ctas">
-              <a className="dc-btn fc-btn-lg" href={START_FREE_URL}>
-                Start free <Icon name="arrowRight" size={18} />
+              <a className="dc-btn fc-btn-lg" href={startFreeUrl(CLUBS_URL, plans)}>
+                {startFreeLabel(plans)} <Icon name="arrowRight" size={18} />
               </a>
               <a className="dc-btn dc-btn--ghost fc-btn-lg" href="#pricing">
                 See pricing
@@ -192,7 +192,10 @@ export function ForClubsView({ plans = null, home = null }) {
           <div className="fc-center-head">
             <p className="dc-eyebrow">Pricing</p>
             <h2 id="fc-pricing-title">Plans that grow with your club</h2>
-            <p>Start free, and move up when your events do.{offer ? ` Pay yearly and get ${offer}.` : ""}</p>
+            <p>
+              {plans?.trial ? `Start with ${plans.trial.days} days of ${plans.trial.planName} free, no card. Then pick a plan, or keep a free one for small events.` : "Start free, and move up when your events do."}
+              {offer ? ` Pay yearly and get ${offer}.` : ""}
+            </p>
           </div>
           <Pricing data={plans} compare="link" />
         </section>

@@ -68,8 +68,20 @@ export function parsePlans(d) {
   return {
     currency: typeof o.currency === "string" && /^[A-Z]{3}$/.test(o.currency) ? o.currency : "INR",
     yearlyMonthsFree: free && free < 12 ? free : null,
+    trial: parseTrial(o.trial),
+    enterpriseTrialDays: count(o.enterprise_trial_days) || null,
     plans,
   };
+}
+
+/** The free trial every new club starts with: `{days, planKey, planName}`, or null when the API offers none. */
+function parseTrial(t) {
+  const o = obj(t);
+  const days = count(o?.days);
+  const planKey = str(o?.plan_key);
+  const planName = str(o?.plan_name);
+  if (!days || !planKey || !KEY.test(planKey) || !planName || o.card_required === true) return null;
+  return { days, planKey, planName };
 }
 
 /* ---------- money ---------- */
@@ -141,9 +153,42 @@ export function cheapestPaid(data) {
   return prices.length ? Math.min(...prices) : null;
 }
 
-/** The longest free trial any plan offers, in days (0 for none). */
+/** The longest free trial on offer, in days (0 for none): the free trial every new club gets, or a plan's own. */
 export function longestTrial(data) {
-  return Math.max(0, ...(data?.plans || []).filter((p) => planKind(p) === "paid").map((p) => p.trialDays));
+  return Math.max(data?.trial?.days || 0, ...(data?.plans || []).filter((p) => planKind(p) === "paid").map((p) => p.trialDays));
+}
+
+/** "Start free: 14 days of Pro, no card", or plain "Start free" with no trial on offer. */
+export function startFreeLabel(data) {
+  const t = data?.trial;
+  return t ? `Start free: ${t.days} days of ${t.planName}, no card` : "Start free";
+}
+
+/** Where every "Start free" goes: the sign-up, with the trial's plan named (the dashboard offers it first). */
+export function startFreeUrl(clubsUrl, data) {
+  return signupUrl(clubsUrl, data?.trial?.planKey || "pro", "monthly");
+}
+
+/** The plans that get a card: with a free trial on offer, the paid tiers and Enterprise (Free is what a club keeps after). */
+export function cardPlans(data) {
+  const plans = data?.plans || [];
+  if (!data?.trial) return plans;
+  const paid = plans.filter((p) => planKind(p) !== "free");
+  return paid.length ? paid : plans;
+}
+
+/** The free plan, when there is one. */
+export function freePlan(data) {
+  return (data?.plans || []).find((p) => planKind(p) === "free") || null;
+}
+
+/** "After your trial, your club keeps Free: 2 events a month, 100 people per event and 2 team seats, enough to run small events." */
+export function freeAfterTrialLine(data) {
+  const free = freePlan(data);
+  if (!data?.trial || !free) return null;
+  const limits = headlineLimits(free, ["events_per_month", "registrations_per_event", "committee_seats"]);
+  const what = limits.length > 1 ? `${limits.slice(0, -1).join(", ")} and ${limits[limits.length - 1]}` : limits[0];
+  return `After your trial, your club keeps ${free.name} for as long as it likes${what ? `: ${what}` : ""}, enough to run small events. Published events, tickets and data keep working.`;
 }
 
 /* ---------- limits in plain words ---------- */
@@ -162,17 +207,17 @@ export const LIMITS = [
   { key: "announcements_per_month", row: "Announcements a month", one: "announcement a month", many: "announcements a month", unlimited: "Unlimited announcements" },
   { key: "merch_items_per_event", row: "Merch items per event", one: "merch item per event", many: "merch items per event", unlimited: "Unlimited merch items", needs: "merch" },
   { key: "website_templates", row: "Website templates", one: "website template", many: "website templates", unlimited: "Every website template", needs: "website" },
-  { key: "storage_gb", row: "Storage", gb: true, unlimited: "Unlimited storage" },
 ];
 const LIMIT_BY_KEY = new Map(LIMITS.map((l) => [l.key, l]));
 
 /**
  * Limits the API sends that are never shown: ticket types and coupons are
- * not in the product yet, so no page may promise a number of them.
+ * not in the product yet, so no page may promise a number of them; storage
+ * was never metered and is no longer a limit (an older API still sends it).
  */
-export const HIDDEN_LIMITS = new Set(["ticket_types_per_event", "coupons_per_event"]);
+export const HIDDEN_LIMITS = new Set(["ticket_types_per_event", "coupons_per_event", "storage_gb"]);
 
-/** The limits a card leads with, in this order. Storage isn't measured per club yet, so it stays in the table. */
+/** The limits a card leads with, in this order. */
 export const HEADLINE_LIMITS = ["events_per_month", "registrations_per_event", "registrations_per_month", "committee_seats", "announcements_per_month"];
 
 const humanize = (key) => {
@@ -183,21 +228,20 @@ const humanize = (key) => {
 /** How a limit reads, for one the API adds before this page knows its words. */
 const limitSpec = (key) => LIMIT_BY_KEY.get(key) || { key, row: humanize(key), one: humanize(key).toLowerCase(), many: humanize(key).toLowerCase(), unlimited: `Unlimited ${humanize(key).toLowerCase()}` };
 
-/** "15 events a month", "1,000 people per event", "5 GB storage", "Unlimited events"; null for none (0), not stated, or hidden. */
+/** "15 events a month", "1,000 people per event", "Unlimited events"; null for none (0), not stated, or hidden. */
 export function limitPhrase(key, value) {
   if (HIDDEN_LIMITS.has(key)) return null;
   const spec = limitSpec(key);
   if (value === null) return spec.unlimited;
   if (!(value > 0)) return null;
-  if (spec.gb) return `${formatNumber(value)} GB storage`;
   return `${formatNumber(value)} ${value === 1 ? spec.one : spec.many}`;
 }
 
-/** A table cell: "Unlimited", "1,000", "5 GB", or null for none or not stated (the table shows a dash). */
+/** A table cell: "Unlimited", "1,000", or null for none or not stated (the table shows a dash). */
 export function limitCell(key, value) {
   if (value === null) return "Unlimited";
   if (!(value > 0)) return null;
-  return limitSpec(key).gb ? `${formatNumber(value)} GB` : formatNumber(value);
+  return formatNumber(value);
 }
 
 /** The few limits a card leads with, in plain words (skipping any a plan doesn't state or allows none of). */
@@ -206,7 +250,7 @@ export function headlineLimits(plan, keys = HEADLINE_LIMITS) {
 }
 
 /**
- * A plan's limit as the table shows it: "Unlimited", "1,000", "5 GB", or
+ * A plan's limit as the table shows it: "Unlimited", "1,000", or
  * null (a dash) for none, not stated, or a limit on a feature the plan
  * doesn't have.
  */
@@ -288,21 +332,37 @@ export const plansPageUrl = (clubsUrl) => `${base(clubsUrl)}/signup`;
 export const contactUrl = (email) => `mailto:${email}?subject=${encodeURIComponent("MyOtherApp for our institution")}`;
 
 /**
- * A plan's button: "Start free", "Start 14-day trial", "Choose Pro", or
+ * A plan's button: "Start free", "Start free trial", "Choose Pro", or
  * "Talk to us"; its link (the sign-up with the plan and the cycle picked, or
- * an email), and the line under it for a trial (what it costs after).
+ * an email), and the line under it (what a paid plan costs after the trial;
+ * Enterprise's trial).
+ *
+ * `trial` is the free trial every new club starts with (parsePlans'
+ * `trial`): with one, a paid plan's button starts it and the plan is picked
+ * at sign-up, billed only from the trial's end. `enterpriseTrialDays` is the
+ * trial the team gives with Enterprise.
  */
-export function planCta(plan, cycle, { clubsUrl, contactEmail, currency = "INR" }) {
+export function planCta(plan, cycle, { clubsUrl, contactEmail, currency = "INR", trial = null, enterpriseTrialDays = null }) {
   const price = planPrice(plan, cycle);
-  if (price.kind === "contact") return { label: "Talk to us", href: contactUrl(contactEmail), kind: "contact", note: null };
+  if (price.kind === "contact") {
+    return { label: "Talk to us", href: contactUrl(contactEmail), kind: "contact", note: enterpriseTrialDays ? `${enterpriseTrialDays}-day trial included` : null };
+  }
   if (price.kind === "free") return { label: "Start free", href: signupUrl(clubsUrl, plan.key, "monthly"), kind: "free", note: null };
-  const trial = plan.trialDays > 0;
-  const note = trial ? `Then ${formatMoney(price.billed, currency)} a ${price.cycle === "yearly" ? "year" : "month"}` : null;
+  const then = `${formatMoney(price.billed, currency)} a ${price.cycle === "yearly" ? "year" : "month"}`;
+  if (trial) {
+    return {
+      label: "Start free trial",
+      href: signupUrl(clubsUrl, plan.key, price.cycle),
+      kind: "paid",
+      note: `${trial.days} days of ${trial.planName} free, then ${then}`,
+    };
+  }
+  const own = plan.trialDays > 0;
   return {
-    label: trial ? `Start ${plan.trialDays}-day trial` : `Choose ${plan.name}`,
+    label: own ? `Start ${plan.trialDays}-day trial` : `Choose ${plan.name}`,
     href: signupUrl(clubsUrl, plan.key, price.cycle),
     kind: "paid",
-    note,
+    note: own ? `Then ${then}` : null,
   };
 }
 
@@ -334,6 +394,19 @@ export function plansJsonLd(data, { url, siteUrl, description }) {
     };
   };
   const offers = [];
+  if (data.trial) {
+    // The free trial: the trial's plan at no charge for its days, no card.
+    offers.push({
+      "@type": "Offer",
+      name: `${data.trial.planName}, ${data.trial.days}-day free trial`,
+      description: `${data.trial.days} days of ${data.trial.planName} free for every new club, no card needed`,
+      price: 0,
+      priceCurrency: currency,
+      url,
+      availability: "https://schema.org/InStock",
+      eligibleDuration: { "@type": "QuantitativeValue", value: data.trial.days, unitCode: "DAY" },
+    });
+  }
   for (const p of data.plans) {
     const kind = planKind(p);
     if (kind === "free") offers.push(offer(p.name, 0, "P1M"));

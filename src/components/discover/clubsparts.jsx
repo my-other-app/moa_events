@@ -4,8 +4,8 @@ import { contactUrl, loginUrl, signupUrl } from "@/utils/pricing";
 import { Inline } from "./legalpage";
 import Icon from "./icons";
 
-/** Where "Start free" goes. */
-const START_FREE_URL = signupUrl(CLUBS_URL, "free", "monthly");
+/** Where "Start free" goes: the sign-up, where every new club starts its free Pro trial. */
+const START_FREE_URL = signupUrl(CLUBS_URL, "pro", "monthly");
 
 /** The questions organisers ask, each one opening in place. */
 export function ClubFaq({ yearlyMonthsFree = null }) {
@@ -52,7 +52,7 @@ export function ClubsCta() {
         <h2 id="fc-cta-title">
           Bring your club to <em>MyOtherApp.</em>
         </h2>
-        <p>Start on the Free plan today, and run your next event from one place.</p>
+        <p>Start with 14 days of Pro free, no card needed, and run your next event from one place.</p>
       </div>
       <div className="fc-cta-actions">
         <div className="fc-cta-buttons">

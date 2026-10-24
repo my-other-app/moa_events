@@ -12,7 +12,7 @@ export const FOR_CLUBS = {
   path: "/for-clubs",
   title: "MyOtherApp for clubs · Run your club's events from one place",
   description:
-    "Registrations with your own questions, paid tickets through Razorpay, QR check-in, certificates, a live room and a website for your club: everything a student club needs to run its events, in one dashboard. Start free.",
+    "Registrations with your own questions, paid tickets through Razorpay, QR check-in, certificates, a live room and a website for your club: everything a student club needs to run its events, in one dashboard. Start with 14 days of Pro free, no card needed.",
   lede: "Sign-ups with your own questions, paid tickets, QR check-in at the door, certificates and a live room for the audience — one dashboard for every event your club runs, from the first sign-up to the last certificate.",
   /** The short list under the hero: one word or two for each thing the dashboard does. */
   highlights: [
@@ -161,9 +161,9 @@ export const FOR_CLUBS = {
     },
   ],
   steps: [
-    { title: "Apply", text: "Sign up with your club's details and pick a plan. The Free plan is a fine place to start." },
+    { title: "Apply", text: "Sign up with your club's details. Nothing to pay and no card to give." },
     { title: "We verify your club", text: "We check that your club is who it says it is before it goes public, so students can trust every event they find here." },
-    { title: "Go live", text: "Publish your first event, share its link, and watch the registrations come in." },
+    { title: "Go live", text: "Once you're approved, you get 14 days of Pro free. Publish your first event, share its link, and watch the registrations come in." },
   ],
 };
 
@@ -171,7 +171,7 @@ export const PRICING_PAGE = {
   path: "/pricing",
   title: "Pricing · MyOtherApp for clubs",
   description:
-    "Plans for student clubs, starting free: events, registrations, paid tickets, QR check-in, certificates and more. Pay monthly, or yearly for less.",
+    "Plans for student clubs in India: start with 14 days of Pro free, no card needed. Then Starter, Growth or Pro, monthly or yearly, Enterprise for institutions, or a free plan for small events.",
 };
 
 /**
@@ -192,9 +192,20 @@ export function clubFaq({ yearlyMonthsFree = null, contactEmail = "support@myoth
       ],
     },
     {
+      id: "trial",
+      q: "How does the free trial work?",
+      a: [
+        "Every new club gets 14 days of Pro, free, from the day it's approved. No card, nothing to cancel.",
+        "Pick a plan any time during the trial and nothing is charged until the trial ends; your plan starts then. One trial per club.",
+      ],
+    },
+    {
       id: "free",
-      q: "Is the Free plan really free?",
-      a: ["Yes — ₹0 a month, for as long as it suits your club. It comes with the limits shown in the plans; move up when you outgrow them."],
+      q: "What happens when the trial ends?",
+      a: [
+        "If you haven't picked a plan, your club moves to the Free plan: ₹0 a month, for as long as it suits you, with smaller limits that are enough for small events.",
+        "Your published events, tickets, followers and data all keep working. Move up whenever you outgrow it.",
+      ],
     },
     {
       id: "switch",
@@ -233,7 +244,7 @@ export function clubFaq({ yearlyMonthsFree = null, contactEmail = "support@myoth
     {
       id: "institution",
       q: "We're a whole college or university. Is there a plan for us?",
-      a: [`Yes. Pick the plan that fits, or [write to us](mailto:${contactEmail}) and we'll work out one for your institution together.`],
+      a: [`Yes: Enterprise, priced for your institution, with a trial to try it first. [Write to us](mailto:${contactEmail}) and we'll set it up together.`],
     },
   ];
 }
