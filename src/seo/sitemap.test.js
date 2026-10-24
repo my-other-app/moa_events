@@ -19,7 +19,9 @@ describe("the sitemap's parts", () => {
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/events/x?a=1&b=2");
     expect(xml).toContain("<loc>https://myotherapp.in/events/x?a=1&amp;b=2</loc>");
     expect(texts(doc, "loc").slice(0, 3)).toEqual(["https://myotherapp.in/", "https://myotherapp.in/events", "https://myotherapp.in/clubs"]);
-    expect(texts(doc, "url")).toHaveLength(10);
+    // The fixed pages (/verify among them) and the one added.
+    expect(texts(doc, "url")).toHaveLength(11);
+    expect(texts(doc, "loc")).toContain("https://myotherapp.in/verify");
   });
 
   it("indexes one sitemap per page: the API's paged sitemap when it has one", () => {

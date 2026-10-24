@@ -30,6 +30,8 @@ export const STATIC_PAGES = [
   ["/for-clubs", "weekly", "0.8"],
   ["/pricing", "weekly", "0.7"],
   ["/about", "monthly", "0.5"],
+  // The certificate check; its results (/verify/{number}) are never listed.
+  ["/verify", "monthly", "0.5"],
   ["/privacy", "yearly", "0.3"],
   ["/terms", "yearly", "0.3"],
 ];

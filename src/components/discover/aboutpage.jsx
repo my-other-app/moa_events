@@ -38,7 +38,7 @@ function LiveNumbers({ stats }) {
   );
 }
 
-function Feature({ icon, title, text }) {
+function Feature({ icon, title, text, link = null }) {
   return (
     <li className="dc-feature">
       <span className="dc-feature-icon" aria-hidden="true">
@@ -46,6 +46,11 @@ function Feature({ icon, title, text }) {
       </span>
       <h3>{title}</h3>
       <p>{text}</p>
+      {link ? (
+        <Link className="dc-link dc-feature-link" to={link.to}>
+          {link.label} <Icon name="arrowRight" size={14} />
+        </Link>
+      ) : null}
     </li>
   );
 }

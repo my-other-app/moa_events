@@ -14,6 +14,7 @@ The site is myotherapp.in. Its audience is India, Kerala first: Kochi, Thiruvana
 | City `/events/in/{city}`, `/clubs/in/{city}` | CollectionPage about the City, ItemList, BreadcrumbList, visible breadcrumbs, the place's feed. |
 | Find pages `/events`, `/clubs` | ItemList of what is shown. One filter alone is indexed at its own canonical; any mix is `noindex, follow` (`src/seo/listings.js`). |
 | Posts `/threads`, `/threads/{id}` | CollectionPage and ItemList; each post a DiscussionForumPosting (author, `datePublished`, likes and comment counts, comments). |
+| Certificate check `/verify` | Indexed, in `pages.xml`. A result, `/verify/{number}`, is never indexed or listed: `noindex, nofollow` in its head and as `X-Robots-Tag`, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, no frames (`next.config.mjs`). |
 | `/sitemap.xml` | An index: `pages.xml`, `topics.xml`, `cities.xml` (when a city page is worth indexing), `events-{n}.xml`, `clubs-{n}.xml`. |
 
 The JSON-LD is built by pure functions in `src/seo` (`jsonld.js`, `structured.js`, `citypages.js`) and checked by `src/seo/validate.js` against Google's rules for each rich result. `src/app/_tests/event-jsonld.test.js` renders an event page and checks every field Google requires and recommends.

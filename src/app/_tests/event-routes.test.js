@@ -107,8 +107,10 @@ describe("the transactional pages", () => {
     expect(route.dynamic).toBe("force-dynamic");
     expect(route.metadata.robots).toMatchObject({ index: false });
     const { value } = await outcome(() => route.default({ params: params(p), searchParams: params(q) }));
-    expect(value.type.name).toBe(component);
-    expect(value.props).toEqual(props);
+    // The certificate sits in the site's frame (header and footer).
+    const page = value.type.name === "SitePage" ? value.props.children : value;
+    expect(page.type.name).toBe(component);
+    expect(page.props).toEqual(props);
     expect(fetch.calls).toEqual([]);
   });
 

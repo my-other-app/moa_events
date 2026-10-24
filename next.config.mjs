@@ -12,10 +12,33 @@
  *   - the find pages (/events, /clubs) and a topic's page (/topics/{slug})
  *     kept a minute at Vercel's edge: they are rendered per request, but
  *     their HTML depends on the address alone;
+ *   - the certificate check (/verify) never framed by another site, and its
+ *     results (/verify/{number}) and a guest's certificate
+ *     (/certificates/{ticket id}) never stored, indexed or referred on (the
+ *     code is in the address);
  *   - the OG fonts traced into the functions that read them.
  */
 import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
 import { cityRedirects } from "./src/seo/cities.js";
+
+/**
+ * The certificate check is what a fake site would most like to show inside
+ * its own page: no frame anywhere (both headers, for old browsers and new),
+ * and no address passed on to a link followed from it. A result is never
+ * kept by a browser or a cache (a revocation must show at once) nor indexed.
+ */
+export const VERIFY_HEADERS = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Referrer-Policy", value: "no-referrer" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+];
+export const VERIFY_RESULT_HEADERS = [
+  ...VERIFY_HEADERS,
+  { key: "Cache-Control", value: "no-store, max-age=0" },
+  { key: "Vercel-CDN-Cache-Control", value: "no-store" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
+];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -44,6 +67,10 @@ const nextConfig = {
       { source: "/events", headers: edge },
       { source: "/clubs", headers: edge },
       { source: "/topics/:slug", headers: edge },
+      { source: "/verify", headers: VERIFY_HEADERS },
+      { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
+      // A guest's certificate: its address holds the ticket's code.
+      { source: "/certificates/:ticketid", headers: VERIFY_RESULT_HEADERS },
     ];
   },
   async redirects() {

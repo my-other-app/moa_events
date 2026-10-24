@@ -69,6 +69,9 @@ export function SiteFooter() {
                 <Link to="/pricing">Pricing</Link>
               </li>
               <li>
+                <Link to="/verify">Verify a certificate</Link>
+              </li>
+              <li>
                 <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
               </li>
             </ul>

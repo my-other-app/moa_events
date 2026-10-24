@@ -14,7 +14,12 @@ export const ABOUT = {
     { icon: "search", title: "Discover events and clubs near you", text: "Hackathons, workshops and meetups from the clubs around you — by day, place, price and category." },
     { icon: "zap", title: "Register in a minute", text: "A short form, and your ticket is in your email — and in the app, once you sign in." },
     { icon: "qr", title: "Tickets with QR entry", text: "Show the QR code at the door and you're checked in." },
-    { icon: "award", title: "Certificates", text: "Your certificate after the event, ready to download." },
+    {
+      icon: "award",
+      title: "Certificates",
+      text: "Your certificate after the event, ready to download — and anyone can check it's genuine by its number.",
+      link: { to: "/verify", label: "Verify a certificate" },
+    },
     { icon: "monitor", title: "Live rooms", text: "Quizzes, polls and Q&A while the event is on, from your phone." },
     { icon: "comment", title: "Club threads", text: "Follow clubs and keep up with their posts and polls." },
   ],
