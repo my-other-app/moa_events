@@ -175,6 +175,9 @@ describe("signing in with Google", () => {
       frame.title = "Sign in with Google Button";
       el.appendChild(frame);
     });
+    // The sheet starts listening for the page's focus in an effect that runs
+    // after the button is ready, which can be a moment after the iframe shows.
+    const listens = vi.spyOn(window, "addEventListener");
     show();
     const sheet = await openSheet();
     const frame = await waitFor(() => {
@@ -182,6 +185,8 @@ describe("signing in with Google", () => {
       expect(f).not.toBeNull();
       return f;
     });
+    await waitFor(() => expect(listens).toHaveBeenCalledWith("focus", expect.any(Function)));
+    listens.mockRestore();
     vi.useFakeTimers();
     try {
       frame.focus();
