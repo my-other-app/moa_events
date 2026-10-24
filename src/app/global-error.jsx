@@ -1,7 +1,16 @@
 "use client";
 
-/* The last resort, when even the site's frame fails: plain words and a way back. */
-export default function GlobalError({ reset }) {
+import { useEffect } from "react";
+import { reportError } from "@/sentry/lazy";
+
+/*
+ * The last resort, when even the site's frame fails: plain words and a way
+ * back. Sent to Sentry as error.jsx does (a server error was sent already).
+ */
+export default function GlobalError({ error, reset }) {
+  useEffect(() => {
+    if (!error?.digest) reportError(error);
+  }, [error]);
   return (
     <html lang="en">
       <body style={{ fontFamily: "system-ui, sans-serif", padding: "48px 20px", textAlign: "center", color: "#111827" }}>
