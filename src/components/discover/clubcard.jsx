@@ -74,13 +74,3 @@ export function ClubCardSkeleton() {
     </div>
   );
 }
-
-export function ClubRailSkeleton({ count = 4, grid = false }) {
-  return (
-    <div className={grid ? "dc-grid dc-grid--4" : "dc-rail dc-rail--cards"} role="status" aria-label="Loading clubs">
-      {Array.from({ length: count }, (_, i) => (
-        <ClubCardSkeleton key={i} />
-      ))}
-    </div>
-  );
-}

@@ -764,19 +764,6 @@
   gap: 8px;
   margin-top: 18px;
 }
-.me-prompt .dc-btn.me-google {
-  gap: 10px;
-  background: #fff;
-  color: var(--dc-ink);
-  box-shadow: inset 0 0 0 1px var(--dc-line);
-  font-family: var(--dc-font);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-.me-prompt .dc-btn.me-google:hover {
-  background: var(--dc-sunken);
-}
 
 @keyframes ac-spin {
   to {

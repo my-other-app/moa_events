@@ -102,20 +102,3 @@ export function ThreadCard({ thread, full = false, headingLevel = 3, poll = null
     </article>
   );
 }
-
-export function ThreadCardSkeleton() {
-  return (
-    <div className="dc-tcard" aria-hidden="true">
-      <div className="dc-tcard-head">
-        <span className="dc-skel" style={{ width: 40, height: 40, borderRadius: 999 }} />
-        <div style={{ flex: 1 }}>
-          <div className="dc-skel" style={{ width: "50%", height: 14 }} />
-          <div className="dc-skel dc-skel-line" style={{ width: "25%", height: 10 }} />
-        </div>
-      </div>
-      <div className="dc-skel dc-skel-line" />
-      <div className="dc-skel dc-skel-line" style={{ width: "85%" }} />
-      <div className="dc-skel dc-skel-line" style={{ width: "60%" }} />
-    </div>
-  );
-}
