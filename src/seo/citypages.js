@@ -23,9 +23,6 @@ import { absoluteUrl, clubPagePath, eventPagePath, feeds } from "./urls";
 /** "Kochi (Ernakulam, Cochin)": the name, and the first two it also goes by. */
 export const cityAlso = (city) => (city.also.length ? `${city.name} (${city.also.slice(0, 2).join(", ")})` : city.name);
 
-/** "Kochi, Kerala". */
-export const cityWhere = (city) => `${city.name}, ${city.state}`;
-
 /** The radius the find pages offer that holds the city (the nearest at least its own). */
 const finderRadius = (city) => RADIUS_OPTIONS.find((r) => r >= city.radiusKm) || RADIUS_OPTIONS.at(-1);
 

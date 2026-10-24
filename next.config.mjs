@@ -2,9 +2,6 @@
  * The public site at https://myotherapp.in, on Next.js (App Router).
  *
  * Routing lives in src/app. What is configured here:
- *   - link-preview bots asking for a page that is still drawn in the browser
- *     get the small server-made page from /api/share instead (see BOT_PAGES);
- *     server-rendered pages need no such help and are not listed;
  *   - /me → /me/tickets, and /events/{id} handed to the old-address page;
  *   - a city's other names to its page (/events/in/cochin → /events/in/kochi);
  *   - metadata always in <head>, never streamed into <body> (canonical tags
@@ -16,10 +13,11 @@
  *     results (/verify/{number}) and a guest's certificate
  *     (/certificates/{ticket id}) never stored, indexed or referred on (the
  *     code is in the address);
- *   - the OG fonts traced into the functions that read them.
+ *   - the OG fonts traced into the functions that read them;
+ *   - Sentry's build settings, only when it is on (withSentry, below).
  */
-import { BOT_PAGES, BOT_UA } from "./src/seo/bots.js";
 import { cityRedirects } from "./src/seo/cities.js";
+import { sentryDsn, sentryEnvironment, sentryRelease } from "./src/sentry/env.js";
 
 /**
  * The certificate check is what a fake site would most like to show inside
@@ -79,11 +77,6 @@ const nextConfig = {
   async rewrites() {
     return {
       beforeFiles: [
-        ...BOT_PAGES.map(({ source, path }) => ({
-          source,
-          has: [{ type: "header", key: "user-agent", value: BOT_UA }],
-          destination: `/api/share${path}`,
-        })),
         // /events/{id}: an id is never the canonical address. The old-address
         // page (/{id}) answers it with a 308 to /events/{slug}, query kept.
         { source: "/events/:id(\\d+)", destination: "/:id" },
@@ -92,4 +85,34 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Without NEXT_PUBLIC_SENTRY_DSN, Sentry (src/sentry) is off and the build is
+ * exactly as it would be without it. With the DSN, the release (the commit)
+ * and the environment (Vercel's production / preview) are written into the
+ * bundles from the build's own variables. When SENTRY_AUTH_TOKEN,
+ * SENTRY_ORG and SENTRY_PROJECT are set as well, the source maps (browser
+ * and server) are uploaded to Sentry for that release and then deleted from
+ * the build, so they are never served. A failed upload is logged and the
+ * build goes on.
+ */
+async function withSentry(config) {
+  if (!sentryDsn()) return config;
+  const release = sentryRelease();
+  const withEnv = {
+    ...config,
+    env: { ...config.env, NEXT_PUBLIC_SENTRY_ENVIRONMENT: sentryEnvironment(), ...(release ? { NEXT_PUBLIC_SENTRY_RELEASE: release } : {}) },
+  };
+  const { SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT } = process.env;
+  if (!SENTRY_AUTH_TOKEN || !SENTRY_ORG || !SENTRY_PROJECT) return withEnv;
+  const { withSentryConfig } = await import("@sentry/nextjs/config");
+  return withSentryConfig(withEnv, {
+    org: SENTRY_ORG,
+    project: SENTRY_PROJECT,
+    authToken: SENTRY_AUTH_TOKEN,
+    ...(release ? { release: { name: release } } : {}),
+    sourcemaps: { deleteSourcemapsAfterUpload: true },
+    telemetry: false,
+  });
+}
+
+export default await withSentry(nextConfig);

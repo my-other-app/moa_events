@@ -103,9 +103,6 @@ export function getSession() {
 
 export const isSignedIn = () => Boolean(getSession());
 
-/** The account's access token, or null when nobody is signed in. */
-export const userToken = () => getSession()?.access_token ?? null;
-
 export function setSession({ access_token, refresh_token, profile = null, claims = null }) {
   dropNotice();
   write({ access_token, refresh_token, profile, claims });

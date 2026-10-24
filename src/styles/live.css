@@ -293,13 +293,6 @@
 }
 
 /* The quiz, played. */
-.play-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 40px;
-  letter-spacing: 0.2em;
-  text-align: center;
-  margin: 8px 0;
-}
 .play-clock {
   font-variant-numeric: tabular-nums;
   font-weight: 700;

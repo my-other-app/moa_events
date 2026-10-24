@@ -46,8 +46,6 @@ export const RESERVED = new Set([
   "_next",
 ]);
 
-export const SUBS = new Set(["", "register", "live", "compete"]);
-
 /** True when `ref` may be an old event address worth looking up. */
 export const isLegacyRef = (ref) => REF.test(String(ref || "")) && !RESERVED.has(String(ref).toLowerCase());
 

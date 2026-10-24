@@ -10,9 +10,6 @@ const apiClient = axios.create({
     },
 });
 
-/** Drops the guest token a registration left behind; every page here works without one. */
-export const forgetSession = forgetGuestTokens;
-
 /*
  * Which token goes with a request:
  *

@@ -175,8 +175,7 @@
       .tp-chip,
       button.dc-poll-option,
       .live-option,
-      .register-btn,
-      .snackbar-close-btn
+      .register-btn
     ) {
     transition:
       var(--motion-colors),
@@ -197,8 +196,7 @@
       .ac-menu-btn,
       .tp-chip,
       .live-option,
-      .register-btn,
-      .snackbar-close-btn
+      .register-btn
     ):active:not(:disabled, [aria-disabled="true"]) {
     transform: scale(var(--motion-press));
   }
@@ -356,9 +354,6 @@
   }
   .ac-signedout {
     animation: motion-rise-centred var(--motion-slow) var(--motion-ease-out) backwards;
-  }
-  .snackbar {
-    animation: fadeIn var(--motion-slow) var(--motion-ease-out);
   }
 
   /* ---------- menus and popovers: they drop in, and fold away ---------- */
