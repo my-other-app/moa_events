@@ -1,5 +1,6 @@
 import { Link } from "@/lib/router";
-import { commonFeatures, yearlyOffer } from "@/utils/pricing";
+import { CLUBS_URL } from "@/config";
+import { commonFeatures, startFreeLabel, startFreeUrl, yearlyOffer } from "@/utils/pricing";
 import { ClubFaq, ClubsCta } from "./clubsparts";
 import { Pricing } from "./pricing";
 import Icon from "./icons";
@@ -16,6 +17,7 @@ const COMMON_SHOWN = 7;
 export function PricingView({ plans = null }) {
   const offer = yearlyOffer(plans?.yearlyMonthsFree);
   const common = plans ? commonFeatures(plans.plans).slice(0, COMMON_SHOWN) : [];
+  const trial = plans?.trial ?? null;
 
   return (
     <div className="dc-wrap">
@@ -24,7 +26,18 @@ export function PricingView({ plans = null }) {
         <h1 id="pr-title">
           Plans for <span className="dc-hl">every club.</span>
         </h1>
-        <p className="pr-hero-lede">Start free, and move up when your events grow.{offer ? ` Pay yearly and get ${offer}.` : ""}</p>
+        <p className="pr-hero-lede">
+          {trial
+            ? `Every new club gets ${trial.days} days of ${trial.planName} free, no card needed. Then pick the plan that fits, or keep a free plan for small events.`
+            : "Start free, and move up when your events grow."}
+          {offer ? ` Pay yearly and get ${offer}.` : ""}
+        </p>
+        <div className="pr-hero-cta">
+          <a className="dc-btn dc-btn--accent" href={startFreeUrl(CLUBS_URL, plans)}>
+            {startFreeLabel(plans)} <Icon name="arrowRight" size={16} />
+          </a>
+          {trial ? <p>Billing starts only if you pick a plan, and only when the trial ends.</p> : null}
+        </div>
         {common.length ? (
           <div className="pr-hero-common">
             <p>Every plan comes with</p>

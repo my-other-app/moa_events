@@ -6,7 +6,10 @@ import { usePlans } from "@/utils/plans";
 import { CLUBS_URL, CONTACT_EMAIL } from "@/config";
 import {
   addedFeatures,
+  cardPlans,
   featureSections,
+  freeAfterTrialLine,
+  freePlan,
   formatMoney,
   headlineLimits,
   includes,
@@ -15,6 +18,7 @@ import {
   planLimitCell,
   planPrice,
   plansPageUrl,
+  signupUrl,
   yearlyOffer,
 } from "@/utils/pricing";
 import Icon from "./icons";
@@ -39,7 +43,7 @@ export function CycleSwitch({ cycle, onChange, offer }) {
 }
 
 /** The big number on a card and the line under it: what is billed, and the saving on a year. */
-function PlanPrice({ plan, cycle, currency }) {
+function PlanPrice({ plan, cycle, currency, enterpriseTrialDays = null }) {
   const p = planPrice(plan, cycle);
   if (p.kind === "contact") {
     return (
@@ -47,7 +51,9 @@ function PlanPrice({ plan, cycle, currency }) {
         <p className="pr-price">
           <span className="pr-amount">Custom</span>
         </p>
-        <p className="pr-billed">A plan and a price made for your institution</p>
+        <p className="pr-billed">
+          {enterpriseTrialDays ? "Custom pricing, a trial included: talk to us" : "A plan and a price made for your institution"}
+        </p>
       </>
     );
   }
@@ -91,9 +97,9 @@ function More({ href, children }) {
   );
 }
 
-function PlanCard({ plans, index, cycle, currency, moreHref }) {
+function PlanCard({ plans, index, cycle, currency, moreHref, trial = null, enterpriseTrialDays = null }) {
   const plan = plans[index];
-  const cta = planCta(plan, cycle, { clubsUrl: CLUBS_URL, contactEmail: CONTACT_EMAIL, currency });
+  const cta = planCta(plan, cycle, { clubsUrl: CLUBS_URL, contactEmail: CONTACT_EMAIL, currency, trial, enterpriseTrialDays });
   const limits = headlineLimits(plan);
   const adds = addedFeatures(plans, index);
   const shown = adds.length > ADDS_ALL ? adds.slice(0, ADDS_SOME) : adds;
@@ -107,7 +113,7 @@ function PlanCard({ plans, index, cycle, currency, moreHref }) {
         {plan.name}
       </h3>
       {plan.tagline ? <p className="pr-plan-tagline">{plan.tagline}</p> : null}
-      <PlanPrice plan={plan} cycle={cycle} currency={currency} />
+      <PlanPrice plan={plan} cycle={cycle} currency={currency} enterpriseTrialDays={enterpriseTrialDays} />
       <a className={`${button} dc-btn--block pr-plan-cta`} href={cta.href} aria-describedby={headingId}>
         {cta.label}
       </a>
@@ -257,7 +263,7 @@ export function CompareTable({ data, cycle }) {
             <tr>
               <td />
               {plans.map((p) => {
-                const cta = planCta(p, cycle, { clubsUrl: CLUBS_URL, contactEmail: CONTACT_EMAIL, currency });
+                const cta = planCta(p, cycle, { clubsUrl: CLUBS_URL, contactEmail: CONTACT_EMAIL, currency, trial: data.trial, enterpriseTrialDays: data.enterpriseTrialDays });
                 return (
                   <td key={p.key} className={cell(p)}>
                     <a className={`dc-btn dc-btn--sm ${p.featured ? "dc-btn--accent" : cta.kind === "paid" ? "" : "dc-btn--ghost"}`} href={cta.href}>
@@ -340,14 +346,41 @@ export function Pricing({ data = null, compare = "table", moreHref = "#compare",
   const shown = plans.data;
   const offer = yearlyOffer(shown.yearlyMonthsFree);
   const hasYearly = shown.plans.some((p) => p.yearly > 0 && p.monthly > 0);
+  // With the free trial on offer, the cards are the tiers and Enterprise;
+  // Free is what a club keeps after the trial, said under them.
+  const cards = cardPlans(shown);
+  const afterTrial = freeAfterTrialLine(shown);
+  const free = freePlan(shown);
   return (
     <div className={`pr-pricing${compare === "table" ? "" : " pr-pricing--brief"}`}>
       {hasYearly ? <CycleSwitch cycle={cycle} onChange={setCycle} offer={offer} /> : null}
-      <ul className={`pr-plans pr-plans--${shown.plans.length}`}>
-        {shown.plans.map((p, i) => (
-          <PlanCard key={p.key} plans={shown.plans} index={i} cycle={cycle} currency={shown.currency} moreHref={compare === "table" ? moreHref : compareHref} />
+      <ul className={`pr-plans pr-plans--${cards.length}`}>
+        {cards.map((p, i) => (
+          <PlanCard
+            key={p.key}
+            plans={cards}
+            index={i}
+            cycle={cycle}
+            currency={shown.currency}
+            moreHref={compare === "table" ? moreHref : compareHref}
+            trial={shown.trial}
+            enterpriseTrialDays={shown.enterpriseTrialDays}
+          />
         ))}
       </ul>
+      {afterTrial && free ? (
+        <div className="pr-free-after" role="note">
+          <span className="dc-feature-icon" aria-hidden="true">
+            <Icon name="check" size={18} />
+          </span>
+          <p>
+            <strong>Free after the trial.</strong> {afterTrial}
+          </p>
+          <a className="dc-btn dc-btn--ghost dc-btn--sm" href={signupUrl(CLUBS_URL, shown.trial.planKey, "monthly")}>
+            Start free
+          </a>
+        </div>
+      ) : null}
       {shown.currency === "INR" ? <p className="pr-fineprint">Prices are in Indian rupees.</p> : null}
       {compare === "table" ? (
         <CompareTable data={shown} cycle={cycle} />

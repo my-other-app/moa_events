@@ -33,6 +33,22 @@
   font-size: 18px;
   color: var(--dc-text);
 }
+.pr-hero-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+.pr-hero-cta .dc-btn {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+.pr-hero-cta p {
+  font-size: 14px;
+  color: var(--dc-muted);
+}
 .pr-hero-common {
   margin-top: 24px;
 }
@@ -360,6 +376,41 @@
 }
 .is-featured .pr-plan-more {
   color: var(--dc-accent);
+}
+
+/* ---------- what a club keeps after its trial ---------- */
+
+.pr-free-after {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px dashed #d1d5db;
+  border-radius: 18px;
+  background: var(--dc-sunken);
+}
+.pr-free-after p {
+  font-size: 15px;
+  color: var(--dc-text);
+}
+.pr-free-after strong {
+  color: var(--dc-ink);
+}
+@media (min-width: 720px) {
+  .pr-free-after {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+  .pr-free-after p {
+    flex: 1 1 auto;
+  }
+  .pr-free-after .dc-feature-icon,
+  .pr-free-after .dc-btn {
+    flex: 0 0 auto;
+  }
 }
 
 .pr-fineprint {

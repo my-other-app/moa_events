@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plansResponse } from "@/test/plansFixture";
+import { plansResponse, trialPlansResponse } from "@/test/plansFixture";
 import {
   addedFeatures,
   cheapestPaid,
@@ -21,6 +21,10 @@ import {
   plansJsonLd,
   plansPageUrl,
   signupUrl,
+  startFreeLabel,
+  startFreeUrl,
+  cardPlans,
+  freeAfterTrialLine,
   yearlyOffer,
 } from "./pricing";
 
@@ -122,7 +126,8 @@ describe("limits in plain words", () => {
     expect(limitPhrase("registrations_per_event", 1)).toBe("1 person per event");
     expect(limitPhrase("registrations_per_month", 100000)).toBe("1,00,000 registrations a month");
     expect(limitPhrase("committee_seats", 10)).toBe("10 team seats");
-    expect(limitPhrase("storage_gb", 5)).toBe("5 GB storage");
+    // Storage was never metered and is no longer a limit, even from an older API that still sends it.
+    expect(limitPhrase("storage_gb", 5)).toBeNull();
     expect(limitPhrase("events_per_month", null)).toBe("Unlimited events");
     expect(limitPhrase("committee_seats", null)).toBe("Unlimited team seats");
     expect(limitPhrase("merch_items_per_event", 0)).toBeNull();
@@ -143,7 +148,6 @@ describe("limits in plain words", () => {
   it("fills the table's cells: a number, Unlimited, or nothing for none", () => {
     expect(limitCell("events_per_month", null)).toBe("Unlimited");
     expect(limitCell("registrations_per_month", 100000)).toBe("1,00,000");
-    expect(limitCell("storage_gb", 20)).toBe("20 GB");
     expect(limitCell("merch_items_per_event", 0)).toBeNull();
   });
 
@@ -154,7 +158,6 @@ describe("limits in plain words", () => {
     expect(planLimitCell(plan("free"), "website_templates")).toBeNull();
     expect(planLimitCell(plan("starter"), "website_templates")).toBe("3");
     expect(planLimitCell(plan("growth"), "website_templates")).toBe("Unlimited");
-    expect(planLimitCell(plan("free"), "storage_gb")).toBe("1 GB");
   });
 
   it("leads a card with events, people per event, registrations, seats and announcements — never storage", () => {
@@ -168,7 +171,6 @@ describe("limits in plain words", () => {
     const rows = limitRows([{ limits: { storage_gb: 1, events_per_month: 2, judges: 3 } }]);
     expect(rows).toEqual([
       { key: "events_per_month", label: "Events a month" },
-      { key: "storage_gb", label: "Storage" },
       { key: "judges", label: "Judges" },
     ]);
     expect(limitRows(data.plans).map((r) => r.label)).toEqual([
@@ -179,7 +181,6 @@ describe("limits in plain words", () => {
       "Announcements a month",
       "Merch items per event",
       "Website templates",
-      "Storage",
     ]);
   });
 });
@@ -266,5 +267,53 @@ describe("for search engines", () => {
     );
     expect(planSummary(plan("enterprise"))).toMatch(/^Talk to us\. For large fests and institutions\. Unlimited events/);
     expect(planSummary(plan("free"))).toMatch(/^Free\. For a club just starting out\. 2 events a month/);
+  });
+});
+
+
+describe("the free trial", () => {
+  const t = parsePlans(trialPlansResponse());
+
+  it("reads the trial offer and Enterprise's trial, and drops a trial that wants a card", () => {
+    expect(t.trial).toEqual({ days: 14, planKey: "pro", planName: "Pro" });
+    expect(t.enterpriseTrialDays).toBe(30);
+    expect(data.trial).toBeNull();
+    const card = trialPlansResponse();
+    card.trial.card_required = true;
+    expect(parsePlans(card).trial).toBeNull();
+  });
+
+  it("starts free with the trial, and cards the tiers and Enterprise", () => {
+    expect(startFreeLabel(t)).toBe("Start free: 14 days of Pro, no card");
+    expect(startFreeLabel(data)).toBe("Start free");
+    expect(startFreeUrl(CLUBS, t)).toBe(`${CLUBS}/signup?plan=pro&cycle=monthly`);
+    expect(cardPlans(t).map((p) => p.key)).toEqual(["starter", "growth", "pro", "enterprise"]);
+    expect(cardPlans(data).map((p) => p.key)).toEqual(data.plans.map((p) => p.key));
+    expect(freeAfterTrialLine(t)).toMatch(/^After your trial, your club keeps Free for as long as it likes: 2 events a month/);
+    expect(freeAfterTrialLine(data)).toBeNull();
+    expect(longestTrial(t)).toBe(14);
+  });
+
+  it("puts the trial on the paid buttons, and Enterprise's on its talk", () => {
+    const o = { ...opts, trial: t.trial, enterpriseTrialDays: t.enterpriseTrialDays };
+    const g = t.plans.find((p) => p.key === "growth");
+    expect(planCta(g, "yearly", o)).toEqual({ label: "Start free trial", href: `${CLUBS}/signup?plan=growth&cycle=yearly`, kind: "paid", note: "14 days of Pro free, then ₹6,990 a year" });
+    expect(planCta(t.plans.find((p) => p.key === "enterprise"), "monthly", o)).toMatchObject({ label: "Talk to us", note: "30-day trial included" });
+  });
+
+  it("offers the trial and every price in INR to search engines, and nothing about storage", () => {
+    const ld = plansJsonLd(t, { url: "https://myotherapp.in/pricing", siteUrl: "https://myotherapp.in" });
+    expect(ld.offers[0]).toMatchObject({ "@type": "Offer", name: "Pro, 14-day free trial", price: 0, priceCurrency: "INR", eligibleDuration: { value: 14, unitCode: "DAY" } });
+    const named = ld.offers.map((o) => [o.name, o.price]);
+    expect(named).toEqual(
+      expect.arrayContaining([
+        ["Starter, monthly", 299],
+        ["Growth, monthly", 699],
+        ["Pro, monthly", 1499],
+        ["Growth, yearly", 6990],
+      ])
+    );
+    expect(ld.offers.every((o) => o.priceCurrency === "INR")).toBe(true);
+    expect(JSON.stringify(ld)).not.toMatch(/storage|Campus/i);
   });
 });

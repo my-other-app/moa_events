@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { plansResponse } from "@/test/plansFixture";
+import { plansResponse, trialPlansResponse } from "@/test/plansFixture";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
 const { parsePlans } = await import("@/utils/pricing");
 const { Pricing } = await import("./pricing");
+const { PricingView } = await import("./pricingpage");
 
 /*
  * The plans block. The server reads the plans and renders it whole (the
@@ -143,7 +144,8 @@ describe("the comparison", () => {
 
     expect(cellsOf(table, "Events a month")).toEqual(["2", "5", "15", "Unlimited", "Unlimited", "Unlimited"]);
     expect(cellsOf(table, "Registrations a month")).toEqual(["300", "1,500", "8,000", "30,000", "1,50,000", "Unlimited"]);
-    expect(cellsOf(table, "Storage")).toEqual(["1 GB", "5 GB", "20 GB", "100 GB", "500 GB", "Unlimited"]);
+    // Storage is never a row, even from an older API that still sends it.
+    expect(within(table).queryByRole("rowheader", { name: /Storage/ })).toBeNull();
     // A count for a feature the plan lacks is a dash, not a promise.
     expect(cellsOf(table, "Merch items per event")).toEqual(["—Not included", "—Not included", "—Not included", "100", "Unlimited", "Unlimited"]);
     expect(within(table).queryByRole("rowheader", { name: /Ticket types/ })).toBeNull();
@@ -151,7 +153,7 @@ describe("the comparison", () => {
 
     expect(cellsOf(table, "Finance and expenses")).toEqual(["—Not included", "—Not included", "—Not included", "—Not included", "Included", "Included"]);
     expect(cellsOf(table, "Check-in at the door")).toEqual(Array(6).fill("Included"));
-    expect(within(table).getAllByRole("rowheader")).toHaveLength(8 + 21);
+    expect(within(table).getAllByRole("rowheader")).toHaveLength(7 + 21);
 
     // The last row is a button per plan.
     expect(within(table).getByRole("link", { name: "Start 14-day trial, Growth" })).toHaveAttribute("href", `${SIGNUP}?plan=growth&cycle=monthly`);
@@ -207,5 +209,55 @@ describe("before and without the plans", () => {
     show(parsePlans(monthlyOnly));
     expect(screen.queryByRole("group", { name: "Billing period" })).toBeNull();
     expect(within(card("Growth")).getByText("₹699")).toBeInTheDocument();
+  });
+});
+
+
+describe("with the free trial (the backend's trial_pricing)", () => {
+  const trialData = () => parsePlans(trialPlansResponse());
+
+  it("cards the three tiers and Enterprise, Growth highlighted, each starting the trial", () => {
+    show(trialData());
+    const names = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(names).toEqual(["Starter", "Growth", "Pro", "Enterprise"]);
+    expect(card("Growth")).toHaveClass("is-featured");
+    const growth = within(card("Growth"));
+    expect(growth.getByRole("link", { name: "Start free trial" })).toHaveAttribute("href", `${SIGNUP}?plan=growth&cycle=monthly`);
+    expect(growth.getByText("14 days of Pro free, then ₹699 a month")).toBeInTheDocument();
+    expect(within(card("Starter")).getByText("14 days of Pro free, then ₹299 a month")).toBeInTheDocument();
+    expect(within(card("Pro")).getByText("14 days of Pro free, then ₹1,499 a month")).toBeInTheDocument();
+  });
+
+  it("prices Enterprise on request, with its trial, and talks", () => {
+    show(trialData());
+    const ent = within(card("Enterprise"));
+    expect(ent.getByText("Custom pricing, a trial included: talk to us")).toBeInTheDocument();
+    expect(ent.getByText("30-day trial included")).toBeInTheDocument();
+    expect(ent.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", expect.stringMatching(/^mailto:/));
+  });
+
+  it("says a club keeps a free plan for small events after the trial", () => {
+    show(trialData());
+    const note = screen.getByRole("note");
+    expect(note).toHaveTextContent("Free after the trial. After your trial, your club keeps Free for as long as it likes: 2 events a month, 100 people per event and 2 team seats, enough to run small events.");
+    expect(within(note).getByRole("link", { name: "Start free" })).toHaveAttribute("href", `${SIGNUP}?plan=pro&cycle=monthly`);
+  });
+
+  it("compares every plan, Free included, and never storage", () => {
+    const { container } = show(trialData());
+    const table = screen.getByRole("table");
+    expect([...table.querySelectorAll("thead .pr-th-name")].map((th) => th.textContent)).toEqual(["Free", "Starter", "Growth", "Pro", "Enterprise"]);
+    expect(within(table).queryByRole("rowheader", { name: /Storage/ })).toBeNull();
+    expect(container.textContent).not.toMatch(/storage|\bGB\b|Campus/i);
+  });
+
+  it("leads /pricing with the trial", () => {
+    render(
+      <MemoryRouter>
+        <PricingView plans={trialData()} />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link", { name: /^Start free: 14 days of Pro, no card/ })).toHaveAttribute("href", `${SIGNUP}?plan=pro&cycle=monthly`);
+    expect(screen.getByText(/Every new club gets 14 days of Pro free, no card needed\. Then pick the plan that fits, or keep a free plan for small events\./)).toBeInTheDocument();
   });
 });

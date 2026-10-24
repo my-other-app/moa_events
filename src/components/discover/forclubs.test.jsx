@@ -66,7 +66,8 @@ describe("/for-clubs", () => {
     expect(main.getByRole("heading", { level: 1 })).toHaveTextContent("Run your club’s events from one place.");
 
     const startFree = main.getAllByRole("link", { name: /^Start free/ });
-    for (const a of startFree) expect(a).toHaveAttribute("href", `${SIGNUP}?plan=free&cycle=monthly`);
+    // The hero's and the last word's start the free trial (Pro named); a Free card's names Free.
+    for (const a of startFree) expect(a.getAttribute("href")).toMatch(new RegExp(`^${SIGNUP.replace(/[.?]/g, "\\$&")}\\?plan=(pro|free)&cycle=monthly$`));
     expect(main.getByRole("link", { name: "See pricing" })).toHaveAttribute("href", "#pricing");
     expect(main.getByRole("link", { name: "Log in" })).toHaveAttribute("href", LOGIN);
     expect(main.getByRole("link", { name: "Log in to the clubs dashboard" })).toHaveAttribute("href", LOGIN);
@@ -112,7 +113,7 @@ describe("/for-clubs", () => {
     // Questions open in place, and point at the policy.
     const faq = screen.getByRole("region", { name: "Questions, answered" });
     const qs = [...faq.querySelectorAll("summary")].map((s) => s.textContent);
-    expect(qs).toEqual(expect.arrayContaining(["How do payments and payouts work?", "Is the Free plan really free?", "Can we switch plans later?", "How much do we save by paying yearly?", "Can we cancel?"]));
+    expect(qs).toEqual(expect.arrayContaining(["How do payments and payouts work?", "How does the free trial work?", "What happens when the trial ends?", "Can we switch plans later?", "How much do we save by paying yearly?", "Can we cancel?"]));
     fireEvent.click(within(faq).getByText("How much do we save by paying yearly?"));
     expect(within(faq).getByText(/twelve months for the price of 10/)).toBeInTheDocument();
     expect(within(faq).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
@@ -132,7 +133,7 @@ describe("/for-clubs", () => {
     expect(await within(pricing).findByRole("heading", { name: "Pricing is loading…" })).toBeInTheDocument();
     expect(within(pricing).getByRole("link", { name: "See plans in the dashboard" })).toHaveAttribute("href", SIGNUP);
     expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /^Start free/ })[0]).toHaveAttribute("href", `${SIGNUP}?plan=free&cycle=monthly`);
+    expect(screen.getAllByRole("link", { name: /^Start free/ })[0]).toHaveAttribute("href", `${SIGNUP}?plan=pro&cycle=monthly`);
     expect(screen.queryByText(/Paid plans from/)).toBeNull();
     expect(screen.queryByText("on MyOtherApp right now", { exact: false })).toBeNull();
 
