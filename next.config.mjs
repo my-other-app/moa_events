@@ -40,6 +40,10 @@ export const VERIFY_RESULT_HEADERS = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Self-hosted (the Oracle box: Dockerfile here, moa_backend ops/server):
+  // the image build sets NEXT_OUTPUT=standalone, for a server.js carrying
+  // only the files it needs. A Vercel build leaves it unset and is unchanged.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" } : {}),
   poweredByHeader: false,
   reactStrictMode: true,
   // Every crawler and preview bot gets <title>, canonical and Open Graph in the <head>.
