@@ -36,7 +36,7 @@ import { DEFAULT_API_BASE_URL } from "@/config";
 const clean = (v) => (typeof v === "string" && v.trim() ? v.trim().replace(/\/+$/, "") : null);
 
 export const serverApiBase = () =>
-  clean(process.env.API_BASE_URL) || clean(process.env.NEXT_PUBLIC_API_BASE_URL) || clean(process.env.MOA_API_URL) || DEFAULT_API_BASE_URL;
+  clean(process.env.API_BASE_URL) || clean(process.env.NEXT_PUBLIC_API_BASE_URL) || DEFAULT_API_BASE_URL;
 
 export class ApiError extends Error {
   constructor(status, message) {
