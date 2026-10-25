@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 vi.mock("@/api/live", () => ({
@@ -174,5 +174,173 @@ describe("questions from the room", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Hack Night 04" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "← Event" })).toHaveAttribute("href", "/events/hack-night-04");
     expect(screen.getByRole("status")).toHaveTextContent("Opening the room…");
+  });
+});
+
+describe("word-cloud polls", () => {
+  const words = (over = {}) => ({
+    ...feed,
+    poll: { id: "p2", kind: "words", prompt: "One word for tonight?", options: [], status: "live", sort_order: 1, results: { responses: 13, words: [{ word: "Rust", count: 9 }, { word: "Go", count: 3 }, { word: "Zig", count: 1 }] }, my_response: null, ...over },
+  });
+  const room = () => at("/events/hack-night-04/live", <Live eventId="68" eventSlug="hack-night-04" />, "/events/:slug/live");
+
+  it("draws what the room said, the most said word largest", async () => {
+    liveApi.fetchFeed.mockResolvedValue(words());
+    room();
+    const cloud = await screen.findByLabelText("What the room said");
+    const size = (w) => within(cloud).getByText(w).style.fontSize;
+    // From 14px for the least said to twice that for the most, in proportion between.
+    expect(size("Rust")).toBe("32px");
+    expect(size("Go")).toBe("18.5px");
+    expect(size("Zig")).toBe("14px");
+    expect(screen.getByText("13 answers so far")).toBeInTheDocument();
+    // No choices to tap on a word poll.
+    expect(screen.queryByText(/%$/)).toBeNull();
+  });
+
+  it("draws every word the same size when all were said as often", async () => {
+    liveApi.fetchFeed.mockResolvedValue(words({ results: { responses: 2, words: [{ word: "Rust", count: 1 }, { word: "Go", count: 1 }] } }));
+    room();
+    const cloud = await screen.findByLabelText("What the room said");
+    expect(within(cloud).getByText("Rust").style.fontSize).toBe("22px");
+    expect(within(cloud).getByText("Go").style.fontSize).toBe("22px");
+  });
+
+  it("has no cloud before anyone answers", async () => {
+    liveApi.fetchFeed.mockResolvedValue(words({ results: { responses: 0, words: [] } }));
+    room();
+    expect(await screen.findByText("One word for tonight?")).toBeInTheDocument();
+    expect(screen.queryByLabelText("What the room said")).toBeNull();
+    expect(screen.getByText("0 answers so far")).toBeInTheDocument();
+  });
+
+  it("sends a word of two letters or more, trimmed, then clears the box", async () => {
+    liveApi.fetchFeed.mockResolvedValue(words());
+    liveApi.respond.mockResolvedValue(words({ my_response: "Rust", results: { responses: 14, words: [{ word: "Rust", count: 10 }, { word: "Go", count: 3 }, { word: "Zig", count: 1 }] } }).poll);
+    room();
+    const box = await screen.findByLabelText("Your word");
+    const send = screen.getByRole("button", { name: "Send" });
+    fireEvent.change(box, { target: { value: " R " } });
+    expect(send).toBeDisabled();
+    fireEvent.change(box, { target: { value: "  Rust " } });
+    fireEvent.click(send);
+    await waitFor(() => expect(liveApi.respond).toHaveBeenCalledWith("68", "p2", "Rust"));
+    expect(await screen.findByText("14 answers so far · you answered")).toBeInTheDocument();
+    expect(screen.getByLabelText("Your word")).toHaveValue("");
+    expect(screen.getByLabelText("Your word")).toHaveAttribute("placeholder", "You said “Rust” — change it?");
+  });
+
+  it("keeps the word and says why when it isn't taken", async () => {
+    liveApi.fetchFeed.mockResolvedValue(words());
+    liveApi.respond.mockRejectedValue({ response: { status: 409, data: { message: "The poll has closed." } } });
+    room();
+    fireEvent.change(await screen.findByLabelText("Your word"), { target: { value: "Rust" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("The poll has closed.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Your word")).toHaveValue("Rust");
+  });
+});
+
+describe("rating polls", () => {
+  const rating = (over = {}) => ({
+    ...feed,
+    poll: { id: "p3", kind: "rating", prompt: "How was the keynote?", options: [], status: "live", sort_order: 2, results: { responses: 40, rating: { average: 4.2 } }, my_response: null, ...over },
+  });
+  const room = () => at("/events/hack-night-04/live", <Live eventId="68" eventSlug="hack-night-04" />, "/events/:slug/live");
+  const stars = () => within(screen.getByRole("group", { name: "Rate from 1 to 5" })).getAllByRole("button");
+
+  it("offers five stars and the room's average", async () => {
+    liveApi.fetchFeed.mockResolvedValue(rating());
+    room();
+    expect(await screen.findByText("How was the keynote?")).toBeInTheDocument();
+    expect(stars().map((b) => b.getAttribute("aria-label"))).toEqual(["1 of 5", "2 of 5", "3 of 5", "4 of 5", "5 of 5"]);
+    expect(stars().filter((b) => b.classList.contains("is-on"))).toHaveLength(0);
+    expect(screen.getByText("Room average 4.2 of 5")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your word")).toBeNull();
+  });
+
+  it("sends the stars tapped, and lights that many", async () => {
+    liveApi.fetchFeed.mockResolvedValue(rating());
+    liveApi.respond.mockResolvedValue(rating({ my_response: "4", results: { responses: 41, rating: { average: 4.18 } } }).poll);
+    room();
+    fireEvent.click(await screen.findByRole("button", { name: "4 of 5" }));
+    await waitFor(() => expect(liveApi.respond).toHaveBeenCalledWith("68", "p3", "4"));
+    expect(await screen.findByText("Room average 4.18 of 5")).toBeInTheDocument();
+    expect(stars().map((b) => b.classList.contains("is-on"))).toEqual([true, true, true, true, false]);
+    expect(screen.getByText("41 answers so far · you answered")).toBeInTheDocument();
+  });
+
+  it("shows no average before anyone rates", async () => {
+    liveApi.fetchFeed.mockResolvedValue(rating({ results: { responses: 0, rating: { average: null } } }));
+    room();
+    expect(await screen.findByText("How was the keynote?")).toBeInTheDocument();
+    expect(screen.queryByText(/Room average/)).toBeNull();
+  });
+});
+
+describe("the quiz's end", () => {
+  const ended = (over = {}) => ({
+    status: "ended",
+    title: "Edge AI warm-up quiz",
+    name: "Sneha",
+    score: 1840,
+    current_index: 3,
+    total: 4,
+    question: null,
+    rank: 2,
+    leaderboard: [
+      { rank: 1, name: "Rohan", score: 2210 },
+      { rank: 2, name: "Sneha", score: 1840 },
+      { rank: 3, name: "Kiran", score: 990 },
+    ],
+    ...over,
+  });
+  const play = () => {
+    localStorage.setItem("moa.live.player.68", JSON.stringify({ player_key: "secret-key", name: "Sneha" }));
+    at("/play/68", <Play eventId="68" />, "/play/:id");
+  };
+
+  it("says where you came and shows the board, your row marked", async () => {
+    liveApi.playState.mockResolvedValue(ended());
+    play();
+    expect(await screen.findByRole("heading", { level: 2, name: "That is the quiz" })).toBeInTheDocument();
+    expect(screen.getByText("You came 2nd with 1840 points.")).toBeInTheDocument();
+    const rows = within(screen.getByRole("list", { name: "Leaderboard" })).getAllByRole("listitem");
+    expect(rows.map((r) => r.textContent)).toEqual(["1Rohan2210", "2Sneha1840", "3Kiran990"]);
+    expect(rows[1]).toHaveClass("is-me");
+    expect(rows[0]).not.toHaveClass("is-me");
+    expect(liveApi.playState).toHaveBeenCalledWith("68", "secret-key");
+  });
+
+  it.each([
+    [1, "1st"],
+    [3, "3rd"],
+    [4, "4th"],
+    [11, "11th"],
+    [12, "12th"],
+    [13, "13th"],
+    [21, "21st"],
+    [22, "22nd"],
+    [101, "101st"],
+    [111, "111th"],
+  ])("says place %i as %s", async (rank, words) => {
+    liveApi.playState.mockResolvedValue(ended({ rank, leaderboard: [] }));
+    play();
+    expect(await screen.findByText(`You came ${words} with 1840 points.`)).toBeInTheDocument();
+  });
+
+  it("has no board and no place for a player who never scored a rank", async () => {
+    liveApi.playState.mockResolvedValue(ended({ rank: null, leaderboard: [] }));
+    play();
+    expect(await screen.findByRole("heading", { level: 2, name: "That is the quiz" })).toBeInTheDocument();
+    expect(screen.queryByText(/You came/)).toBeNull();
+    expect(screen.queryByRole("list", { name: "Leaderboard" })).toBeNull();
+  });
+
+  it("waits in the lobby before the host starts", async () => {
+    liveApi.playState.mockResolvedValue(ended({ status: "draft", rank: null, leaderboard: [], current_index: -1 }));
+    play();
+    expect(await screen.findByRole("heading", { level: 2, name: "The host has not started yet" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Leaderboard" })).toBeNull();
   });
 });
