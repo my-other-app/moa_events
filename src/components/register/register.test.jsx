@@ -55,8 +55,8 @@ function Where() {
   return <output data-testid="where">{`${l.pathname}${l.search}`}</output>;
 }
 
-function show(page, { questions = [], items = [] } = {}) {
-  eventsApi.fetchEvent.mockResolvedValue({ id: page.event.id, additional_details: questions, reg_fee: page.event.fee });
+function show(page, { questions = [], items = [], info = {} } = {}) {
+  eventsApi.fetchEvent.mockResolvedValue({ id: page.event.id, additional_details: questions, reg_fee: page.event.fee, ...info });
   eventsApi.fetchStoreCatalog.mockResolvedValue({ enabled: items.length > 0, items });
   const path = `/events/${page.event.slug}/register`;
   return render(
@@ -821,5 +821,117 @@ describe("the WhatsApp box", () => {
     go();
     await heading(/Your details/);
     expect(await screen.findByText(/WhatsApp can't reach this number/)).toBeInTheDocument();
+  });
+});
+
+describe("the club's updates on WhatsApp", () => {
+  const LABEL = "Get updates from Yasya on WhatsApp";
+  const box = () => screen.queryByRole("checkbox", { name: LABEL });
+  const ticketBox = () => screen.queryByRole("checkbox", { name: /Send my ticket and event reminders on WhatsApp/ });
+  const formClub = (whatsapp_updates) => ({ club: { id: 2, name: "Yasya", slug: "yasya", logo: null, whatsapp_updates } });
+  const offering = parseEventPage(sparseEvent({ club: { ...sparseEvent().club, whatsapp_updates: true } }));
+  const registered = () =>
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA77", pay_amount: 0, full_name: "Asha Rao", email: "asha@example.org" });
+
+  it("stays hidden, and nothing is sent, for a club the API doesn't say offers it", async () => {
+    registered();
+    show(free);
+    await heading(/Your details/);
+    fillDetails();
+    expect(ticketBox()).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /Get updates from/ })).toBeNull();
+    go();
+    await heading(/Review and/);
+    expect(screen.queryByText("Club updates")).toBeNull();
+    go();
+    await heading(/You.re in/);
+    expect(eventsApi.registerForEvent.mock.calls[0][1]).not.toHaveProperty("club_updates_whatsapp");
+  });
+
+  it("names the club, shows beside the WhatsApp box once a number is typed, unticked, and goes only when ticked", async () => {
+    registered();
+    show(free, { info: formClub(true) });
+    await heading(/Your details/);
+    expect(box()).toBeNull();
+    fillDetails();
+    expect(box()).not.toBeChecked();
+    // Right after the ticket's own box.
+    expect(ticketBox().compareDocumentPosition(box()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(box());
+    expect(box()).toBeChecked();
+    go();
+    await heading(/Review and/);
+    expect(screen.getByText("Club updates")).toBeInTheDocument();
+    expect(screen.getByText("From Yasya on WhatsApp")).toBeInTheDocument();
+    // The ticket's box stayed unticked: one is not the other.
+    expect(screen.queryByText("WhatsApp")).toBeNull();
+    go();
+    await heading(/You.re in/);
+    expect(eventsApi.registerForEvent).toHaveBeenCalledWith("124", {
+      full_name: "Asha Rao",
+      email: "asha@example.org",
+      phone: "98765 43210",
+      additional_details: {},
+      club_updates_whatsapp: true,
+    });
+  });
+
+  it("goes with the number: cleared, the box goes and nothing is sent", async () => {
+    show(free, { info: formClub(true) });
+    await heading(/Your details/);
+    fillDetails();
+    fireEvent.click(box());
+    fireEvent.change(field(/^Phone number/), { target: { value: "" } });
+    expect(box()).toBeNull();
+  });
+
+  it("follows the event page's club until the form's own answer says otherwise", async () => {
+    show(offering);
+    await heading(/Your details/);
+    fillDetails();
+    expect(box()).toBeInTheDocument();
+    cleanup();
+    sessionStorage.clear();
+    show(offering, { info: formClub(false) });
+    await heading(/Your details/);
+    fillDetails();
+    expect(ticketBox()).toBeInTheDocument();
+    expect(box()).toBeNull();
+  });
+
+  it("ticked, wants a number WhatsApp can reach before going on, as the ticket's box does", async () => {
+    show(free, { info: formClub(true) });
+    await heading(/Your details/);
+    fillDetails({ phone: "080 2233 445" });
+    fireEvent.click(box());
+    go();
+    expect(await screen.findByText(/WhatsApp needs a mobile number/)).toBeInTheDocument();
+    fireEvent.click(box());
+    go();
+    expect(await heading(/Review and/)).toBeInTheDocument();
+    expect(eventsApi.registerForEvent).not.toHaveBeenCalled();
+  });
+
+  it("puts the server's WHATSAPP_NUMBER refusal beside the phone number", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(
+      Object.assign(new Error("Registration failed"), {
+        status: 422,
+        data: {
+          message: "To get the club's updates on WhatsApp, enter a mobile number WhatsApp can reach, or untick the box.",
+          error_code: "WHATSAPP_NUMBER",
+          errors: { phone: "WhatsApp can't reach this number: not a mobile number." },
+        },
+      }),
+    );
+    show(free, { info: formClub(true) });
+    await heading(/Your details/);
+    fillDetails();
+    fireEvent.click(box());
+    go();
+    await heading(/Review and/);
+    go();
+    await heading(/Your details/);
+    expect(await screen.findByText(/WhatsApp can't reach this number/)).toBeInTheDocument();
+    expect(box()).toBeChecked();
   });
 });

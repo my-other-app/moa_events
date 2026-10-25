@@ -218,6 +218,17 @@ describe("reading the responses", () => {
   });
 });
 
+describe("a club's updates on WhatsApp", () => {
+  it("keeps whatsapp_updates on a club's page and an event's club only when the API says true", () => {
+    expect(parseClubPage({ club: { slug: "c", name: "C", whatsapp_updates: true } }).club.whatsapp_updates).toBe(true);
+    expect(parseClubPage({ club: { slug: "c", name: "C", whatsapp_updates: false } }).club).not.toHaveProperty("whatsapp_updates");
+    expect(parseClubPage({ club: { slug: "c", name: "C" } }).club).not.toHaveProperty("whatsapp_updates");
+    const club = sparseEvent().club;
+    expect(parseEventPage(sparseEvent({ club: { ...club, whatsapp_updates: true } })).club.whatsapp_updates).toBe(true);
+    expect(parseEventPage(sparseEvent()).club).not.toHaveProperty("whatsapp_updates");
+  });
+});
+
 describe("reading an event's page", () => {
   it("reads every part of a full event, and leaves this event out of its own 'more' row", () => {
     const p = parseEventPage(fullEvent());

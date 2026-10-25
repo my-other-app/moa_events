@@ -133,10 +133,31 @@ export const accountApi = {
     apiClient.get("/api/v1/user/following", { params: { offset, limit } }).then((r) => page(r.data, list(r.data?.items, parseFollowedClub), offset)),
 
   /** Whether the signed-in person follows the club. */
-  isFollowing: (clubId) => apiClient.get(`/api/v1/clubs/info/${encodeURIComponent(clubId)}`).then((r) => Boolean(r.data?.user_data?.is_following)),
+  isFollowing: (clubId) => accountApi.followState(clubId).then((s) => s.following),
 
-  /** Resolves true when the follow is new, false when it was already there. `ref` credits a tracking link. */
-  follow: (clubId, ref = null) => settled(apiClient.post(`/api/v1/clubs/follow/${encodeURIComponent(clubId)}`, null, ref ? { params: { ref } } : undefined)),
+  /**
+   * The signed-in person and the club: whether they follow it, and whether
+   * they said yes to "Get updates from <club> on WhatsApp" (false from an API
+   * that doesn't say).
+   */
+  followState: (clubId) =>
+    apiClient.get(`/api/v1/clubs/info/${encodeURIComponent(clubId)}`).then((r) => ({
+      following: Boolean(r.data?.user_data?.is_following),
+      updates: r.data?.user_data?.club_updates_whatsapp === true,
+    })),
+
+  /**
+   * Resolves true when the follow is new, false when it was already there. `ref` credits a tracking link.
+   * `updates: true` is "Get updates from <club> on WhatsApp" ticked as they follow; unticked, the follow is sent as it always was.
+   */
+  follow: (clubId, ref = null, { updates = false } = {}) =>
+    settled(
+      apiClient.post(`/api/v1/clubs/follow/${encodeURIComponent(clubId)}`, updates ? { club_updates_whatsapp: true } : null, ref ? { params: { ref } } : undefined)
+    ),
+
+  /** A follower turning the club's updates on WhatsApp on or off; the follow stays as it is. */
+  setClubUpdates: (clubId, on) =>
+    apiClient.post(`/api/v1/clubs/follow/${encodeURIComponent(clubId)}`, { club_updates_whatsapp: Boolean(on) }).then(() => Boolean(on)),
 
   unfollow: (clubId) => settled(apiClient.post(`/api/v1/clubs/unfollow/${encodeURIComponent(clubId)}`)),
 

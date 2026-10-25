@@ -4,7 +4,8 @@
  * The club page's client islands. The page itself is server-rendered
  * (clubpage.jsx); these are the parts that depend on who is reading:
  * following (the button, the count, the empty list's offer, the app
- * prompt), the ?follow= hint, counting the visit, and "Show more".
+ * prompt, and "Get updates from <club> on WhatsApp" for a club that offers
+ * it), the ?follow= hint, counting the visit, and "Show more".
  *
  * <ClubFollow> holds the follow state for the whole page; the islands
  * inside it read it. Each takes only plain data from the server.
@@ -14,6 +15,7 @@ import { accountApi } from "@/api/account";
 import { discoverApi } from "@/api/discover";
 import { useAuth } from "@/auth/context";
 import { useSearchParams } from "@/lib/router";
+import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { formatCount } from "@/utils/format";
 import { currentRef } from "@/utils/ref";
 import { countVisit } from "@/utils/visit";
@@ -25,24 +27,30 @@ import Icon from "./icons";
 
 /* ---------- following ---------- */
 
+const FRESH = { known: false, on: false, busy: false, error: null, delta: 0, flips: 0, updates: false, updatesBusy: false };
+
 /**
  * Following a club as the signed-in person. The button flips the moment it
  * is pressed (and the count with it), and flips back if the server says no.
  * "Already following" and "not following" from the server are the state the
  * person asked for, not errors.
+ *
+ * `updates` is their yes to "Get updates from <club> on WhatsApp": it can go
+ * with the follow (`set(true, { updates: true })`), a follower turns it on or
+ * off with `setUpdates`, and unfollowing takes it back (the server does too).
  */
 function useClubFollow(clubId, signedIn) {
   // `flips`: the reader's own presses, so only those animate (styles/motion.css).
-  const [s, setS] = useState({ known: false, on: false, busy: false, error: null, delta: 0, flips: 0 });
+  const [s, setS] = useState(FRESH);
   const acted = useRef(false);
 
   useEffect(() => {
     acted.current = false;
-    setS({ known: false, on: false, busy: false, error: null, delta: 0, flips: 0 });
+    setS(FRESH);
     if (!signedIn || clubId === null || clubId === undefined) return undefined;
     let alive = true;
-    accountApi.isFollowing(clubId).then(
-      (on) => alive && !acted.current && setS((x) => ({ ...x, known: true, on })),
+    accountApi.followState(clubId).then(
+      (st) => alive && !acted.current && setS((x) => ({ ...x, known: true, on: st.following, updates: st.following && st.updates })),
       () => alive && !acted.current && setS((x) => ({ ...x, known: true }))
     );
     return () => {
@@ -51,12 +59,23 @@ function useClubFollow(clubId, signedIn) {
   }, [clubId, signedIn]);
 
   const set = useCallback(
-    (want) => {
+    (want, { updates = false } = {}) => {
       if (clubId === null || clubId === undefined) return;
       acted.current = true;
       const step = want ? 1 : -1;
-      setS((x) => ({ ...x, known: true, on: want, busy: true, error: null, delta: x.delta + step, flips: x.flips + 1 }));
-      (want ? accountApi.follow(clubId, currentRef()) : accountApi.unfollow(clubId)).then(
+      const yes = want && updates;
+      setS((x) => ({
+        ...x,
+        known: true,
+        on: want,
+        busy: true,
+        error: null,
+        delta: x.delta + step,
+        flips: x.flips + 1,
+        updates: yes,
+        was: x.updates,
+      }));
+      (want ? accountApi.follow(clubId, currentRef(), { updates: yes }) : accountApi.unfollow(clubId)).then(
         (changed) => setS((x) => ({ ...x, busy: false, delta: changed ? x.delta : x.delta - step })),
         () =>
           setS((x) => ({
@@ -64,6 +83,7 @@ function useClubFollow(clubId, signedIn) {
             on: !want,
             busy: false,
             delta: x.delta - step,
+            updates: Boolean(x.was),
             error: want ? "Couldn't follow just now. Try again." : "Couldn't unfollow just now. Try again.",
           }))
       );
@@ -71,7 +91,26 @@ function useClubFollow(clubId, signedIn) {
     [clubId]
   );
 
-  return { ...s, set };
+  const setUpdates = useCallback(
+    (want) => {
+      if (clubId === null || clubId === undefined) return;
+      acted.current = true;
+      setS((x) => ({ ...x, updates: want, updatesBusy: true, error: null }));
+      accountApi.setClubUpdates(clubId, want).then(
+        () => setS((x) => ({ ...x, updatesBusy: false })),
+        () =>
+          setS((x) => ({
+            ...x,
+            updates: !want,
+            updatesBusy: false,
+            error: want ? "Couldn't turn on WhatsApp updates just now. Try again." : "Couldn't turn off WhatsApp updates just now. Try again.",
+          }))
+      );
+    },
+    [clubId]
+  );
+
+  return { ...s, set, setUpdates };
 }
 
 const FollowContext = createContext(null);
@@ -87,13 +126,24 @@ export function ClubFollow({ club, children }) {
   const signedIn = auth.status === "signed-in";
   const follow = useClubFollow(club.id ?? null, signedIn);
   const [prompt, setPrompt] = useState(false);
+  // "Get updates from <club> on WhatsApp" ticked before following: it goes with the Follow press.
+  const [wantsUpdates, setWantsUpdates] = useState(false);
   const signInToFollow = useCallback(() => {
     setPrompt(false);
     auth.openSignIn({ reason: "follow", onDone: () => follow.set(true) });
     // follow.set is stable for the club; auth.openSignIn for the session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.openSignIn, follow.set]);
-  const value = { club, follow, signedIn, enabled: auth.enabled, openPrompt: () => setPrompt(true), signInToFollow };
+  const value = {
+    club,
+    follow,
+    signedIn,
+    enabled: auth.enabled,
+    openPrompt: () => setPrompt(true),
+    signInToFollow,
+    wantsUpdates: offersClubUpdates(club) && wantsUpdates,
+    setWantsUpdates,
+  };
   return (
     <FollowContext.Provider value={value}>
       {children}
@@ -115,7 +165,7 @@ export function ClubFollow({ club, children }) {
 }
 
 function FollowButton({ ghost = false }) {
-  const { follow } = useFollow();
+  const { follow, wantsUpdates, setWantsUpdates } = useFollow();
   return (
     <button
       type="button"
@@ -124,7 +174,10 @@ function FollowButton({ ghost = false }) {
       aria-busy={follow.busy || undefined}
       data-pop={follow.on && follow.flips ? "" : undefined}
       onClick={() => {
-        if (!follow.busy) follow.set(!follow.on);
+        if (follow.busy) return;
+        follow.set(!follow.on, { updates: !follow.on && wantsUpdates });
+        // The tick went with this follow; following again later starts unticked.
+        setWantsUpdates(false);
       }}
     >
       <Icon name={follow.on ? "check" : "plus"} size={18} />
@@ -147,6 +200,49 @@ export function FollowerCount({ followers }) {
   );
 }
 
+/**
+ * "Get updates from <club> on WhatsApp", for a club that offers it, to the
+ * signed-in reader: unticked, beside Follow, it goes with the follow; once
+ * they follow, it is their yes as it stands, turned on or off at once. The
+ * number is the one on their profile. Nothing at all for a club without the
+ * flag, signed out, or before it is known whether they follow.
+ */
+function ClubUpdatesBox() {
+  const { club, follow, signedIn, wantsUpdates, setWantsUpdates } = useFollow();
+  if (!signedIn || !offersClubUpdates(club) || !follow.known) return null;
+  const following = follow.on;
+  const checked = following ? follow.updates : wantsUpdates;
+  return (
+    <div className="rg-field ac-updates">
+      <label className={`rg-choice rg-check${checked ? " is-on" : ""}`} htmlFor="ac-club-updates">
+        <input
+          type="checkbox"
+          id="ac-club-updates"
+          name="club_updates"
+          checked={checked}
+          disabled={following && (follow.busy || follow.updatesBusy)}
+          aria-labelledby="ac-club-updates-label"
+          aria-describedby="ac-club-updates-hint"
+          onChange={(e) => (following ? follow.setUpdates(e.target.checked) : setWantsUpdates(e.target.checked))}
+        />
+        <span className="rg-check-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
+            <polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <span className="rg-choice-text">
+          <span className="rg-check-label" id="ac-club-updates-label">
+            {clubUpdatesText(club.name)}
+          </span>
+          <span className="rg-check-option" id="ac-club-updates-hint">
+            {following ? "On the mobile number in your profile. Untick to stop them." : "Comes with the follow, on the mobile number in your profile."}
+          </span>
+        </span>
+      </label>
+    </div>
+  );
+}
+
 /** The header's buttons: Follow (or Follow in the app), then whatever the page puts after it (the website). */
 export function ClubActions({ children }) {
   const { follow, signedIn, openPrompt } = useFollow();
@@ -160,6 +256,7 @@ export function ClubActions({ children }) {
         </button>
       )}
       {children}
+      <ClubUpdatesBox />
       {follow.error ? (
         <p className="ac-follow-err" role="status">
           {follow.error}

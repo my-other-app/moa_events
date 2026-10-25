@@ -130,7 +130,7 @@ export function ClubView({ data }) {
   ].filter(Boolean);
 
   return (
-    <ClubFollow club={{ id: club.id, name: club.name, slug }}>
+    <ClubFollow club={{ id: club.id, name: club.name, slug, whatsapp_updates: club.whatsapp_updates === true }}>
       <Suspense fallback={null}>
         <VisitCounter slug={slug} />
       </Suspense>

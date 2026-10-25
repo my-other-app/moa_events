@@ -32,10 +32,13 @@ const page = {
 };
 
 let following;
+// The person's yes to the club's updates on WhatsApp, as GET /clubs/info says it; undefined from an API without it.
+let updates;
 function answer() {
   get.mockImplementation(async (url) => {
     if (url === "/api/v1/discover/clubs/circuit-society") return { data: page };
-    if (url === "/api/v1/clubs/info/3") return { data: { id: 3, user_data: { is_following: following, is_pinned: false, is_hidden: false } } };
+    if (url === "/api/v1/clubs/info/3")
+      return { data: { id: 3, user_data: { is_following: following, is_pinned: false, is_hidden: false, club_updates_whatsapp: updates } } };
     if (url === "/api/v1/user/profile/me") return { data: PROFILE };
     throw new Error(`unexpected GET ${url}`);
   });
@@ -71,6 +74,7 @@ beforeEach(() => {
   resetAuth();
   window.scrollTo = vi.fn();
   following = false;
+  updates = undefined;
   answer();
 });
 afterAll(() => {
@@ -224,5 +228,103 @@ describe("following a club, signed out", () => {
     const prompt = screen.getByRole("dialog", { name: "Follow Circuit Society" });
     expect(within(prompt).queryByRole("button", { name: /Sign in/ })).toBeNull();
     expect(get).not.toHaveBeenCalledWith("/api/v1/clubs/info/3");
+  });
+});
+
+describe("Get updates from the club on WhatsApp", () => {
+  const LABEL = "Get updates from Circuit Society on WhatsApp";
+  const offering = { ...page, club: { ...page.club, whatsapp_updates: true } };
+  const box = () => screen.queryByRole("checkbox", { name: LABEL });
+
+  describe("signed in", () => {
+    beforeEach(() => {
+      enableSignIn();
+      signInAs();
+    });
+
+    it("sits unticked beside Follow, and goes with the follow when ticked", async () => {
+      post.mockResolvedValue({ data: { is_following: true } });
+      show(offering);
+      const follow = await screen.findByRole("button", { name: "Follow" });
+      const tick = await screen.findByRole("checkbox", { name: LABEL });
+      expect(tick).not.toBeChecked();
+      expect(screen.getByText(/Comes with the follow/)).toBeInTheDocument();
+      fireEvent.click(tick);
+      expect(tick).toBeChecked();
+      fireEvent.click(follow);
+      expect(post).toHaveBeenCalledWith("/api/v1/clubs/follow/3", { club_updates_whatsapp: true }, undefined);
+      await waitFor(() => expect(follow).not.toHaveAttribute("aria-busy"));
+      // Now it is the follower's own switch, on.
+      expect(box()).toBeChecked();
+      expect(screen.getByText(/Untick to stop them/)).toBeInTheDocument();
+    });
+
+    it("left unticked, the follow is sent as it always was", async () => {
+      post.mockResolvedValue({ data: { is_following: true } });
+      show(offering);
+      fireEvent.click(await screen.findByRole("button", { name: "Follow" }));
+      expect(post).toHaveBeenCalledWith("/api/v1/clubs/follow/3", null, undefined);
+      await waitFor(() => expect(screen.getByRole("button", { name: /Following/ })).not.toHaveAttribute("aria-busy"));
+      expect(box()).not.toBeChecked();
+    });
+
+    it("lets a follower turn it off, and on again, without touching the follow", async () => {
+      following = true;
+      updates = true;
+      post.mockResolvedValue({ data: { is_following: true } });
+      show(offering);
+      const tick = await screen.findByRole("checkbox", { name: LABEL });
+      await waitFor(() => expect(tick).toBeChecked());
+      fireEvent.click(tick);
+      expect(tick).not.toBeChecked();
+      expect(post).toHaveBeenCalledWith("/api/v1/clubs/follow/3", { club_updates_whatsapp: false });
+      await waitFor(() => expect(tick).not.toBeDisabled());
+      fireEvent.click(tick);
+      expect(post).toHaveBeenLastCalledWith("/api/v1/clubs/follow/3", { club_updates_whatsapp: true });
+      await waitFor(() => expect(tick).not.toBeDisabled());
+      expect(tick).toBeChecked();
+      expect(screen.getByRole("button", { name: /Following/ })).toHaveAttribute("aria-pressed", "true");
+      expect(post).not.toHaveBeenCalledWith("/api/v1/clubs/unfollow/3");
+    });
+
+    it("puts the switch back, and says so, when the server says no", async () => {
+      following = true;
+      updates = false;
+      post.mockRejectedValue(new Error("down"));
+      show(offering);
+      const tick = await screen.findByRole("checkbox", { name: LABEL });
+      await waitFor(() => expect(screen.getByRole("button", { name: /Following/ })).toHaveAttribute("aria-pressed", "true"));
+      fireEvent.click(tick);
+      expect(await screen.findByText(/Couldn't turn on WhatsApp updates/)).toBeInTheDocument();
+      expect(tick).not.toBeChecked();
+    });
+
+    it("unfollowing takes the yes with it", async () => {
+      following = true;
+      updates = true;
+      post.mockResolvedValue({ data: { is_following: false } });
+      show(offering);
+      const tick = await screen.findByRole("checkbox", { name: LABEL });
+      await waitFor(() => expect(tick).toBeChecked());
+      fireEvent.click(screen.getByRole("button", { name: /Following/ }));
+      await waitFor(() => expect(post).toHaveBeenCalledWith("/api/v1/clubs/unfollow/3"));
+      expect(box()).not.toBeChecked();
+      expect(screen.getByText(/Comes with the follow/)).toBeInTheDocument();
+    });
+
+    it("is not there for a club without the flag, whatever the person said before", async () => {
+      following = true;
+      updates = true;
+      show();
+      await waitFor(() => expect(screen.getByRole("button", { name: /Following/ })).toHaveAttribute("aria-pressed", "true"));
+      expect(screen.queryByRole("checkbox", { name: /Get updates from/ })).toBeNull();
+    });
+  });
+
+  it("is not there signed out: following happens in the app, or after signing in", async () => {
+    enableSignIn();
+    show(offering);
+    await screen.findByRole("button", { name: "Follow in the app" });
+    expect(screen.queryByRole("checkbox", { name: /Get updates from/ })).toBeNull();
   });
 });

@@ -289,6 +289,12 @@ function optional(o, fields) {
 
 /** Marked as made-up showcase content by the API (`is_demo`), once it says so (see src/seo/demo.js). */
 const DEMO = { is_demo: flag };
+/**
+ * A club's own page, or the club on an event's: `whatsapp_updates` when the
+ * club offers "Get updates from <club> on WhatsApp" (src/utils/clubupdates.js).
+ * Kept only when true, so a club from an API without it reads as before.
+ */
+const CLUB_EXTRAS = { ...DEMO, whatsapp_updates: flag };
 /** How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js). */
 const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag };
 
@@ -470,7 +476,7 @@ export function parseClub(c) {
     contact_email: str(o.contact_email),
     socials: socials(o.socials),
     events_held: n(o.events_held, null),
-    ...optional(o, DEMO),
+    ...optional(o, CLUB_EXTRAS),
   };
 }
 

@@ -398,6 +398,18 @@
   font-size: 14px;
   color: #b91c1c;
 }
+/* "Get updates from <club> on WhatsApp": its own row under the buttons. */
+.ac-updates {
+  flex-basis: 100%;
+  max-width: 440px;
+  margin-top: 4px;
+}
+.ac-updates .rg-choice {
+  min-height: 0;
+}
+.ac-updates input:disabled {
+  cursor: progress;
+}
 .dc-modal-alt {
   margin-top: 16px;
 }

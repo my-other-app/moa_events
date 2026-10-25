@@ -32,6 +32,7 @@ import {
   validateDetails,
   wantsWhatsapp,
 } from "@/utils/register";
+import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
 import { SitePage } from "../discover/chrome";
@@ -468,6 +469,8 @@ function Flow({ event, club, info, onDone }) {
   const [picks, setPicks] = useState(() => draft?.picks || {});
   // "Send my ticket and event reminders on WhatsApp": unticked until the guest ticks it.
   const [whatsapp, setWhatsapp] = useState(() => draft?.whatsapp === true);
+  // "Get updates from <club> on WhatsApp": the same, for a club that offers its own updates.
+  const [clubUpdates, setClubUpdates] = useState(() => draft?.clubUpdates === true);
   const [touched, setTouched] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [phase, setPhase] = useState("idle");
@@ -509,8 +512,8 @@ function Flow({ event, club, info, onDone }) {
 
   // What was typed, kept for the tab.
   useEffect(() => {
-    saveDraft(eventId, { values, answers, picks, whatsapp });
-  }, [eventId, values, answers, picks, whatsapp]);
+    saveDraft(eventId, { values, answers, picks, whatsapp, clubUpdates });
+  }, [eventId, values, answers, picks, whatsapp, clubUpdates]);
 
   const ready = info.status === "ready" && items !== null;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
@@ -525,7 +528,17 @@ function Flow({ event, club, info, onDone }) {
   const lines = useMemo(() => orderLines({ fee, items: shelf, picks }), [fee, shelf, picks]);
 
   const byWhatsapp = wantsWhatsapp(values, whatsapp);
-  const detailErrors = useMemo(() => validateDetails(values, { whatsapp: byWhatsapp }), [values, byWhatsapp]);
+  // The club's own updates on WhatsApp, offered only where the API says the club can send them
+  // (`whatsapp_updates`): the form's GET /events/info says it freshest; until it does, the event
+  // page's club. Without the flag at all, the box never shows and nothing is sent.
+  const formClub = info.data?.club;
+  const offersUpdates = typeof formClub?.whatsapp_updates === "boolean" ? formClub.whatsapp_updates : offersClubUpdates(club);
+  const clubName = formClub?.name || club?.name || "";
+  const byClubUpdates = offersUpdates && wantsWhatsapp(values, clubUpdates);
+  const detailErrors = useMemo(
+    () => validateDetails(values, { whatsapp: byWhatsapp || byClubUpdates }),
+    [values, byWhatsapp, byClubUpdates]
+  );
   const answerErrors = useMemo(() => {
     const raw = validateAnswers(questions, answers);
     return Object.fromEntries(Object.entries(raw).map(([k, v]) => [`q:${k}`, v]));
@@ -719,7 +732,7 @@ function Flow({ event, club, info, onDone }) {
       busy.current = false;
       setPhase("idle");
     };
-    const payload = buildPayload({ values, questions, answers, ref: currentRef(), items: shelf, picks, whatsapp });
+    const payload = buildPayload({ values, questions, answers, ref: currentRef(), items: shelf, picks, whatsapp, clubUpdates: byClubUpdates });
     let stage = "register";
     let responseData = null;
     try {
@@ -933,6 +946,18 @@ function Flow({ event, club, info, onDone }) {
                   }}
                 />
               ) : null}
+              {values.phone.trim() && offersUpdates ? (
+                <CheckField
+                  name="club_updates"
+                  label={clubUpdatesText(clubName)}
+                  value={clubUpdates ? "Yes" : ""}
+                  option="Yes"
+                  onChange={(v) => {
+                    setClubUpdates(v === "Yes");
+                    changed("phone");
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
 
@@ -973,6 +998,12 @@ function Flow({ event, club, info, onDone }) {
                     <div>
                       <dt>WhatsApp</dt>
                       <dd>Your ticket and reminders, there too</dd>
+                    </div>
+                  ) : null}
+                  {byClubUpdates ? (
+                    <div>
+                      <dt>Club updates</dt>
+                      <dd>From {clubName || "the club"} on WhatsApp</dd>
                     </div>
                   ) : null}
                 </dl>
