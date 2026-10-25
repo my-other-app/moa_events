@@ -75,8 +75,10 @@ describe(AASA, () => {
     ["/clubs", true],
     ["/threads", true],
     ["/topics", true],
-    // The live room stays on the web.
-    ["/events/hack-night-04/live", false],
+    // The live room and the quiz: native screens in the app.
+    ["/events/hack-night-04/live", true],
+    ["/events/123/live", true],
+    ["/play/123", true],
     // So do the city pages, which the app has no screen for.
     ["/events/in", false],
     ["/events/in/kochi", false],
@@ -86,7 +88,6 @@ describe(AASA, () => {
     ["/events/rss.xml", false],
     ["/clubs/circuit-society/rss.xml", false],
     ["/topics/development/rss.xml", false],
-    ["/play/123", false],
     ["/api/share/events/x", false],
     ["/og/events/hack-night-04", false],
     ["/media/events/hack-night-04/poster", false],
