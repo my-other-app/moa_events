@@ -10,6 +10,8 @@ import { MemoryRouter } from "react-router-dom";
  */
 vi.mock("@/api/events", () => ({ eventsApi: { fetchTicketDetails: vi.fn() } }));
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn() } }));
+// The event's public page, which says whether it was cancelled: not found unless a test says otherwise.
+vi.mock("@/api/discover", () => ({ discoverApi: { event: vi.fn(() => Promise.reject(Object.assign(new Error("No such event"), { notFound: true }))) } }));
 vi.mock("qrcode.react", async (importOriginal) => {
   const real = await importOriginal();
   const { createElement } = await import("react");
@@ -188,5 +190,59 @@ describe("what kind of ticket", () => {
     expect(ticketKind(ticket({ paid_amount: null }, { has_fee: true }))).toBe("Paid");
     expect(ticketKind(ticket({ is_paid: false, actual_amount: 250 }, { has_fee: true }))).toBe("Payment pending");
     expect(ticketKind(null)).toBe("Free");
+  });
+});
+
+const { discoverApi } = await import("@/api/discover");
+
+describe("ticket types and a cancelled event", () => {
+  const CANCELLED = { event: { id: 68, slug: "hack-night-04", status: "cancelled", cancellation: { reason: "The venue flooded.", cancelled_at: "2026-10-12T10:00:00+05:30" } } };
+
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("names the ticket's type when the ticket says it", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({ is_paid: true, actual_amount: 499, paid_amount: 499, ticket_label: "VIP" }, { has_fee: true }));
+    open();
+    await screen.findByRole("heading", { level: 1, name: "Hack Night 04" });
+    expect(field("Ticket Type")).toBe("VIP · Paid · ₹499");
+  });
+
+  it("names it from the registration just made when the ticket doesn't (yet) say it", async () => {
+    sessionStorage.setItem("moa.register.done.68", JSON.stringify({ eventId: "68", ticket_id: "MOA77", name: "Asha Rao", ticket_type: "Early bird" }));
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    open();
+    await screen.findByRole("heading", { level: 1, name: "Hack Night 04" });
+    expect(field("Ticket Type")).toBe("Early bird · Free");
+  });
+
+  it("asks the event's own page whether it is still on, and says nothing new when it is", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    open();
+    await screen.findByRole("heading", { level: 1, name: "Hack Night 04" });
+    await waitFor(() => expect(discoverApi.event).toHaveBeenCalledWith("hack-night-04"));
+    expect(screen.queryByText("This event was cancelled")).toBeNull();
+    expect(QRCodeCanvas).toHaveBeenCalled();
+  });
+
+  it("a cancelled event's paid ticket: the reason, the refund, and no QR to scan", async () => {
+    discoverApi.event.mockResolvedValueOnce(CANCELLED);
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({ is_paid: true, actual_amount: 250, paid_amount: 250 }, { has_fee: true }));
+    open();
+    expect(await screen.findByText("This event was cancelled")).toBeInTheDocument();
+    expect(screen.getByText("The venue flooded.", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("Your payment is being refunded.")).toBeInTheDocument();
+    expect(screen.getByText(/Cancelled on 12 Oct 2026. This ticket is no longer valid./)).toBeInTheDocument();
+    expect(field("Ticket Type")).toBe("Cancelled");
+    expect(screen.queryByLabelText("QR code for ticket MOA77")).toBeNull();
+  });
+
+  it("a cancelled event's free ticket says nothing of refunds", async () => {
+    discoverApi.event.mockResolvedValueOnce(CANCELLED);
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    open();
+    expect(await screen.findByText("This event was cancelled")).toBeInTheDocument();
+    expect(screen.queryByText("Your payment is being refunded.")).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { Link } from "@/lib/router";
-import { dateTile, eventUrl, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
+import { dateTile, eventUrl, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
+import { EventTickets } from "../register/eventtickets";
 import { formatCount, formatPrice, plural } from "@/utils/format";
 import { topicPagePath } from "@/seo/urls";
 import { Agenda } from "./agenda";
@@ -8,6 +9,7 @@ import { EventCard } from "./eventcard";
 import {
   About,
   CalendarButton,
+  CancelledNotice,
   Contact,
   EpIcon,
   EpSection,
@@ -64,10 +66,14 @@ function ClubRow({ club }) {
 function Facts({ event, venueLink }) {
   const lines = scheduleLines(event);
   const tile = dateTile(event.starts_at);
-  const left = seatsLeft(event);
-  const people = [event.going > 0 ? `${formatCount(event.going)} going` : null, left !== null && left > 0 ? `${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : null]
-    .filter(Boolean)
-    .join(" · ");
+  // A cancelled event has no seats to speak of.
+  const left = event.status === "cancelled" ? null : seatsLeft(event);
+  const people =
+    event.status === "cancelled"
+      ? ""
+      : [event.going > 0 ? `${formatCount(event.going)} going` : null, left !== null && left > 0 ? `${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : null]
+          .filter(Boolean)
+          .join(" · ");
   return (
     <ul className="ep-facts">
       {lines ? (
@@ -144,11 +150,12 @@ export function EventView({ page }) {
     .filter(Boolean)
     .map(([id, label]) => ({ id, label }));
 
+  const cancelled = event.status === "cancelled";
+  const regState = registerState(event);
+
   return (
     <article className="ep" aria-labelledby="ep-title">
-      <div className="dc-wrap">
-        <LiveStrips event={{ id: event.id, slug: event.slug, status: event.status }} />
-      </div>
+      <div className="dc-wrap">{cancelled ? null : <LiveStrips event={{ id: event.id, slug: event.slug, status: event.status }} />}</div>
       <div className="dc-wrap ep-layout">
         <header className="ep-intro">
           {event.category || prize || topics.length ? (
@@ -170,11 +177,12 @@ export function EventView({ page }) {
           <h1 id="ep-title" className="ep-title">
             {event.name}
           </h1>
+          <CancelledNotice event={event} />
           {club ? <ClubRow club={club} /> : null}
           <Facts event={event} venueLink={hasVenue && !event.is_online} />
           <div className="ep-actions">
             <ShareButton title={event.name} text={club ? `${event.name} — ${club.name}` : event.name} url={url} />
-            <CalendarButton event={calendarEvent(event)} url={url} />
+            {cancelled ? null : <CalendarButton event={calendarEvent(event)} url={url} />}
           </div>
         </header>
 
@@ -185,6 +193,13 @@ export function EventView({ page }) {
 
         <div className="ep-body">
           <SectionNav items={sections} />
+
+          {/* Its ticket types and waiting list, read in the browser (nothing for a single ticket with no line). */}
+          <EventTickets
+            eventId={String(event.id)}
+            kind={regState.kind}
+            registerHref={regState.kind === "open" ? regState.href || null : regState.kind === "live" ? regState.also?.href || null : null}
+          />
 
           {hasAbout ? (
             <EpSection id="about" title="About this event">

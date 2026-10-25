@@ -40,6 +40,7 @@ export default function Success({ event, club, ticket }) {
         <p className="rg-done-lede">
           {first ? `${first}, your` : "Your"} spot at <strong>{event.name}</strong> is confirmed
           {ticket.paid && ticket.amount > 0 ? <> and your payment of {rupees(ticket.amount)} went through</> : null}.
+          {ticket.covered && ticket.code ? <> Your code {ticket.code} covered the ticket, so there was nothing to pay.</> : null}
         </p>
 
         <div className="rg-done-actions">
@@ -114,6 +115,12 @@ export default function Success({ event, club, ticket }) {
             <dt>Name</dt>
             <dd>{ticket.name}</dd>
           </div>
+          {ticket.ticket_type ? (
+            <div>
+              <dt>Ticket</dt>
+              <dd>{ticket.ticket_type}</dd>
+            </div>
+          ) : null}
         </dl>
         <div className="rg-ticket-bottom">
           <div className="rg-ticket-qr">

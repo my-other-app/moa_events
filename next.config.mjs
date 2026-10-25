@@ -38,6 +38,22 @@ export const VERIFY_RESULT_HEADERS = [
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
+/**
+ * A waiting list's claim link (/claim/{token}): the token is the offer's
+ * only credential. Never kept by a browser or a cache, framed or indexed,
+ * and never passed on in a Referer: other sites (Razorpay's checkout among
+ * them) are told only the site's origin, never the address.
+ */
+export const CLAIM_HEADERS = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Referrer-Policy", value: "strict-origin" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Cache-Control", value: "no-store, max-age=0" },
+  { key: "Vercel-CDN-Cache-Control", value: "no-store" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Self-hosted (the Oracle box: Dockerfile here, moa_backend ops/server):
@@ -73,6 +89,8 @@ const nextConfig = {
       { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
       // A guest's certificate: its address holds the ticket's code.
       { source: "/certificates/:ticketid", headers: VERIFY_RESULT_HEADERS },
+      // A waiting list's offer: its address is the claim's credential.
+      { source: "/claim/:token", headers: CLAIM_HEADERS },
     ];
   },
   async redirects() {

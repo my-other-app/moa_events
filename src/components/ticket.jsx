@@ -7,6 +7,26 @@ import { competitionApi } from "@/api/competition";
 import { QRCodeCanvas } from "qrcode.react";
 import Download from "@/components/download";
 import { formatDate, formatPrice, formatTime } from "@/utils/format";
+import { loadDone } from "@/utils/register";
+import { ticketTypeName } from "@/utils/ticketing";
+import { CancelledNote, ownState, useEventStates } from "./cancelled";
+
+/**
+ * The ticket's type (docs/TICKETING.md), when the event sells more than one:
+ * from the ticket when the API says it, else from the registration this tab
+ * just made (the form keeps it until the page is left). Null otherwise: a
+ * single-type event's ticket reads as it always did.
+ */
+function typeOfTicket(ticket, ticketid) {
+  const said = ticketTypeName(ticket);
+  if (said) return said;
+  const id = ticket?.event?.id;
+  const kept = id !== undefined && id !== null ? loadDone(String(id)) : null;
+  return kept && String(kept.ticket_id) === String(ticketid) && typeof kept.ticket_type === "string" ? kept.ticket_type : null;
+}
+
+/** Paid for (so refunded when the event is cancelled): a paid ticket that isn't waiting for its payment. */
+const wasPaid = (ticket) => ticket?.is_paid !== false && (Number(ticket?.paid_amount) > 0 || (Boolean(ticket?.event?.has_fee) && Number(ticket?.actual_amount) > 0));
 
 /**
  * What kind of ticket it is. The API has no ticket tiers: a ticket is free,
@@ -67,6 +87,12 @@ const Ticket = ({ ticketid }) => {
     getTicketDetails();
   }, [ticketid, retryCount]);
 
+  // Whether the event was called off: the ticket doesn't say, its event's public page does.
+  const slug = ticketData?.event?.slug || null;
+  const states = useEventStates(slug && !ownState(ticketData?.event) ? [slug] : []);
+  const state = ownState(ticketData?.event) || (slug ? states[slug] : null) || null;
+  const cancelled = state?.status === "cancelled";
+
 
   if (error) {
     return (
@@ -86,11 +112,14 @@ const Ticket = ({ ticketid }) => {
   const startsAt = ticketData.event?.event_datetime;
   const time = formatTime(startsAt);
   const eventPage = eventPageOf(ticketData.event);
+  const typeName = typeOfTicket(ticketData, ticketid);
+  const kind = ticketKind(ticketData);
 
   return (
     <div className="ticket-container">
+      {cancelled ? <CancelledNote cancellation={state.cancellation} paid={wasPaid(ticketData)} className="ticket-cancelled" /> : null}
       <div
-        className="ticket"
+        className={`ticket${cancelled ? " is-cancelled" : ""}`}
         id="ticket"
         style={{
           background: `url(${ticketData.event?.poster?.original || ""}) no-repeat center center`,
@@ -129,7 +158,7 @@ const Ticket = ({ ticketid }) => {
 
           <div className="ticket-info">
             <span className="ticket-info-label">Ticket Type</span>
-            <span className="ticket-info-value">{ticketKind(ticketData)}</span>
+            <span className="ticket-info-value">{cancelled ? "Cancelled" : typeName ? `${typeName} · ${kind}` : kind}</span>
           </div>
         </div>
 
@@ -143,22 +172,30 @@ const Ticket = ({ ticketid }) => {
 
         <div className="ticket-divider"></div>
 
-        <div className="qr-section">
-          <div className="qr-code">
-            <QRCodeCanvas value={ticketid || "N/A"} size={150} level="H" includeMargin={true} aria-label={`QR code for ticket ${ticketid}`} />
+        {cancelled ? (
+          // No QR for an event that isn't happening: nothing to scan at a door.
+          <div className="qr-section qr-section--void">
+            <p className="ticket-void">Cancelled</p>
+            <p className="qr-info">This event was called off, so this ticket is no longer valid.</p>
           </div>
-          <p className="qr-info">
-            Generate this ticket at the venue to mark attendance and get other complimentaries
-          </p>
-        </div>
+        ) : (
+          <div className="qr-section">
+            <div className="qr-code">
+              <QRCodeCanvas value={ticketid || "N/A"} size={150} level="H" includeMargin={true} aria-label={`QR code for ticket ${ticketid}`} />
+            </div>
+            <p className="qr-info">
+              Generate this ticket at the venue to mark attendance and get other complimentaries
+            </p>
+          </div>
+        )}
       </div>
 
-      {competition?.enabled && ticketData.event?.id ? (
+      {competition?.enabled && ticketData.event?.id && !cancelled ? (
         <Link href={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>
           Your team and submission
         </Link>
       ) : null}
-      <Download />
+      {cancelled ? null : <Download />}
     </div>
   );
 };

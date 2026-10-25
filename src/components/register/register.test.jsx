@@ -22,6 +22,10 @@ vi.mock("@/api/payments", () => ({
 vi.mock("@/utils/loadScript", () => ({ loadScript: vi.fn(() => Promise.resolve(true)) }));
 vi.mock("@/api/live", () => ({ liveApi: { fetchFeed: vi.fn(() => new Promise(() => {})) } }));
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn(() => new Promise(() => {})) } }));
+// Ticket types and the waiting list (a full event reads them): a server without them.
+vi.mock("@/api/ticketing", () => ({
+  ticketingApi: { types: vi.fn(() => Promise.resolve(null)), checkCode: vi.fn(), joinWaitlist: vi.fn(), myWaitlist: vi.fn(), leaveWaitlist: vi.fn() },
+}));
 
 const { eventsApi } = await import("@/api/events");
 const { paymentsApi } = await import("@/api/payments");

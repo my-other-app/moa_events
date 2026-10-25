@@ -22,7 +22,7 @@ function Label({ htmlFor, required, children, as = "label", id }) {
   );
 }
 
-function ErrorText({ id, error }) {
+export function ErrorText({ id, error }) {
   return (
     <p id={id} className="rg-error" aria-live="polite">
       {error ? (

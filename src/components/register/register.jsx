@@ -18,6 +18,7 @@ import {
   describeRegisterError,
   fieldId,
   forgetDone,
+  isEmail,
   keepDone,
   loadDone,
   loadDraft,
@@ -33,6 +34,9 @@ import {
   wantsWhatsapp,
 } from "@/utils/register";
 import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
+import { CANCELLED_TITLE, REFUND_DETAIL, REFUND_NOTE, cancelledLine } from "@/utils/cancelled";
+import { ticketingApi } from "@/api/ticketing";
+import { anyPaid, defaultType, liveEntries, needsPicker, onSale, parseTicketing, ticketTypeName, typeById, typePrice, waitlistTypes } from "@/utils/ticketing";
 import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
 import { SitePage } from "../discover/chrome";
@@ -43,6 +47,7 @@ import { PayNote, Spinner, useFinishPayment } from "./finishpayment";
 import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
 import Success from "./success";
+import { DiscountCodeField, linkedTypeFrom, TicketPicker, useDiscountCode, useEventTicketing, WaitlistPanel } from "./tickets";
 
 /**
  * Registering for an event, at /events/{slug}/register. The page's server
@@ -52,11 +57,16 @@ import Success from "./success";
  * signed in and the form's questions.
  *
  * Steps, one screen each, and only the ones this event has:
+ *   Ticket    which ticket type, when there is a choice (docs/TICKETING.md);
+ *             a sold-out one offers its waiting list
  *   Details   name, email, phone
  *   Questions the organiser's own questions, if it asks any
  *   Add-ons   the event's shelf, if it sells anything
- *   Review    what was entered and the total, then Confirm (free) or Pay
- * then "You're in" with the ticket. The step is in the address (?step=),
+ *   Review    what was entered and the total (with a discount code, checked
+ *             as it is typed, on a paid ticket), then Confirm (nothing to
+ *             pay) or Pay
+ * then "You're in" with the ticket. `?ticket_type=` (a hidden type a club
+ * shared) chooses that ticket. The step is in the address (?step=),
  * changed with the browser's own history (Next follows it, and the server
  * isn't asked again), so the phone's back button steps back; what was typed
  * is kept for the tab, and the ticket survives a reload.
@@ -97,7 +107,16 @@ function oneTapWelcome() {
   }
 }
 
-const ownsKey = (stepId, key) => (stepId === "details" ? DETAIL_KEYS.includes(key) : stepId === "questions" ? key.startsWith("q:") : false);
+const ownsKey = (stepId, key) =>
+  stepId === "details"
+    ? DETAIL_KEYS.includes(key)
+    : stepId === "questions"
+      ? key.startsWith("q:")
+      : stepId === "ticket"
+        ? key === "ticket_type"
+        : stepId === "review"
+          ? key === "discount_code"
+          : false;
 
 function focusField(key) {
   const el = typeof document !== "undefined" ? document.getElementById(fieldId(key)) : null;
@@ -181,8 +200,8 @@ function AwaitingActions({ eventId, onPaid }) {
   );
 }
 
-/** What went wrong with the registration, said once and calmly, with the way forward. */
-function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, onPaid }) {
+/** What went wrong with the registration, said once and calmly, with the way forward. `extra`: more under it (the waiting list). */
+function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, onPaid, extra = null }) {
   const box = useRef(null);
   // Said where the eye is: the checkout closes over the top of a long page.
   useEffect(() => {
@@ -261,6 +280,7 @@ function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, o
         <p className="rg-problem-title">{title}</p>
         {text ? <p className="rg-problem-text">{text}</p> : null}
         {actions ? <div className="rg-problem-actions">{actions}</div> : null}
+        {extra}
       </div>
     </div>
   );
@@ -321,11 +341,19 @@ function Panel({ event, club, icon = "ticket", title, children, actions }) {
 
 /* ---------- registration isn't open ---------- */
 
-function Closed({ event, club, gate }) {
+/**
+ * Registration isn't open. A full event whose tickets can be waited for
+ * (`ticketing`, from GET /events/info/{id}) offers its waiting list here.
+ */
+function Closed({ event, club, gate, ticketing = null, onTicketsChanged = null }) {
+  const waitable = gate.kind === "full" && ticketing && (waitlistTypes(ticketing).length > 0 || liveEntries(ticketing.viewerWaitlist).length > 0);
   const copy = {
     soon: { title: gate.label, text: `${gate.note}. Add it to your calendar and come back then.` },
     closed: { title: "Registration has closed", text: "The organisers aren't taking new registrations for this event." },
-    full: { title: "This event is full", text: `${gate.note || "Every seat is taken."} Keep an eye on the event page in case a seat opens up.` },
+    full: {
+      title: "This event is full",
+      text: `${gate.note || "Every seat is taken."} ${waitable ? "You can still join its waiting list, below." : "Keep an eye on the event page in case a seat opens up."}`,
+    },
     ended: { title: "This event has ended", text: gate.note ? `${gate.note}.` : "It's over — but there's always another one." },
     live: { title: "It's happening now", text: "Registration has closed, but the live room is open: polls, questions and the quiz." },
   }[gate.kind] || { title: "Registration isn't open", text: "Check the event page for the latest." };
@@ -353,6 +381,56 @@ function Closed({ event, club, gate }) {
       }
     >
       <p className="rg-closed-text">{copy.text}</p>
+      {waitable ? <WaitlistPanel eventId={String(event.id)} ticketing={ticketing} onChanged={onTicketsChanged} headingLevel={2} /> : null}
+    </Panel>
+  );
+}
+
+/**
+ * The club called the event off: why, and what it means for whoever is
+ * reading. Signed in and registered, their ticket is no longer valid (and
+ * their payment, if they made one, is on its way back); a registration that
+ * was waiting for payment has nothing left to pay.
+ */
+function CancelledPanel({ event, club, mine }) {
+  const c = event.cancellation || {};
+  const registered = mine?.state === "registered" || mine?.state === "unknown";
+  const paid = registered && event.has_fee;
+  return (
+    <Panel
+      event={event}
+      club={club}
+      title={CANCELLED_TITLE}
+      actions={
+        <>
+          {mine?.state && mine.state !== "none" ? (
+            <Link className="dc-btn" href="/me/tickets">
+              My tickets
+            </Link>
+          ) : null}
+          <Link className={`dc-btn${mine?.state && mine.state !== "none" ? " dc-btn--ghost" : ""}`} href="/events">
+            Find other events
+          </Link>
+        </>
+      }
+    >
+      {c.reason ? (
+        <p className="rg-closed-text rg-cancel-reason">
+          <span>The organisers said:</span> {c.reason}
+        </p>
+      ) : null}
+      <p className="rg-closed-text">
+        {cancelledLine(c)}, so it isn&rsquo;t taking registrations.
+        {registered ? " Your ticket for it is no longer valid." : ""}
+        {mine?.state === "unpaid" ? " Your registration was waiting for payment: there's nothing to pay." : ""}
+      </p>
+      {paid ? (
+        <p className="rg-refund" role="status">
+          <strong>{REFUND_NOTE}</strong> {REFUND_DETAIL}
+        </p>
+      ) : !mine || mine.state === "none" ? (
+        <p className="rg-closed-text">If you registered and paid online, your payment is being refunded in full.</p>
+      ) : null}
     </Panel>
   );
 }
@@ -449,6 +527,40 @@ function useEventInfo(eventId, enabled, who) {
   return { ...state, retry };
 }
 
+/**
+ * The event's tickets for the form (docs/TICKETING.md): `ticketing` from
+ * GET /events/info/{id}, which the form reads anyway; with `?ticket_type=`
+ * in the address, GET /events/{id}/ticket-types?ticket_type= instead, which
+ * lists that hidden type too. Null from a server without ticket types: the
+ * form is then exactly what it was. `reload()` after the server refused a
+ * ticket (sold out meanwhile, off sale) or after joining a waiting list.
+ */
+function useFlowTicketing(eventId, info, linked) {
+  const [own, setOwn] = useState({ status: "idle", data: null });
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!linked) return undefined;
+    let alive = true;
+    setOwn((s) => (s.status === "ready" ? s : { status: "loading", data: null }));
+    Promise.resolve()
+      .then(() => ticketingApi.types(eventId, { ticketType: linked }))
+      .then(
+        (data) => alive && setOwn({ status: "ready", data }),
+        () => alive && setOwn({ status: "error", data: null }),
+      );
+    return () => {
+      alive = false;
+    };
+  }, [eventId, linked, attempt]);
+  const fromInfo = useMemo(() => parseTicketing(info.data?.ticketing), [info.data]);
+  const { retry } = info;
+  const reload = useCallback(() => (linked ? setAttempt((a) => a + 1) : retry()), [linked, retry]);
+  if (!linked) return { ticketing: fromInfo, ready: true, reload };
+  // Until the list with the linked type has come, nothing: the type it names must be the one chosen first.
+  if (own.status !== "ready" && own.status !== "error") return { ticketing: null, ready: false, reload };
+  return { ticketing: own.status === "ready" ? own.data || fromInfo : fromInfo, ready: true, reload };
+}
+
 /* ---------- the flow ---------- */
 
 function Flow({ event, club, info, onDone }) {
@@ -484,6 +596,15 @@ function Flow({ event, club, info, onDone }) {
   // Which step each step was opened from on this visit, for Back to step back through history.
   const openedFrom = useRef({});
 
+  // The ticket: a link's hidden type, the one chosen before (the draft), or the only one.
+  const linked = useMemo(() => linkedTypeFrom(params.toString()), [params]);
+  const tix = useFlowTicketing(eventId, info, linked);
+  const ticketing = tix.ticketing;
+  // The ticket the person picked here; until they do, the one chosen for them (worked out as the page draws).
+  const [typeId, setTypeId] = useState(null);
+  // A sold-out ticket's waiting list, opened from the picker: {typeId}.
+  const [waitFor, setWaitFor] = useState(null);
+
   // Signing in part-way through fills in what the account knows; the email becomes the account's.
   useEffect(() => {
     if (!accountEmail) return;
@@ -510,22 +631,49 @@ function Flow({ event, club, info, onDone }) {
     };
   }, [eventId]);
 
-  // What was typed, kept for the tab.
+  // What was typed, kept for the tab (and the ticket chosen, once there is a choice).
   useEffect(() => {
-    saveDraft(eventId, { values, answers, picks, whatsapp, clubUpdates });
-  }, [eventId, values, answers, picks, whatsapp, clubUpdates]);
+    const keepType = typeId ?? draft?.ticketType ?? null;
+    saveDraft(eventId, { values, answers, picks, whatsapp, clubUpdates, ...(keepType !== null ? { ticketType: keepType } : {}) });
+  }, [eventId, values, answers, picks, whatsapp, clubUpdates, typeId, draft]);
 
-  const ready = info.status === "ready" && items !== null;
+  const ready = info.status === "ready" && items !== null && tix.ready;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
   const infoFee = Number(info.data?.reg_fee) > 0 ? Number(info.data.reg_fee) : null;
   const shelf = useMemo(() => items || [], [items]);
-  const steps = useMemo(() => stepsFor({ questions, items: shelf }), [questions, shelf]);
+  const chooseTicket = needsPicker(ticketing);
+  const steps = useMemo(() => stepsFor({ questions, items: shelf, chooseTicket }), [questions, shelf, chooseTicket]);
 
-  const fee = event.has_fee ? (event.fee ?? infoFee) : 0;
+  // The ticket and what it costs: the type picked, else the one a link names, the one picked before this
+  // reload (the draft) or the event's only one; on an older server, the event's fee.
+  const listed = (id) => (id !== null && id !== undefined ? typeById(ticketing, id) : null);
+  const chosen =
+    listed(typeId) || listed(linked) || listed(draft?.ticketType) || listed(defaultType(ticketing, linked)) || (ticketing && ticketing.types.length === 1 ? ticketing.types[0] : null);
+  const namesType = linked !== null && typeById(ticketing, linked) !== null;
+  // Sent only when there was a choice (or a link named one): one ticket sends what it always did.
+  const sendType = chooseTicket || namesType ? (chosen?.id ?? null) : null;
+  const typeFee = chosen ? (chosen.isFree ? 0 : chosen.price) : null;
+  const fee = ticketing ? (chosen ? typeFee : anyPaid(ticketing) ? null : 0) : event.has_fee ? (event.fee ?? infoFee) : 0;
+
+  // A discount code, on a ticket that costs something (and only from a server that has them).
+  const showCode = Boolean(ticketing) && (chosen ? !chosen.isFree : anyPaid(ticketing));
+  const code = useDiscountCode({
+    eventId,
+    ticketTypeId: chosen?.id ?? null,
+    email: isEmail(values.email) ? values.email.trim() : null,
+    phone: values.phone.trim() && values.phone.trim().length <= 20 ? values.phone.trim() : null,
+  });
+  const applied = showCode && code.applied && (chosen === null || code.applied.ticketTypeId === null || code.applied.ticketTypeId === chosen.id) ? code.applied : null;
+  const discount = applied && fee !== null ? Math.min(fee, applied.discount) : 0;
+
   const addOns = picksTotal(shelf, picks);
-  const total = fee === null ? null : fee + addOns;
+  const total = fee === null ? null : Math.max(0, fee - discount) + addOns;
   const pays = total === null || total > 0;
-  const lines = useMemo(() => orderLines({ fee, items: shelf, picks }), [fee, shelf, picks]);
+  const ticketLabel = chooseTicket || namesType ? chosen?.name || null : null;
+  const lines = useMemo(
+    () => orderLines({ fee, items: shelf, picks, ticket: ticketLabel, discount: discount > 0 ? { code: applied.code, amount: discount } : null }),
+    [fee, shelf, picks, ticketLabel, discount, applied],
+  );
 
   const byWhatsapp = wantsWhatsapp(values, whatsapp);
   // The club's own updates on WhatsApp, offered only where the API says the club can send them
@@ -543,8 +691,16 @@ function Flow({ event, club, info, onDone }) {
     const raw = validateAnswers(questions, answers);
     return Object.fromEntries(Object.entries(raw).map(([k, v]) => [`q:${k}`, v]));
   }, [questions, answers]);
-  const errorsOf = (stepId) => (stepId === "details" ? detailErrors : stepId === "questions" ? answerErrors : {});
-  const orderOf = (stepId) => (stepId === "details" ? DETAIL_KEYS : stepId === "questions" ? questions.map((q) => `q:${q.key}`) : []);
+  const ticketErrors = !chooseTicket
+    ? {}
+    : !chosen
+      ? { ticket_type: "Choose a ticket." }
+      : !onSale(chosen)
+        ? { ticket_type: "This ticket isn't on sale now. Choose another." }
+        : {};
+  const errorsOf = (stepId) => (stepId === "details" ? detailErrors : stepId === "questions" ? answerErrors : stepId === "ticket" ? ticketErrors : {});
+  const orderOf = (stepId) =>
+    stepId === "details" ? DETAIL_KEYS : stepId === "questions" ? questions.map((q) => `q:${q.key}`) : stepId === "ticket" ? ["ticket_type"] : [];
 
   // The step: the one the address names, but never past a step that still needs something.
   const want = params.get("step");
@@ -647,7 +803,7 @@ function Flow({ event, club, info, onDone }) {
     if (value === "" || value === undefined) return;
     setTouched((t) => (t[key] ? t : { ...t, [key]: true }));
   };
-  const errorFor = (key) => serverErrors[key] || (touched[key] ? detailErrors[key] || answerErrors[key] : null) || null;
+  const errorFor = (key) => serverErrors[key] || (touched[key] ? detailErrors[key] || answerErrors[key] || ticketErrors[key] : null) || null;
 
   /* ---------- moving ---------- */
 
@@ -670,6 +826,9 @@ function Flow({ event, club, info, onDone }) {
   /* ---------- registering ---------- */
 
   const finish = (responseData, paid, amount = null) => {
+    // The ticket's type (when there was a choice) and the code that took something off, as the server says them.
+    const typeName = ticketTypeName(responseData) || ticketLabel;
+    const used = responseData.discount && typeof responseData.discount === "object" ? responseData.discount : null;
     const ticket = {
       eventId,
       ticket_id: responseData.ticket_id,
@@ -678,6 +837,8 @@ function Flow({ event, club, info, onDone }) {
       paid,
       amount: paid ? (amount ?? (Number(responseData.pay_amount) || 0)) : 0,
       account: submittedAs.current,
+      ...(typeName && (chooseTicket || namesType) ? { ticket_type: typeName } : {}),
+      ...(used?.code ? { code: String(used.code), covered: !(Number(responseData.pay_amount) > 0) && Number(used.amount) > 0 } : {}),
     };
     busy.current = false;
     setPhase("idle");
@@ -690,6 +851,18 @@ function Flow({ event, club, info, onDone }) {
 
   const showError = (error) => {
     const p = describeRegisterError(error, questions.map((q) => q.key));
+    // The tickets changed under the form (sold out, off sale, full): read them again.
+    if (p.ticketTypes || p.kind === "full") tix.reload();
+    if (p.kind === "fields" && p.fields.discount_code) code.refuse(p.fields.discount_code);
+    // A ticket refused where there was no choice of tickets: said on the review, with its waiting list when it has one.
+    if (p.kind === "fields" && p.fields.ticket_type && !steps.some((s) => s.id === "ticket")) {
+      setProblem(
+        p.waitlist
+          ? { kind: "full", title: "Tickets just sold out", message: "Join the waiting list and we'll email you if a place opens up.", waitlist: true }
+          : { kind: "message", message: p.fields.ticket_type },
+      );
+      return;
+    }
     if (p.kind === "soldout") {
       const next = applyStockRefusal(shelf, picks, p);
       setItems(next.items);
@@ -712,6 +885,11 @@ function Flow({ event, club, info, onDone }) {
     }
     const firstKey = orderOf(target.id).find((k) => p.fields[k]) || keys[0];
     setProblem({ kind: "fields", step: target.id, message: p.message });
+    if (target.id === step.id) {
+      // On this step already (a discount code refused on the review): no new history entry, just the field.
+      setTimeout(() => focusField(firstKey), 0);
+      return;
+    }
     focusNext.current = firstKey;
     goTo(target.id, { edit: true });
   };
@@ -732,7 +910,18 @@ function Flow({ event, club, info, onDone }) {
       busy.current = false;
       setPhase("idle");
     };
-    const payload = buildPayload({ values, questions, answers, ref: currentRef(), items: shelf, picks, whatsapp, clubUpdates: byClubUpdates });
+    const payload = buildPayload({
+      values,
+      questions,
+      answers,
+      ref: currentRef(),
+      items: shelf,
+      picks,
+      whatsapp,
+      clubUpdates: byClubUpdates,
+      ticketTypeId: sendType,
+      discountCode: showCode ? code.toSend : null,
+    });
     let stage = "register";
     let responseData = null;
     try {
@@ -822,6 +1011,7 @@ function Flow({ event, club, info, onDone }) {
   const isReview = step.id === "review";
   const title = isReview ? (pays ? "Review and pay" : "Review and confirm") : step.title;
   const ledes = {
+    ticket: `${club?.name || "The organisers"} sell${club?.name ? "s" : ""} more than one kind of ticket for this event. Pick yours.`,
     details: accountEmail ? "It takes a minute. Your ticket comes by email and lands in your MyOtherApp app." : "It takes a minute. Your ticket comes by email.",
     questions: `${club?.name || "The organisers"} would like to know a little more. Questions marked * need an answer.`,
     addons: "Paid together with your registration and collected at the event. Skip it if you don't want anything.",
@@ -849,6 +1039,25 @@ function Flow({ event, club, info, onDone }) {
             </h1>
             <p className="rg-lede">{ledes[step.id]}</p>
           </header>
+
+          {step.id === "ticket" ? (
+            <div className="rg-fields">
+              <TicketPicker
+                ticketing={ticketing}
+                value={chosen?.id ?? null}
+                onChange={(id) => {
+                  setTypeId(id);
+                  setWaitFor(null);
+                  changed("ticket_type");
+                }}
+                error={errorFor("ticket_type")}
+                onWaitlist={(id) => setWaitFor({ typeId: id })}
+              />
+              {waitFor || liveEntries(ticketing.viewerWaitlist).length ? (
+                <WaitlistPanel eventId={eventId} ticketing={ticketing} open={waitFor} onChanged={tix.reload} headingLevel={2} />
+              ) : null}
+            </div>
+          ) : null}
 
           {step.id === "details" && auth.enabled && !accountEmail ? (
             <p className="ac-haveapp">
@@ -980,6 +1189,18 @@ function Flow({ event, club, info, onDone }) {
 
           {isReview ? (
             <div className="rg-review">
+              {chooseTicket && chosen ? (
+                <ReviewBlock title="Your ticket" editLabel="Change your ticket" onEdit={() => goTo("ticket", { edit: true })}>
+                  <dl className="rg-dl">
+                    <div>
+                      <dt>Ticket</dt>
+                      <dd>
+                        {chosen.name} · {typePrice(chosen)}
+                      </dd>
+                    </div>
+                  </dl>
+                </ReviewBlock>
+              ) : null}
               <ReviewBlock title="Your details" editLabel="Edit your details" onEdit={() => goTo("details", { edit: true })}>
                 <dl className="rg-dl">
                   <div>
@@ -1031,6 +1252,7 @@ function Flow({ event, club, info, onDone }) {
                     </button>
                   ) : null}
                 </div>
+                {showCode ? <DiscountCodeField code={code} error={serverErrors.discount_code || null} onChanged={() => changed("discount_code")} /> : null}
                 <Lines lines={lines} total={total} />
                 <p className="rg-mailnote">
                   <Icon name="mail" size={16} />
@@ -1073,6 +1295,18 @@ function Flow({ event, club, info, onDone }) {
                       account: accountEmail,
                     })
                   : info.retry()
+              }
+              extra={
+                problem.kind === "full" && problem.waitlist ? (
+                  <WaitlistPanel
+                    eventId={eventId}
+                    ticketing={ticketing}
+                    open={{ typeId: chosen?.id ?? null }}
+                    fallbackTypes={chosen ? [chosen] : []}
+                    onChanged={tix.reload}
+                    headingLevel={2}
+                  />
+                ) : null
               }
             />
           ) : null}
@@ -1144,9 +1378,12 @@ export default function Register({ event, club = null }) {
   const who = signedIn ? auth.user?.email || "account" : "";
   const open = gate.kind === "open" || (gate.kind === "live" && event.registration_open);
   const ended = gate.kind === "ended";
+  const cancelled = gate.kind === "cancelled";
   // The form needs its questions; signed in, the person's own registration matters even when the form is closed.
   const info = useEventInfo(eventId, auth.ready && !done && (open || (signedIn && !ended)), who);
   const mine = signedIn && info.who === who ? myRegistration(info.data) : null;
+  // A full event's tickets (the public list, which counts no visit) say whether its waiting list can be joined.
+  const { ticketing: closedTickets, reload: reloadClosed } = useEventTicketing(eventId, { enabled: !done && gate.kind === "full" });
 
   // Paid from the panel: the ticket, as the form shows one.
   const paidNow = (r, ticketId) =>
@@ -1162,11 +1399,12 @@ export default function Register({ event, club = null }) {
 
   let body;
   if (done) body = <Success event={event} club={club} ticket={done} />;
+  else if (cancelled) body = <CancelledPanel event={event} club={club} mine={mine} />;
   else if (mine?.state === "unpaid" && !ended)
     body = <FinishPanel event={event} club={club} registration={mine} onPaid={(r) => (mine.ticketId ? paidNow(r, mine.ticketId) : info.retry())} />;
   else if (mine?.state === "registered") body = <Registered event={event} club={club} ticketId={mine.ticketId} />;
   else if (open) body = <Flow key={eventId} event={event} club={club} info={info} onDone={finished} />;
-  else body = <Closed event={event} club={club} gate={gate} />;
+  else body = <Closed event={event} club={club} gate={gate} ticketing={closedTickets} onTicketsChanged={reloadClosed} />;
 
   return (
     <SitePage>

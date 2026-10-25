@@ -1,4 +1,5 @@
 import { dayRange, isDay, isMonth } from "@/utils/days";
+import { parseCancellation } from "@/utils/cancelled";
 
 /**
  * The public discovery API's shapes: the filters as the pages' addresses
@@ -300,6 +301,11 @@ const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag }
 
 const SOURCES = new Set(["browser", "ip", "none"]);
 const STATUSES = new Set(["upcoming", "closing_soon", "full", "live", "ended"]);
+/**
+ * An event's own page also says "cancelled": the club called it off (it is
+ * in no list, but its page still opens and says so, with `cancellation`).
+ */
+const DETAIL_STATUSES = new Set([...STATUSES, "cancelled"]);
 
 export function parseWhere(w) {
   const o = obj(w) || {};
@@ -691,8 +697,8 @@ export function parseEventDetail(e) {
     seats_left: capacity !== null && seats !== null ? Math.max(0, Math.floor(seats)) : null,
     reg_opens_at: isoOrNull(o.reg_opens_at),
     reg_closes_at: isoOrNull(o.reg_closes_at),
-    status: STATUSES.has(o.status) ? o.status : "upcoming",
-    registration_open: Boolean(o.registration_open),
+    status: DETAIL_STATUSES.has(o.status) ? o.status : "upcoming",
+    registration_open: o.status === "cancelled" ? false : Boolean(o.registration_open),
     category: category && idOf(category.id) !== null && str(category.name) ? { id: category.id, name: str(category.name) } : null,
     interests: Array.isArray(o.interests) ? o.interests.map((i) => (typeof i === "string" ? str(i) : str(obj(i)?.name))).filter(Boolean) : [],
     topics: list(o.topics, parseTopicRef),
@@ -709,6 +715,8 @@ export function parseEventDetail(e) {
       locality: (v, all) => str(v) || str(all.city),
       region: str,
       postal_code: (v) => (typeof v === "string" || typeof v === "number" ? str(String(v)) : null),
+      // Only on a cancelled event: why, and when (src/utils/cancelled.js).
+      cancellation: (v, all) => (all.status === "cancelled" ? parseCancellation(v) || { reason: null, cancelled_at: null } : null),
     }),
   };
 }

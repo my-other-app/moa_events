@@ -25,14 +25,15 @@ export function Thumb({ event, className = "" }) {
   );
 }
 
-const money = (n) => (n === null || n === undefined ? "Paid" : n > 0 ? rupees(n) : "Free");
+/** A line's amount: "₹250", "Free", "−₹50" for a discount, "Paid" when it isn't known. */
+const money = (n) => (n === null || n === undefined ? "Paid" : n > 0 ? rupees(n) : n < 0 ? `−${rupees(-n)}` : "Free");
 
 export function Lines({ lines, total }) {
   return (
     <div className="rg-lines">
       <ul>
         {lines.map((l) => (
-          <li key={l.id}>
+          <li key={l.id} className={l.amount < 0 ? "is-discount" : undefined}>
             <span className="rg-line-label">
               {l.label}
               {l.sub ? <span className="rg-line-sub">{l.sub}</span> : null}

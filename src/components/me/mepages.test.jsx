@@ -440,3 +440,61 @@ describe("Following", () => {
     expect(screen.getByRole("link", { name: "Browse clubs" })).toHaveAttribute("href", "/clubs");
   });
 });
+
+const { forgetEvents } = await import("@/api/discover");
+
+describe("My tickets: ticket types and cancelled events", () => {
+  const cancelledPage = { event: { id: 901, slug: "hack-night-04", name: "Hack Night 04", starts_at: "2026-10-24T18:00:00+05:30", status: "cancelled", cancellation: { reason: "The venue flooded.", cancelled_at: "2026-10-12T10:00:00+05:30" } } };
+
+  /** The lists as before, and each event's page: Hack Night 04 cancelled, the rest on. */
+  function answerWithPages({ upcoming = UPCOMING, past = PAST } = {}) {
+    get.mockImplementation(async (url, config) => {
+      if (url === "/api/v1/user/profile/me") return { data: PROFILE };
+      if (url === "/api/v1/events/list") return pageOf(config.params.is_ended ? past : upcoming);
+      if (url === "/api/v1/discover/events/hack-night-04") return { data: cancelledPage };
+      if (url.startsWith("/api/v1/discover/events/")) return { data: { event: { id: 1, slug: url.split("/").pop(), name: "On", status: "upcoming" } } };
+      throw new Error(`unexpected GET ${url}`);
+    });
+  }
+
+  beforeEach(() => {
+    forgetEvents();
+    enableSignIn();
+    signInAs();
+  });
+
+  it("marks an upcoming event that was cancelled, with the reason and the refund for a paid ticket", async () => {
+    answerWithPages({ upcoming: [row({ is_paid: true })], past: [] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    const item = within(upcoming).getByRole("listitem");
+    expect(await within(item).findByText("Cancelled")).toBeInTheDocument();
+    expect(within(item).getByText("This event was cancelled")).toBeInTheDocument();
+    expect(within(item).getByText("The venue flooded.", { exact: false })).toBeInTheDocument();
+    expect(within(item).getByText("Your payment is being refunded.")).toBeInTheDocument();
+    // The ticket's own page says the rest.
+    expect(within(item).getByRole("link", { name: "View ticket for Hack Night 04" })).toBeInTheDocument();
+    // Asked by slug, as nobody.
+    expect(get).toHaveBeenCalledWith("/api/v1/discover/events/hack-night-04", { params: undefined, skipAuth: true });
+  });
+
+  it("a cancelled event's registration waiting for payment has nothing left to pay", async () => {
+    answerWithPages({ upcoming: [row({ is_paid: false })], past: [] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    const item = within(upcoming).getByRole("listitem");
+    expect(await within(item).findByText("Nothing to pay")).toBeInTheDocument();
+    expect(within(item).queryByRole("button", { name: /Finish payment/ })).toBeNull();
+    expect(within(item).queryByText("Awaiting payment")).toBeNull();
+    expect(within(item).queryByText("Your payment is being refunded.")).toBeNull();
+  });
+
+  it("leaves events that are on as they were, and names a ticket's type when the list says it", async () => {
+    answerWithPages({ upcoming: [UPCOMING[1]], past: [row({ ...PAST[0], ticket_type_name: "Early bird" })] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/discover/events/ctf-night", expect.anything()));
+    expect(within(upcoming).queryByText("Cancelled")).toBeNull();
+    expect(within(screen.getByRole("region", { name: /Past/ })).getByText("Early bird")).toBeInTheDocument();
+  });
+});

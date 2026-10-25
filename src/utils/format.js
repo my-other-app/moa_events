@@ -86,12 +86,14 @@ export const formatTotal = (n, capped = false) => (capped ? `${whole.format(Numb
 
 /**
  * The pill on an event's poster: what is most worth knowing at a glance.
- * Live beats closing soon beats full; a free event says so when nothing
- * more pressing does.
+ * Cancelled beats everything; live beats closing soon beats full; a free
+ * event says so when nothing more pressing does.
  */
 export function statusPill(event) {
   if (!event) return null;
   switch (event.status) {
+    case "cancelled":
+      return { label: "Cancelled", tone: "cancelled" };
     case "live":
       return { label: "Live now", tone: "live" };
     case "closing_soon":

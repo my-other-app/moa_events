@@ -94,6 +94,7 @@ describe("which file answers which address", () => {
     ["/play/123", "play/[eventId]/page.jsx"],
     ["/feedback/123/456", "feedback/[eventId]/[registrationId]/page.jsx"],
     ["/tickets/abc-123", "tickets/[ticketid]/page.jsx"],
+    ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", "claim/[token]/page.jsx"],
     ["/certificates/abc-123", "certificates/[ticketid]/page.jsx"],
     ["/sitemap.xml", "sitemap.xml/route.js"],
     ["/sitemaps/events-1.xml", "sitemaps/[name]/route.js"],
