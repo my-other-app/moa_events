@@ -28,3 +28,23 @@ export function trialPlansResponse() {
   d.enterprise_trial_days = 30;
   return d;
 }
+
+/** The owner's monthly message limits (migration message_quotas): emails, WhatsApp. Enterprise is null: set per club. */
+const MESSAGES = { free: [200, 0], starter: [1000, 50], growth: [5000, 250], pro: [20000, 1000], enterprise: [null, null] };
+
+/**
+ * The answer once the backend has the message quotas: each plan's emails and
+ * WhatsApp a month, and the price of an extra one (₹0.10 an email, ₹1 a
+ * WhatsApp message), on top of the free trial's answer.
+ */
+export function quotaPlansResponse() {
+  const d = trialPlansResponse();
+  for (const p of d.plans) {
+    const [emails, whatsapp] = MESSAGES[p.key] ?? [null, null];
+    p.limits.emails_per_month = emails;
+    p.limits.whatsapp_per_month = whatsapp;
+    p.email_overage_paise = 10;
+    p.whatsapp_overage_paise = 100;
+  }
+  return d;
+}

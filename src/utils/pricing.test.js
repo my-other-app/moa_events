@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plansResponse, trialPlansResponse } from "@/test/plansFixture";
+import { plansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
 import {
   addedFeatures,
   cheapestPaid,
@@ -25,6 +25,9 @@ import {
   startFreeUrl,
   cardPlans,
   freeAfterTrialLine,
+  formatPaisa,
+  messagesLine,
+  overageLine,
   yearlyOffer,
 } from "./pricing";
 
@@ -315,5 +318,61 @@ describe("the free trial", () => {
     );
     expect(ld.offers.every((o) => o.priceCurrency === "INR")).toBe(true);
     expect(JSON.stringify(ld)).not.toMatch(/storage|Campus/i);
+  });
+});
+
+
+describe("the monthly messages (the backend's message_quotas)", () => {
+  const q = parsePlans(quotaPlansResponse());
+  const qp = (key) => q.plans.find((p) => p.key === key);
+
+  it("reads each plan's overage prices in paise, and nothing when the API doesn't say", () => {
+    expect(qp("growth")).toMatchObject({ emailOverage: 10, whatsappOverage: 100 });
+    expect(plan("growth")).toMatchObject({ emailOverage: null, whatsappOverage: null });
+    expect([formatPaisa(10), formatPaisa(100), formatPaisa(150), formatPaisa(0)]).toEqual(["₹0.10", "₹1", "₹1.50", "₹0"]);
+  });
+
+  it("says a plan's emails and WhatsApp a month in one line", () => {
+    expect(messagesLine(qp("starter"))).toBe("1,000 emails / 50 WhatsApp a month");
+    expect(messagesLine(qp("pro"))).toBe("20,000 emails / 1,000 WhatsApp a month");
+    expect(messagesLine(qp("free"))).toBe("200 emails a month");
+    expect(messagesLine(qp("enterprise"))).toBe("Custom email and WhatsApp limits");
+    expect(messagesLine(plan("growth"))).toBeNull();
+  });
+
+  it("prices an extra message on a paid plan only", () => {
+    expect(overageLine(qp("growth"))).toBe("Extra: ₹0.10 per email, ₹1 per WhatsApp");
+    expect(overageLine(qp("free"))).toBeNull();
+    expect(overageLine(qp("enterprise"))).toBeNull();
+    expect(overageLine(plan("growth"))).toBeNull();
+  });
+
+  it("compares the message limits and what an extra one costs", () => {
+    expect(limitRows(q.plans).map((r) => r.label).slice(-4)).toEqual([
+      "Emails a month",
+      "WhatsApp messages a month",
+      "Each extra email",
+      "Each extra WhatsApp message",
+    ]);
+    const row = (key) => q.plans.map((p) => planLimitCell(p, key));
+    expect(row("emails_per_month")).toEqual(["200", "1,000", "5,000", "20,000", "Custom"]);
+    expect(row("whatsapp_per_month")).toEqual([null, "50", "250", "1,000", "Custom"]);
+    expect(row("email_overage")).toEqual([null, "₹0.10", "₹0.10", "₹0.10", "Custom"]);
+    expect(row("whatsapp_overage")).toEqual([null, "₹1", "₹1", "₹1", "Custom"]);
+  });
+
+  it("tells search engines and crawlers, and keeps the JSON-LD valid", () => {
+    const ld = plansJsonLd(q, { url: "https://myotherapp.in/pricing", siteUrl: "https://myotherapp.in" });
+    expect(ld.offers.find((o) => o.name === "Starter, monthly").description).toBe("1,000 emails / 50 WhatsApp a month. Extra: ₹0.10 per email, ₹1 per WhatsApp");
+    expect(ld.offers.find((o) => o.name === "Free").description).toBe("200 emails a month");
+    // Valid JSON, every offer a priced Offer, nothing undefined.
+    const round = JSON.parse(JSON.stringify(ld));
+    expect(round).toEqual(ld);
+    for (const o of round.offers) {
+      expect(o["@type"]).toBe("Offer");
+      expect(typeof o.price).toBe("number");
+      if ("description" in o) expect(typeof o.description).toBe("string");
+    }
+    expect(planSummary(qp("growth"))).toMatch(/5,000 emails \/ 250 WhatsApp a month\. Extra: ₹0\.10 per email, ₹1 per WhatsApp\.$/);
   });
 });
