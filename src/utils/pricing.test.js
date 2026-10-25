@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
+import { plansResponse, pricedPlansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
 import {
   addedFeatures,
   cheapestPaid,
@@ -28,6 +28,8 @@ import {
   formatPaisa,
   messagesLine,
   overageLine,
+  promotionalNote,
+  trialAllowancesLine,
   yearlyOffer,
 } from "./pricing";
 
@@ -374,5 +376,48 @@ describe("the monthly messages (the backend's message_quotas)", () => {
       if ("description" in o) expect(typeof o.description).toBe("string");
     }
     expect(planSummary(qp("growth"))).toMatch(/5,000 emails \/ 250 WhatsApp a month\. Extra: ₹0\.10 per email, ₹1 per WhatsApp\.$/);
+  });
+});
+
+
+describe("the pricing of 2026-10-25 (the backend's pricing_adjust)", () => {
+  const d = parsePlans(pricedPlansResponse());
+  const dp = (key) => d.plans.find((p) => p.key === key);
+
+  it("prices an extra WhatsApp message at ₹1.50, as the API says", () => {
+    expect(dp("growth")).toMatchObject({ emailOverage: 10, whatsappOverage: 150 });
+    expect(overageLine(dp("growth"))).toBe("Extra: ₹0.10 per email, ₹1.50 per WhatsApp");
+  });
+
+  it("says each plan's promotional WhatsApp inside its WhatsApp, never on a row of its own", () => {
+    expect(messagesLine(dp("pro"))).toBe("20,000 emails / 1,000 WhatsApp (up to 200 promotional) a month");
+    expect(messagesLine(dp("starter"))).toBe("1,000 emails / 50 WhatsApp (up to 10 promotional) a month");
+    expect(messagesLine(dp("free"))).toBe("200 emails a month");
+    expect(promotionalNote(dp("enterprise"))).toBe("");
+    const labels = limitRows(d.plans).map((r) => r.label);
+    expect(labels).not.toContain("Whatsapp marketing per month");
+    expect(labels.filter((l) => /promotional/i.test(l))).toEqual([]);
+    const row = (key) => d.plans.map((p) => planLimitCell(p, key));
+    expect(row("whatsapp_per_month")).toEqual([null, "50 (up to 10 promotional)", "250 (up to 50 promotional)", "1,000 (up to 200 promotional)", "Custom"]);
+    expect(row("whatsapp_overage")).toEqual([null, "₹1.50", "₹1.50", "₹1.50", "Custom"]);
+  });
+
+  it("names AI actions as a limit, and none on a plan without AI assist", () => {
+    expect(limitRows(d.plans).map((r) => r.label)).toContain("AI actions a month");
+    expect(d.plans.map((p) => planLimitCell(p, "ai_actions_per_month"))).toEqual([null, "20", "150", "500", "Unlimited"]);
+  });
+
+  it("reads the free trial's own allowances and says them in a line", () => {
+    expect(d.trial).toEqual({
+      days: 14, planKey: "pro", planName: "Pro",
+      allowances: { emails_per_month: 2000, whatsapp_per_month: 50, whatsapp_marketing_per_month: 10, ai_actions_per_month: 50 },
+    });
+    expect(trialAllowancesLine(d)).toBe("The 14-day Pro trial has everything in Pro, with 2,000 emails, 50 WhatsApp messages and 50 AI actions a month.");
+    // An API from before the allowances: the trial reads as before, and nothing is said.
+    expect(trialAllowancesLine(parsePlans(trialPlansResponse()))).toBeNull();
+    const ld = plansJsonLd(d, { url: "https://myotherapp.in/pricing", siteUrl: "https://myotherapp.in" });
+    expect(ld.offers[0].description).toBe(
+      "14 days of Pro free for every new club, no card needed. The 14-day Pro trial has everything in Pro, with 2,000 emails, 50 WhatsApp messages and 50 AI actions a month",
+    );
   });
 });

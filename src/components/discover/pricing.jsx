@@ -21,6 +21,7 @@ import {
   planPrice,
   plansPageUrl,
   signupUrl,
+  trialAllowancesLine,
   yearlyOffer,
 } from "@/utils/pricing";
 import Icon from "./icons";
@@ -355,6 +356,7 @@ export function Pricing({ data = null, compare = "table", moreHref = "#compare",
   // Free is what a club keeps after the trial, said under them.
   const cards = cardPlans(shown);
   const afterTrial = freeAfterTrialLine(shown);
+  const trialAllows = trialAllowancesLine(shown);
   const free = freePlan(shown);
   return (
     <div className={`pr-pricing${compare === "table" ? "" : " pr-pricing--brief"}`}>
@@ -386,6 +388,7 @@ export function Pricing({ data = null, compare = "table", moreHref = "#compare",
           </a>
         </div>
       ) : null}
+      {trialAllows ? <p className="pr-fineprint">{trialAllows}</p> : null}
       {shown.currency === "INR" ? <p className="pr-fineprint">Prices are in Indian rupees.</p> : null}
       {compare === "table" ? (
         <CompareTable data={shown} cycle={cycle} />

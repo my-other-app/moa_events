@@ -77,14 +77,24 @@ export function parsePlans(d) {
   };
 }
 
-/** The free trial every new club starts with: `{days, planKey, planName}`, or null when the API offers none. */
+/** The trial's own monthly allowances, by limit key, as the API names them. */
+const TRIAL_ALLOWANCES = ["emails_per_month", "whatsapp_per_month", "whatsapp_marketing_per_month", "ai_actions_per_month"];
+
+/**
+ * The free trial every new club starts with: `{days, planKey, planName}`,
+ * with `allowances` (its own monthly emails, WhatsApp and AI actions; the
+ * plan's features stay) when the API sends them, or null when it offers none.
+ */
 function parseTrial(t) {
   const o = obj(t);
   const days = count(o?.days);
   const planKey = str(o?.plan_key);
   const planName = str(o?.plan_name);
   if (!days || !planKey || !KEY.test(planKey) || !planName || o.card_required === true) return null;
-  return { days, planKey, planName };
+  const limits = obj(o.limits) || {};
+  const allowances = {};
+  for (const k of TRIAL_ALLOWANCES) if (count(limits[k]) !== undefined) allowances[k] = limits[k];
+  return Object.keys(allowances).length ? { days, planKey, planName, allowances } : { days, planKey, planName };
 }
 
 /* ---------- money ---------- */
@@ -214,6 +224,27 @@ export function freeAfterTrialLine(data) {
   return `After your trial, your club keeps ${free.name} for as long as it likes${what ? `: ${what}` : ""}, enough to run small events. Published events, tickets and data keep working.`;
 }
 
+/**
+ * "The 14-day Pro trial has everything in Pro, with 2,000 emails, 50 WhatsApp
+ * messages and 50 AI actions a month.", or null when the API doesn't say
+ * what the trial allows.
+ */
+export function trialAllowancesLine(data) {
+  const t = data?.trial;
+  const a = t?.allowances;
+  if (!a) return null;
+  const parts = [
+    ["emails_per_month", "email", "emails"],
+    ["whatsapp_per_month", "WhatsApp message", "WhatsApp messages"],
+    ["ai_actions_per_month", "AI action", "AI actions"],
+  ]
+    .filter(([k]) => a[k] > 0)
+    .map(([k, one, many]) => `${formatNumber(a[k])} ${a[k] === 1 ? one : many}`);
+  if (!parts.length) return null;
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+  return `The ${t.days}-day ${t.planName} trial has everything in ${t.planName}, with ${list} a month.`;
+}
+
 /* ---------- limits in plain words ---------- */
 
 /**
@@ -230,6 +261,7 @@ export const LIMITS = [
   { key: "announcements_per_month", row: "Announcements a month", one: "announcement a month", many: "announcements a month", unlimited: "Unlimited announcements" },
   { key: "merch_items_per_event", row: "Merch items per event", one: "merch item per event", many: "merch items per event", unlimited: "Unlimited merch items", needs: "merch" },
   { key: "website_templates", row: "Website templates", one: "website template", many: "website templates", unlimited: "Every website template", needs: "website" },
+  { key: "ai_actions_per_month", row: "AI actions a month", one: "AI action a month", many: "AI actions a month", unlimited: "Unlimited AI actions", needs: "ai_assist" },
   { key: "emails_per_month", row: "Emails a month", one: "email a month", many: "emails a month", unlimited: "Unlimited emails" },
   { key: "whatsapp_per_month", row: "WhatsApp messages a month", one: "WhatsApp message a month", many: "WhatsApp messages a month", unlimited: "Unlimited WhatsApp messages" },
 ];
@@ -254,7 +286,20 @@ const LIMIT_BY_KEY = new Map(LIMITS.map((l) => [l.key, l]));
  * not in the product yet, so no page may promise a number of them; storage
  * was never metered and is no longer a limit (an older API still sends it).
  */
-export const HIDDEN_LIMITS = new Set(["ticket_types_per_event", "coupons_per_event", "storage_gb"]);
+export const HIDDEN_LIMITS = new Set(["ticket_types_per_event", "coupons_per_event", "storage_gb", "whatsapp_marketing_per_month"]);
+
+/**
+ * " (up to 200 promotional)": a plan's cap on promotional (marketing)
+ * WhatsApp messages, said inside its WhatsApp limit rather than on a row of
+ * its own (which is why it is in HIDDEN_LIMITS). Empty when the plan has no
+ * cap, or no WhatsApp to cap.
+ */
+export function promotionalNote(plan) {
+  const w = plan.limits.whatsapp_per_month;
+  const m = plan.limits.whatsapp_marketing_per_month;
+  if (!(w > 0) || m === null || m === undefined) return "";
+  return m > 0 ? ` (up to ${formatNumber(m)} promotional)` : " (no promotional)";
+}
 
 /** The limits a card leads with, in this order. */
 export const HEADLINE_LIMITS = ["events_per_month", "registrations_per_event", "registrations_per_month", "committee_seats", "announcements_per_month"];
@@ -305,7 +350,8 @@ export function planLimitCell(plan, key, currency = "INR") {
   if (MESSAGE_LIMITS.includes(key) && planKind(plan) === "contact" && (plan.limits[key] === null || plan.limits[key] === undefined)) return "Custom";
   const needs = LIMIT_BY_KEY.get(key)?.needs;
   if (needs && !includes(plan, needs)) return null;
-  return limitCell(key, plan.limits[key]);
+  const cell = limitCell(key, plan.limits[key]);
+  return cell && key === "whatsapp_per_month" ? `${cell}${promotionalNote(plan)}` : cell;
 }
 
 /** The table's limit rows: the known ones in order, then any the API adds, by key; never the hidden ones. */
@@ -321,9 +367,10 @@ export function limitRows(plans) {
 }
 
 /**
- * A plan's monthly messages in one line: "1,000 emails / 50 WhatsApp a
- * month", "200 emails a month" (no WhatsApp), "Custom email and WhatsApp
- * limits" (Enterprise), or null when the plan states neither.
+ * A plan's monthly messages in one line: "1,000 emails / 50 WhatsApp (up to
+ * 10 promotional) a month", "200 emails a month" (no WhatsApp), "Custom
+ * email and WhatsApp limits" (Enterprise), or null when the plan states
+ * neither.
  */
 export function messagesLine(plan) {
   if (!MESSAGE_LIMITS.some((k) => k in plan.limits)) return null;
@@ -332,16 +379,17 @@ export function messagesLine(plan) {
   const none = (v) => v === null || v === undefined;
   if (planKind(plan) === "contact" && none(e) && none(w)) return "Custom email and WhatsApp limits";
   const email = none(e) ? "Unlimited emails" : e > 0 ? `${formatNumber(e)} ${e === 1 ? "email" : "emails"}` : null;
-  const whatsapp = none(w) ? "unlimited WhatsApp" : w > 0 ? `${formatNumber(w)} WhatsApp` : null;
+  const whatsapp = none(w) ? "unlimited WhatsApp" : w > 0 ? `${formatNumber(w)} WhatsApp${promotionalNote(plan)}` : null;
   if (email && whatsapp) return `${email} / ${whatsapp} a month`;
   if (email) return `${email} a month`;
   return whatsapp ? `${whatsapp.charAt(0).toUpperCase()}${whatsapp.slice(1)} a month` : null;
 }
 
 /**
- * What a message past the monthly limits costs: "Extra: ₹0.10 per email, ₹1
- * per WhatsApp". A paid plan only: Free has no card to charge (its
- * announcements pause at the limit instead), Enterprise agrees its own.
+ * What a message past the monthly limits costs: "Extra: ₹0.10 per email,
+ * ₹1.50 per WhatsApp", as the API prices it. A paid plan only: Free has no
+ * card to charge (its announcements pause at the limit instead), Enterprise
+ * agrees its own. Promotional WhatsApp is never sold as an extra.
  */
 export function overageLine(plan, currency = "INR") {
   if (planKind(plan) !== "paid") return null;
@@ -482,7 +530,10 @@ export function plansJsonLd(data, { url, siteUrl, description }) {
     offers.push({
       "@type": "Offer",
       name: `${data.trial.planName}, ${data.trial.days}-day free trial`,
-      description: `${data.trial.days} days of ${data.trial.planName} free for every new club, no card needed`,
+      description: [`${data.trial.days} days of ${data.trial.planName} free for every new club, no card needed`, trialAllowancesLine(data)]
+        .filter(Boolean)
+        .join(". ")
+        .replace(/\.$/, ""),
       price: 0,
       priceCurrency: currency,
       url,

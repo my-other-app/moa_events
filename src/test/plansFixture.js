@@ -48,3 +48,26 @@ export function quotaPlansResponse() {
   }
   return d;
 }
+
+/** The owner's pricing of 2026-10-25 (migration pricing_adjust): promotional WhatsApp capped at 20%, AI actions, ₹1.50. */
+const PROMOTIONAL = { free: 0, starter: 10, growth: 50, pro: 200, enterprise: null };
+const AI_ACTIONS = { free: 0, starter: 20, growth: 150, pro: 500, enterprise: null };
+
+/**
+ * The answer once the backend has pricing_adjust: ₹1.50 a WhatsApp extra,
+ * each plan's cap on promotional WhatsApp and its AI actions, and the free
+ * trial's own allowances (2,000 emails, 50 WhatsApp, 10 of them
+ * promotional, 50 AI actions a month), on top of the message quotas.
+ */
+export function pricedPlansResponse() {
+  const d = quotaPlansResponse();
+  for (const p of d.plans) {
+    p.limits.whatsapp_marketing_per_month = PROMOTIONAL[p.key] ?? null;
+    p.limits.ai_actions_per_month = AI_ACTIONS[p.key] ?? null;
+    p.whatsapp_overage_paise = 150;
+    if (p.key !== "free") p.features.push({ key: "ai_assist", label: "AI assist: event drafts, writing and feedback summaries", included: true });
+    else p.features.push({ key: "ai_assist", label: "AI assist: event drafts, writing and feedback summaries", included: false });
+  }
+  d.trial.limits = { emails_per_month: 2000, whatsapp_per_month: 50, whatsapp_marketing_per_month: 10, ai_actions_per_month: 50 };
+  return d;
+}
