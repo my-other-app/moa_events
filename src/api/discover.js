@@ -26,7 +26,8 @@ import {
  * club's page, the clubs' posts. Everything here is readable without an
  * account, so no request carries the token a registration may have left
  * behind. One post is read as the signed-in person, when there is one, so
- * it can say whether they liked it and how they voted.
+ * it can say whether they liked it and how they voted; and its comments,
+ * so they come as that person may see them (without anyone they blocked).
  *
  * The shapes (filters, queries, parsers) are in ./parse.js and re-exported
  * here; the server reads the same API through src/server/discover.js.
@@ -164,6 +165,9 @@ export const discoverApi = {
     }, tag),
 
   comments: (id) => get(`/api/v1/threads/${encodeURIComponent(id)}/comments`).then((d) => list(d, parseComment), tag),
+
+  /** The same comments, read as the signed-in person: fresher than the page's HTML, and without anyone they blocked. */
+  readerComments: (id) => getAsReader(`/api/v1/threads/${encodeURIComponent(id)}/comments`).then((d) => list(d, parseComment), tag),
 
   /** One public event's page by slug or numeric id; rejects with `notFound` when it isn't public. */
   event: (ref, options) => lookUpEvent(ref, options),

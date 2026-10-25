@@ -80,9 +80,10 @@ export function Dialog({ open, onClose, labelledBy, className, backdropClassName
 /**
  * "Do this in the app": following, liking, voting and commenting need an
  * account, and accounts live in the app. `alt`, when given, is the other way
- * (signing in here), under an "or".
+ * (signing in here), under an "or" — or, with `altFirst`, the first way,
+ * with the app under the "or" (commenting: there is no iPhone app yet).
  */
-export function AppPrompt({ open, onClose, title = "Get MyOtherApp", message, alt = null }) {
+export function AppPrompt({ open, onClose, title = "Get MyOtherApp", message, alt = null, altFirst = false }) {
   const id = useId();
   return (
     <Dialog open={open} onClose={onClose} labelledBy={id} className="dc-modal" backdropClassName="dc-modal-backdrop">
@@ -92,8 +93,14 @@ export function AppPrompt({ open, onClose, title = "Get MyOtherApp", message, al
       <img className="dc-modal-mark" src={assetSrc(logoIcon)} alt="" width="56" height="56" />
       <h2 id={id}>{title}</h2>
       <p>{message || "Follow clubs, get your tickets in a tap and hear about events before they fill up. Free on your phone."}</p>
+      {alt && altFirst ? (
+        <div className="dc-modal-alt dc-modal-alt--first">
+          {alt}
+          <span className="dc-modal-or">or get the app</span>
+        </div>
+      ) : null}
       <StoreButtons />
-      {alt ? (
+      {alt && !altFirst ? (
         <div className="dc-modal-alt">
           <span className="dc-modal-or">or</span>
           {alt}

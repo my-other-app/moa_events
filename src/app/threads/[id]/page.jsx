@@ -12,8 +12,10 @@ import { getComments, getThreadPage } from "@/server/discover";
  * /threads/{id}: one post. SERVER-RENDERED, statically regenerated (ISR,
  * at most once a minute): the post (its words, picture and poll), its
  * counts and its comments are in the HTML, read as nobody, with its
- * DiscussionForumPosting and BreadcrumbList structured data. Liking and
- * voting are islands that read the post again as the signed-in reader.
+ * DiscussionForumPosting and BreadcrumbList structured data. Liking,
+ * voting and commenting are islands that read the post again as the
+ * signed-in reader (the comments stay in the HTML; a reader's new comment
+ * shows in their browser, and in the HTML once the page regenerates).
  * A post that is gone → ./not-found.jsx (a real 404). A made-up demo
  * club's post says noindex, follow (src/seo/demo.js).
  */

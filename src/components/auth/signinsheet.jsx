@@ -16,6 +16,7 @@ const TITLES = {
   follow: "Sign in to follow",
   like: "Sign in to like posts",
   vote: "Sign in to vote",
+  comment: "Sign in to comment",
   register: "Sign in to register",
 };
 

@@ -1,12 +1,13 @@
 import apiClient from "./client";
-import { parseClub, parseClubRef, parsePoll } from "./discover";
+import { parseClub, parseClubRef, parseComment, parsePoll } from "./discover";
 
 /**
  * The signed-in person's side of the API: signing in (with Google, or an
  * email and password), making an account, verifying its email, resetting a
- * password, their profile, their tickets, the clubs they follow, and liking
- * and voting on posts. Every call but the sign-ins themselves goes with the
- * account's token (client.js adds it, and refreshes it once when it is refused).
+ * password, their profile, their tickets, the clubs they follow, and liking,
+ * voting and commenting on posts. Every call but the sign-ins themselves
+ * goes with the account's token (client.js adds it, and refreshes it once
+ * when it is refused).
  *
  * Responses are read defensively, as discover.js reads its own.
  */
@@ -171,4 +172,21 @@ export const accountApi = {
   /** One vote per person; voting again moves it. Resolves the poll as it now stands. */
   vote: (threadId, optionId) =>
     apiClient.post(`/api/v1/threads/${encodeURIComponent(threadId)}/vote`, { option_id: String(optionId) }).then((r) => parsePoll(r.data)),
+
+  /**
+   * A comment on the post, as the signed-in person (the app's own route).
+   * The words go trimmed; the API takes 1 to 500 characters, 30 comments a
+   * minute (429 past that), and answers 404 for a post that is gone.
+   * Resolves the comment as the API saved it, in parseComment's shape.
+   */
+  addComment: (threadId, body) =>
+    apiClient.post(`/api/v1/threads/${encodeURIComponent(threadId)}/comments`, { body: String(body ?? "").trim() }).then((r) => {
+      const comment = parseComment(r.data);
+      if (!comment) throw new Error("The comment didn't come back");
+      return comment;
+    }),
+
+  /** Removes one of the signed-in person's own comments (403 for anyone else's). */
+  deleteComment: (threadId, commentId) =>
+    apiClient.delete(`/api/v1/threads/${encodeURIComponent(threadId)}/comments/${encodeURIComponent(commentId)}`).then(() => true),
 };
