@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { plansResponse, pricedPlansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
+import { creditPacksResponse, plansResponse, prepaidPlansResponse, pricedPlansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
 
-const { parsePlans } = await import("@/utils/pricing");
+const { parseCreditPacks, parsePlans } = await import("@/utils/pricing");
 const { Pricing } = await import("./pricing");
 const { PricingView } = await import("./pricingpage");
 
@@ -270,11 +270,11 @@ describe("with the monthly messages (the backend's message_quotas)", () => {
       .getAllByRole("cell")
       .map((td) => td.textContent);
 
-  it("puts each plan's emails and WhatsApp on its card, and what an extra one costs", () => {
+  it("puts each plan's emails and WhatsApp on its card, and never a price per extra message", () => {
     show(quotaData());
     const starter = within(card("Starter"));
     expect(starter.getByText("1,000 emails / 50 WhatsApp a month")).toBeInTheDocument();
-    expect(starter.getByText("Extra: ₹0.10 per email, ₹1 per WhatsApp")).toBeInTheDocument();
+    expect(screen.queryByText(/^Extra:|per email|per WhatsApp/)).toBeNull();
     expect(within(card("Growth")).getByText("5,000 emails / 250 WhatsApp a month")).toBeInTheDocument();
     expect(within(card("Pro")).getByText("20,000 emails / 1,000 WhatsApp a month")).toBeInTheDocument();
     const ent = within(card("Enterprise"));
@@ -282,13 +282,12 @@ describe("with the monthly messages (the backend's message_quotas)", () => {
     expect(ent.queryByText(/^Extra:/)).toBeNull();
   });
 
-  it("compares the limits and the extra prices, Free never billed", () => {
+  it("compares the message limits, with no row for an extra message's price", () => {
     show(quotaData());
     const table = screen.getByRole("table");
     expect(cellsOf(table, "Emails a month")).toEqual(["200", "1,000", "5,000", "20,000", "Custom"]);
     expect(cellsOf(table, "WhatsApp messages a month")).toEqual(["—Not included", "50", "250", "1,000", "Custom"]);
-    expect(cellsOf(table, "Each extra email")).toEqual(["—Not included", "₹0.10", "₹0.10", "₹0.10", "Custom"]);
-    expect(cellsOf(table, "Each extra WhatsApp message")).toEqual(["—Not included", "₹1", "₹1", "₹1", "Custom"]);
+    expect(within(table).queryByRole("rowheader", { name: /extra/i })).toBeNull();
   });
 });
 
@@ -300,22 +299,65 @@ describe("with the pricing of 2026-10-25 (the backend's pricing_adjust)", () => 
       .getAllByRole("cell")
       .map((td) => td.textContent);
 
-  it("puts the promotional cap and the ₹1.50 extra on the cards, and what the trial allows under them", () => {
+  it("puts the promotional cap on the cards, and what the trial allows under them", () => {
     show(pricedData());
     const pro = within(card("Pro"));
     expect(pro.getByText("20,000 emails / 1,000 WhatsApp (up to 200 promotional) a month")).toBeInTheDocument();
-    expect(pro.getByText("Extra: ₹0.10 per email, ₹1.50 per WhatsApp")).toBeInTheDocument();
+    expect(pro.queryByText(/^Extra:/)).toBeNull();
     expect(screen.getByText("The 14-day Pro trial has everything in Pro, with 2,000 emails, 50 WhatsApp messages and 50 AI actions a month.")).toBeInTheDocument();
   });
 
-  it("compares WhatsApp with its promotional cap, AI actions, and the new extra price", () => {
+  it("compares WhatsApp with its promotional cap and AI actions, and no extra price", () => {
     show(pricedData());
     const table = screen.getByRole("table");
     expect(cellsOf(table, "WhatsApp messages a month")).toEqual([
       "—Not included", "50 (up to 10 promotional)", "250 (up to 50 promotional)", "1,000 (up to 200 promotional)", "Custom",
     ]);
     expect(cellsOf(table, "AI actions a month")).toEqual(["—Not included", "20", "150", "500", "Unlimited"]);
-    expect(cellsOf(table, "Each extra WhatsApp message")).toEqual(["—Not included", "₹1.50", "₹1.50", "₹1.50", "Custom"]);
+    expect(within(table).queryByRole("rowheader", { name: /extra/i })).toBeNull();
     expect(within(table).queryByRole("rowheader", { name: /promotional|marketing/i })).toBeNull();
+  });
+});
+
+
+describe("the top-up packs on /pricing (GET /api/v1/credit-packs)", () => {
+  const view = (packs) =>
+    render(
+      <MemoryRouter>
+        <PricingView plans={parsePlans(prepaidPlansResponse())} packs={packs} />
+      </MemoryRouter>
+    );
+
+  it("lists the email and WhatsApp packs with their prices, GST and how long credits last", () => {
+    view(parseCreditPacks(creditPacksResponse()));
+    const section = screen.getByRole("region", { name: "Need more messages?" });
+    expect(section).toHaveAttribute("id", "top-ups");
+    const s = within(section);
+    expect(s.getByText("Top-up packs")).toBeInTheDocument();
+    expect(s.getByText(/plan's own emails and WhatsApp messages go first, then the credits you've bought, the earliest to expire first/)).toBeInTheDocument();
+    expect(s.getByText(/announcements and reminders pause; tickets, certificates and payment messages always go/)).toBeInTheDocument();
+    const email = within(s.getByRole("list", { name: "Email credits" }));
+    expect(email.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "1,000 emails₹99about ₹0.10 each",
+      "5,000 emails₹449about ₹0.09 each",
+      "20,000 emails₹1,599about ₹0.08 each",
+    ]);
+    const whatsapp = within(s.getByRole("list", { name: "WhatsApp credits" }));
+    expect(whatsapp.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "100 WhatsApp messages₹150₹1.50 each",
+      "500 WhatsApp messages₹699about ₹1.40 each",
+      "2,000 WhatsApp messages₹2,599about ₹1.30 each",
+    ]);
+    expect(s.getByText("Prices include GST. Credits last 12 months from purchase. Buy them any time from Billing in your clubs dashboard.")).toBeInTheDocument();
+    // Packs, not a price per extra message, anywhere on the page.
+    expect(screen.queryByText(/^Extra:/)).toBeNull();
+    expect(screen.queryByRole("rowheader", { name: /extra/i })).toBeNull();
+  });
+
+  it("shows no packs section without packs (an older API, or it couldn't be read)", () => {
+    view(null);
+    expect(screen.queryByRole("region", { name: "Need more messages?" })).toBeNull();
+    expect(screen.queryByText("Top-up packs")).toBeNull();
+    expect(screen.getByRole("table")).toBeInTheDocument();
   });
 });

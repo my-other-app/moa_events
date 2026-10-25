@@ -71,3 +71,34 @@ export function pricedPlansResponse() {
   d.trial.limits = { emails_per_month: 2000, whatsapp_per_month: 50, whatsapp_marketing_per_month: 10, ai_actions_per_month: 50 };
   return d;
 }
+
+/**
+ * The answer once the backend has prepaid credits (migration message_credits):
+ * no per-message extra is sold, so both overage prices are null; on top of
+ * pricing_adjust's answer.
+ */
+export function prepaidPlansResponse() {
+  const d = pricedPlansResponse();
+  for (const p of d.plans) {
+    p.email_overage_paise = null;
+    p.whatsapp_overage_paise = null;
+  }
+  return d;
+}
+
+/** GET /api/v1/credit-packs with the owner's default packs (migration message_credits). */
+export function creditPacksResponse() {
+  return {
+    currency: "INR",
+    prices_include_gst: true,
+    validity_months: 12,
+    packs: [
+      { id: 1, channel: "email", quantity: 1000, price_paise: 9900, sort_order: 10 },
+      { id: 2, channel: "email", quantity: 5000, price_paise: 44900, sort_order: 20 },
+      { id: 3, channel: "email", quantity: 20000, price_paise: 159900, sort_order: 30 },
+      { id: 4, channel: "whatsapp", quantity: 100, price_paise: 15000, sort_order: 10 },
+      { id: 5, channel: "whatsapp", quantity: 500, price_paise: 69900, sort_order: 20 },
+      { id: 6, channel: "whatsapp", quantity: 2000, price_paise: 259900, sort_order: 30 },
+    ],
+  };
+}

@@ -19,7 +19,7 @@ import {
   parseThreadsPage,
   threadsQuery,
 } from "@/api/parse";
-import { parsePlans } from "@/utils/pricing";
+import { parseCreditPacks, parsePlans } from "@/utils/pricing";
 import { everyoneHome } from "@/utils/home";
 import { ApiError, apiGet, forwardsVisitor } from "./api";
 
@@ -205,6 +205,17 @@ export const getComments = cache(async (id) => {
 export const getPlans = cache(async () => {
   const { data } = await apiGet("/api/v1/plans", { revalidate: 300, tags: [TAGS.plans] });
   return data ? parsePlans(data) : null;
+});
+
+/**
+ * The top-up packs (GET /api/v1/credit-packs), the same for everyone; null
+ * when there are none or the API has no such route (404, an older backend):
+ * the pricing page then shows no packs, never numbers of its own. Read like
+ * the plans: an API that fails raises, so the page keeps its last good copy.
+ */
+export const getCreditPacks = cache(async () => {
+  const { data } = await apiGet("/api/v1/credit-packs", { revalidate: 300, tags: [TAGS.plans] });
+  return data ? parseCreditPacks(data) : null;
 });
 
 /* ---------- the sitemap ---------- */

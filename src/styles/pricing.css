@@ -322,14 +322,6 @@
   color: #fff;
 }
 /* What a message past the month's limits costs, under the limits. */
-.pr-plan-extra {
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--dc-muted);
-}
-.is-featured .pr-plan-extra {
-  color: #9ca3af;
-}
 .pr-plan-adds {
   margin-top: 20px;
 }
@@ -689,4 +681,72 @@
   .pr-scroll-hint {
     display: none;
   }
+}
+
+/* ---------- top-up packs (GET /api/v1/credit-packs) ---------- */
+
+.pr-packs {
+  padding-top: 80px;
+  scroll-margin-top: 72px;
+}
+.pr-packs .pr-compare-head p:not(.dc-eyebrow) {
+  max-width: 640px;
+  margin-inline: auto;
+}
+.pr-packs .pr-compare-head p.dc-eyebrow {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.pr-packs-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  max-width: 880px;
+  margin: 0 auto;
+}
+@media (min-width: 720px) {
+  .pr-packs-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.pr-packs-channel {
+  min-width: 0;
+  padding: 22px 22px 14px;
+  border: 1px solid var(--dc-line);
+  border-radius: 18px;
+  background: #fff;
+}
+.pr-packs-channel h3 {
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--dc-ink);
+}
+.pr-packs-channel ul {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-pack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--dc-line);
+}
+.pr-pack-qty {
+  font-weight: 600;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.pr-pack-price {
+  grid-row: span 2;
+  align-self: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--dc-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pr-pack-unit {
+  font-size: 13px;
+  color: var(--dc-muted);
 }

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeFetch } from "@/test/next";
 import { html, jsonLdOf } from "@/test/html";
-import { plansResponse } from "@/test/plansFixture";
+import { creditPacksResponse, plansResponse } from "@/test/plansFixture";
 import { validateSoftwareApplication } from "@/seo/validate";
 import { LEGAL } from "@/content/legal";
 
@@ -11,6 +11,7 @@ let fetch;
 beforeEach(() => {
   fetch = fakeFetch((url) => {
     if (url.pathname === "/api/v1/plans") return { body: plansResponse() };
+    if (url.pathname === "/api/v1/credit-packs") return { body: creditPacksResponse() };
     if (url.pathname === "/api/v1/discover/home") return { body: { where: { source: "none" }, stats: { upcoming_events: 128, clubs: 42, cities: 3 }, clubs: [] } };
     return { status: 404, body: {} };
   });
@@ -54,10 +55,22 @@ describe("the static pages", () => {
     expect(route.metadata.alternates.canonical).toBe("https://myotherapp.in/pricing");
     const out = html(await route.default(), "/pricing");
     for (const words of ["Plans for", "Growth", "Most popular", "₹699", 'id="compare"', "Events a month"]) expect(out).toContain(words);
+    // The top-up packs, in the HTML, and no price per extra message.
+    for (const words of ['id="top-ups"', "Need more messages?", "1,000 emails", "₹99", "2,000 WhatsApp messages", "₹2,599", "Prices include GST."]) expect(out).toContain(words);
+    expect(out).not.toMatch(/Each extra|Extra: ₹/);
     const [ld] = jsonLdOf(out);
     expect(validateSoftwareApplication(ld)).toEqual({ errors: [], warnings: [] });
     expect(ld).toMatchObject({ url: "https://myotherapp.in/pricing" });
     expect(ld.offers).toHaveLength(9);
+  });
+
+  it("/pricing: no packs section on an API without /credit-packs (404)", async () => {
+    vi.stubGlobal("fetch", fakeFetch((url) => (url.pathname === "/api/v1/plans" ? { body: plansResponse() } : { status: 404, body: {} })));
+    const route = await import("../pricing/page.jsx");
+    const out = html(await route.default(), "/pricing");
+    expect(out).toContain('id="compare"');
+    expect(out).not.toContain('id="top-ups"');
+    expect(out).not.toContain("Need more messages?");
   });
 
   it("/for-clubs: what clubs get, the plans, the numbers, and the plans' structured data", async () => {

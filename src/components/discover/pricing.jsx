@@ -15,7 +15,6 @@ import {
   includes,
   limitRows,
   messagesLine,
-  overageLine,
   planCta,
   planLimitCell,
   planPrice,
@@ -103,9 +102,8 @@ function More({ href, children }) {
 function PlanCard({ plans, index, cycle, currency, moreHref, trial = null, enterpriseTrialDays = null }) {
   const plan = plans[index];
   const cta = planCta(plan, cycle, { clubsUrl: CLUBS_URL, contactEmail: CONTACT_EMAIL, currency, trial, enterpriseTrialDays });
-  // The limits a card leads with, then the month's emails and WhatsApp, and what more of them costs.
+  // The limits a card leads with, then the month's emails and WhatsApp (more come in top-up packs, not per message).
   const limits = [...headlineLimits(plan), messagesLine(plan)].filter(Boolean);
-  const extra = overageLine(plan, currency);
   const adds = addedFeatures(plans, index);
   const shown = adds.length > ADDS_ALL ? adds.slice(0, ADDS_SOME) : adds;
   const before = index > 0 ? plans[index - 1].name : null;
@@ -133,7 +131,6 @@ function PlanCard({ plans, index, cycle, currency, moreHref, trial = null, enter
           ))}
         </ul>
       ) : null}
-      {extra ? <p className="pr-plan-extra">{extra}</p> : null}
       {shown.length ? (
         <div className="pr-plan-adds">
           <p>{before ? `Everything in ${before}, plus:` : "Includes:"}</p>
@@ -228,7 +225,7 @@ export function CompareTable({ data, cycle }) {
                 <tr key={r.key}>
                   <th scope="row">{r.label}</th>
                   {plans.map((p) => {
-                    const v = planLimitCell(p, r.key, currency);
+                    const v = planLimitCell(p, r.key);
                     return (
                       <td key={p.key} className={cell(p, v === "Unlimited" ? "is-unlimited" : "")}>
                         {v ?? <Dash />}

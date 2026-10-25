@@ -47,9 +47,8 @@ function parsePlan(p) {
     trialDays: count(o.trial_days) ?? 0,
     contactSales: o.contact_sales === true,
     featured: o.featured === true,
-    /** Each email / WhatsApp message past the monthly limit, in paise; null when the API doesn't say. */
-    emailOverage: count(o.email_overage_paise) ?? null,
-    whatsappOverage: count(o.whatsapp_overage_paise) ?? null,
+    // No per-message price is read (`email_overage_paise`, `whatsapp_overage_paise`):
+    // extra messages are no longer billed; clubs buy top-up packs instead (parseCreditPacks).
     limits,
     features,
   };
@@ -268,17 +267,12 @@ export const LIMITS = [
 
 /**
  * The monthly message limits: every email and WhatsApp message a club sends
- * (tickets, certificates, reminders, announcements). Past them a paid plan
- * pays the overage price for each; Free pauses announcements instead.
+ * (tickets, certificates, reminders, announcements). Past them a club uses
+ * the credits it bought (top-up packs); with none left, announcements and
+ * reminders pause while tickets, certificates and payment messages still go.
  */
 export const MESSAGE_LIMITS = ["emails_per_month", "whatsapp_per_month"];
 
-/** The table's rows for what an extra message costs, after the limits. */
-const OVERAGE_ROWS = [
-  { key: "email_overage", label: "Each extra email", field: "emailOverage" },
-  { key: "whatsapp_overage", label: "Each extra WhatsApp message", field: "whatsappOverage" },
-];
-const OVERAGE_BY_KEY = new Map(OVERAGE_ROWS.map((r) => [r.key, r]));
 const LIMIT_BY_KEY = new Map(LIMITS.map((l) => [l.key, l]));
 
 /**
@@ -338,14 +332,7 @@ export function headlineLimits(plan, keys = HEADLINE_LIMITS) {
  * null (a dash) for none, not stated, or a limit on a feature the plan
  * doesn't have.
  */
-export function planLimitCell(plan, key, currency = "INR") {
-  const overage = OVERAGE_BY_KEY.get(key);
-  if (overage) {
-    // Only a paid plan is billed for more; Enterprise's are agreed with the club.
-    const kind = planKind(plan);
-    if (kind === "contact") return "Custom";
-    return kind === "paid" && plan[overage.field] !== null && plan[overage.field] !== undefined ? formatPaisa(plan[overage.field], currency) : null;
-  }
+export function planLimitCell(plan, key) {
   // Enterprise's message limits are set club by club (unlimited until they are).
   if (MESSAGE_LIMITS.includes(key) && planKind(plan) === "contact" && (plan.limits[key] === null || plan.limits[key] === undefined)) return "Custom";
   const needs = LIMIT_BY_KEY.get(key)?.needs;
@@ -359,11 +346,7 @@ export function limitRows(plans) {
   const keys = new Set(plans.flatMap((p) => Object.keys(p.limits)).filter((k) => !HIDDEN_LIMITS.has(k)));
   const known = LIMITS.filter((l) => keys.has(l.key));
   const extra = [...keys].filter((k) => !LIMIT_BY_KEY.has(k)).map(limitSpec);
-  const rows = [...known, ...extra].map(({ key, row }) => ({ key, label: row }));
-  // What an extra message costs, once the plans have message limits and prices.
-  const priced = MESSAGE_LIMITS.some((k) => keys.has(k));
-  const overage = priced ? OVERAGE_ROWS.filter((r) => plans.some((p) => p[r.field] !== null && p[r.field] !== undefined)) : [];
-  return [...rows, ...overage.map(({ key, label }) => ({ key, label }))];
+  return [...known, ...extra].map(({ key, row }) => ({ key, label: row }));
 }
 
 /**
@@ -383,20 +366,6 @@ export function messagesLine(plan) {
   if (email && whatsapp) return `${email} / ${whatsapp} a month`;
   if (email) return `${email} a month`;
   return whatsapp ? `${whatsapp.charAt(0).toUpperCase()}${whatsapp.slice(1)} a month` : null;
-}
-
-/**
- * What a message past the monthly limits costs: "Extra: ₹0.10 per email,
- * ₹1.50 per WhatsApp", as the API prices it. A paid plan only: Free has no
- * card to charge (its announcements pause at the limit instead), Enterprise
- * agrees its own. Promotional WhatsApp is never sold as an extra.
- */
-export function overageLine(plan, currency = "INR") {
-  if (planKind(plan) !== "paid") return null;
-  const parts = [];
-  if (plan.emailOverage !== null && plan.emailOverage !== undefined) parts.push(`${formatPaisa(plan.emailOverage, currency)} per email`);
-  if (plan.whatsappOverage !== null && plan.whatsappOverage !== undefined) parts.push(`${formatPaisa(plan.whatsappOverage, currency)} per WhatsApp`);
-  return parts.length ? `Extra: ${parts.join(", ")}` : null;
 }
 
 /* ---------- features ---------- */
@@ -543,8 +512,8 @@ export function plansJsonLd(data, { url, siteUrl, description }) {
   }
   for (const p of data.plans) {
     const kind = planKind(p);
-    // What a month's messages include, and what more of them costs: plain text on each offer.
-    const about = [messagesLine(p), overageLine(p, currency)].filter(Boolean).join(". ");
+    // What a month's messages include: plain text on each offer.
+    const about = messagesLine(p) ?? "";
     const described = (o) => (about ? { ...o, description: about } : o);
     if (kind === "free") offers.push(described(offer(p.name, 0, "P1M")));
     if (kind !== "paid") continue;
@@ -578,8 +547,100 @@ export function planSummary(plan, currency = "INR") {
             .join(" or ");
   const limits = [...headlineLimits(plan), messagesLine(plan)].filter(Boolean).join(", ");
   const sentence = (t) => (/[.!?…]$/.test(t) ? t : `${t}.`);
-  return [price, plan.tagline, limits ? `${limits.charAt(0).toUpperCase()}${limits.slice(1)}` : null, overageLine(plan, currency)]
+  return [price, plan.tagline, limits ? `${limits.charAt(0).toUpperCase()}${limits.slice(1)}` : null]
     .filter(Boolean)
     .map(sentence)
     .join(" ");
+}
+
+/* ---------- top-up packs ---------- */
+
+/** The channels a pack can be for, in the order the page lists them. */
+export const PACK_CHANNELS = ["email", "whatsapp"];
+
+const PACK_CHANNEL_WORDS = {
+  email: { title: "Email credits", one: "email", many: "emails" },
+  whatsapp: { title: "WhatsApp credits", one: "WhatsApp message", many: "WhatsApp messages" },
+};
+
+function parsePack(p) {
+  const o = obj(p);
+  const channel = str(o?.channel);
+  const quantity = count(o?.quantity);
+  const price = count(o?.price_paise);
+  if (!PACK_CHANNELS.includes(channel) || !quantity || !price) return null;
+  return { channel, quantity, price, sortOrder: Number.isInteger(o.sort_order) ? o.sort_order : 0 };
+}
+
+/**
+ * The top-up packs, as GET /api/v1/credit-packs sends them:
+ * `{currency, includesGst, validityMonths, channels: [{channel, packs}]}`,
+ * the channels email then WhatsApp and each one's packs in the API's order
+ * (sort_order, then size). Read defensively like the plans: a pack for a
+ * channel this page doesn't know, with no quantity or no price, or the same
+ * as one before it is dropped. Null when there is no pack left to show (or
+ * the API has no packs at all): the page then shows no packs.
+ */
+export function parseCreditPacks(d) {
+  const o = obj(d);
+  if (!o) return null;
+  const seen = new Set();
+  const packs = (Array.isArray(o.packs) ? o.packs : [])
+    .map(parsePack)
+    .filter((p) => {
+      const key = `${p?.channel}:${p?.quantity}:${p?.price}`;
+      return p && !seen.has(key) && seen.add(key);
+    });
+  const channels = PACK_CHANNELS.map((channel) => ({
+    channel,
+    packs: packs.filter((p) => p.channel === channel).sort((a, b) => a.sortOrder - b.sortOrder || a.quantity - b.quantity),
+  })).filter((c) => c.packs.length);
+  if (!channels.length) return null;
+  return {
+    currency: typeof o.currency === "string" && /^[A-Z]{3}$/.test(o.currency) ? o.currency : "INR",
+    /** True: the prices include GST (as the plans' do). Null when the API doesn't say. */
+    includesGst: typeof o.prices_include_gst === "boolean" ? o.prices_include_gst : null,
+    validityMonths: count(o.validity_months) || null,
+    channels,
+  };
+}
+
+/** "Email credits", "WhatsApp credits". */
+export const packChannelTitle = (channel) => PACK_CHANNEL_WORDS[channel]?.title ?? channel;
+
+/** "1,000 emails", "100 WhatsApp messages". */
+export function packQuantity(pack) {
+  const w = PACK_CHANNEL_WORDS[pack.channel];
+  return `${formatNumber(pack.quantity)} ${pack.quantity === 1 ? w.one : w.many}`;
+}
+
+/** A pack's price, to the paisa: "₹99", "₹1,599". */
+export const packPrice = (pack, currency = "INR") => formatPaisa(pack.price, currency);
+
+/**
+ * What one message in the pack comes to: "₹1.50 each" when it divides to the
+ * paisa, otherwise "about ₹0.09 each" (rounded to the paisa).
+ */
+export function packUnit(pack, currency = "INR") {
+  const paise = Math.round(pack.price / pack.quantity);
+  if (paise < 1) return `under ${formatPaisa(1, currency)} each`;
+  const each = formatPaisa(paise, currency);
+  return pack.price % pack.quantity === 0 ? `${each} each` : `about ${each} each`;
+}
+
+/** How bought credits are used, in one sentence each. */
+export const CREDITS_MODEL = [
+  "Each month your plan's own emails and WhatsApp messages go first, then the credits you've bought, the earliest to expire first.",
+  "With none left, announcements and reminders pause; tickets, certificates and payment messages always go.",
+];
+
+/** The small print under the packs: "Prices include GST. Credits last 12 months from purchase. …". */
+export function packsFinePrint(data) {
+  const parts = [];
+  if (data.includesGst === true) parts.push("Prices include GST.");
+  else if (data.includesGst === false) parts.push("Prices are before GST.");
+  const m = data.validityMonths;
+  if (m) parts.push(`Credits last ${formatNumber(m)} ${m === 1 ? "month" : "months"} from purchase.`);
+  parts.push("Buy them any time from Billing in your clubs dashboard.");
+  return parts.join(" ");
 }
