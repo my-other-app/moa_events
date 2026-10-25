@@ -43,7 +43,8 @@ describe("the threads page", () => {
     show(<ThreadsView page={parseThreadsPage({ items: [post, poll], total: 2, offset: 0, limit: 12 })} />);
     expect(screen.getByText("Kits are in! Pick yours up at Lab 3B.")).toBeInTheDocument();
     expect(get).not.toHaveBeenCalled();
-    expect(screen.getByText(/Like, vote and comment in the app/)).toBeInTheDocument();
+    // A build without sign-in: the app is the only way (signed in or out with it: threads.comments.test.jsx).
+    expect(screen.getByText("News, photos and polls from clubs on MyOtherApp. Like, vote and comment in the MyOtherApp app.")).toBeInTheDocument();
     expect(screen.getByText("Pinned")).toBeInTheDocument();
     expect(screen.getByText("12 likes")).toBeInTheDocument();
     expect(screen.getByText("2 comments")).toBeInTheDocument();
@@ -73,7 +74,7 @@ describe("the threads page", () => {
 });
 
 describe("one post", () => {
-  it("shows the post and its comments, and sends every action to the app", async () => {
+  it("shows the post and its comments, and in a build without sign-in sends every action to the app", async () => {
     show(<ThreadView thread={parseThread(poll)} comments={COMMENTS} />);
     expect(screen.getByText("Which night for the next build?")).toBeInTheDocument();
     expect(screen.getByText("Friday please")).toBeInTheDocument();
@@ -93,8 +94,21 @@ describe("one post", () => {
     expect(within(dialog).getByText(/Liking a post/)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
 
+    // Without sign-in the app is the only way, and the prompt says plainly that iPhone has to wait.
     fireEvent.click(screen.getByRole("button", { name: "Comment (2 comments)" }));
-    expect(within(screen.getByRole("dialog")).getByText(/Comments are written in the MyOtherApp app/)).toBeInTheDocument();
+    dialog = screen.getByRole("dialog", { name: "Do this in the app" });
+    expect(within(dialog).getByText(/^For now, comments are written in the MyOtherApp app for Android.*The iPhone app is on its way\.$/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /Sign in/ })).toBeNull();
+    // No box to write in, and nothing offers signing in.
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sign in/ })).toBeNull();
+  });
+
+  it("says when there are no comments yet, without sending anyone to the app for it", () => {
+    show(<ThreadView thread={parseThread({ ...post, comments: 0 })} comments={[]} />);
+    expect(screen.getByRole("heading", { name: "Comments" })).toBeInTheDocument();
+    expect(screen.getByText("No comments yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/Be the first/)).toBeNull();
   });
 
   // The owner saw "two Like and Comment buttons" on a post's page: a row of

@@ -97,10 +97,11 @@ describe("a post, signed in", () => {
     await waitFor(() => expect(like).toHaveAttribute("aria-pressed", "false"));
     expect(like).toHaveAccessibleName("Like (12 likes)");
     expect(post).toHaveBeenCalledTimes(2);
-    // Still one like control, and commenting still happens in the app.
+    // Still one like control, and Comment goes to the box under the comments, not to the app.
     expect(screen.getAllByRole("button", { name: /like/i })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /^Comment\b/ }));
-    expect(screen.getByRole("dialog", { name: "Do this in the app" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Write a comment" })).toHaveFocus();
   });
 
   it("pops the heart and rolls the count only for the reader's own like", async () => {

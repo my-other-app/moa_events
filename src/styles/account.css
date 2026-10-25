@@ -436,6 +436,13 @@
   font-weight: 600;
   letter-spacing: 0;
 }
+/* Signing in first, the app under the "or" (commenting). */
+.dc-modal-alt--first {
+  margin: 0 0 16px;
+}
+.dc-modal-alt--first .dc-modal-or {
+  margin: 16px 0 0;
+}
 
 /* ---------- threads, signed in ---------- */
 
@@ -448,6 +455,80 @@
 .ac-thread-note {
   margin-top: 10px;
   font-size: 14px;
+  color: #b91c1c;
+}
+
+/* A comment: the words take the room, the reader's own Delete sits at the end. */
+.dc-comment-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ac-comment-delete {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: var(--dc-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.ac-comment-delete:hover:not(:disabled) {
+  background: var(--dc-sunken);
+  color: #b91c1c;
+}
+.ac-comment-delete:disabled {
+  cursor: progress;
+}
+
+/* The box to write a comment in, under the comments. */
+.ac-composer {
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--dc-line);
+}
+.dc-scope .ac-composer-text {
+  display: block;
+  width: 100%;
+  min-height: 92px;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  /* 16px: iPhone doesn't zoom into the box. */
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--dc-ink);
+  resize: vertical;
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
+}
+.dc-scope .ac-composer-text:hover {
+  border-color: #9ca3af;
+}
+.dc-scope .ac-composer-text:focus {
+  border-color: var(--dc-primary);
+}
+.dc-scope .ac-composer-text[readonly] {
+  background: var(--dc-sunken);
+}
+.ac-composer-text::placeholder {
+  color: #9ca3af;
+}
+.ac-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+.ac-composer-count {
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dc-muted);
+}
+.ac-composer-count.is-full {
   color: #b91c1c;
 }
 

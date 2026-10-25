@@ -1,9 +1,8 @@
 import { Link } from "@/lib/router";
-import { timeAgo } from "@/utils/format";
-import { Avatar, EmptyState } from "./bits";
+import { EmptyState } from "./bits";
 import { MoreResults } from "./finderislands";
 import { ThreadCard } from "./threadcard";
-import { ThreadActions, ThreadNote, ThreadPoll, ThreadReader, ThreadsLede } from "./threadislands";
+import { ThreadActions, ThreadComments, ThreadNote, ThreadPoll, ThreadReader, ThreadsLede } from "./threadislands";
 import Icon from "./icons";
 
 /**
@@ -38,8 +37,10 @@ export function ThreadsView({ page }) {
 /**
  * One post: the post, its counts and its comments, rendered on the server
  * (src/app/threads/[id]/page.jsx) as nobody reads it. Liking, voting and
- * commenting are islands (threadislands.jsx): a signed-in reader likes and
- * votes right here. The post's one Like and one Comment carry the counts.
+ * commenting are islands (threadislands.jsx): a signed-in reader likes,
+ * votes and comments right here. The post's one Like and one Comment carry
+ * the counts. The comments are in the page's HTML; once in the browser,
+ * <ThreadComments> holds them, with the reader's own added or deleted.
  *   thread     parseThread's result, images stable
  *   comments   parseComment's results, oldest first; null when they couldn't be read
  */
@@ -47,7 +48,7 @@ export function ThreadView({ thread, comments }) {
   const t = thread;
   const count = comments ? Math.max(comments.length, 0) : t.comments;
   return (
-    <ThreadReader thread={{ id: t.id, likes: t.likes, comments: count, poll: t.poll }}>
+    <ThreadReader thread={{ id: t.id, likes: t.likes, comments: count, poll: t.poll }} comments={comments}>
       <div className="dc-wrap dc-wrap--narrow">
         <Link className="dc-back" to="/threads">
           <Icon name="arrowLeft" size={16} /> All posts
@@ -55,30 +56,7 @@ export function ThreadView({ thread, comments }) {
         <h1 className="dc-sr">Post from {t.club.name}</h1>
         <ThreadCard thread={t} full headingLevel={2} poll={t.poll ? <ThreadPoll /> : null} actions={<ThreadActions />} />
         <ThreadNote />
-        <section className="dc-comments" aria-labelledby="dc-comments-title">
-          <h2 id="dc-comments-title">Comments{count ? ` (${count})` : ""}</h2>
-          {comments === null ? <p className="dc-section-sub">Comments couldn&rsquo;t load just now.</p> : null}
-          {comments && !comments.length ? <p className="dc-section-sub">No comments yet. Be the first — in the app.</p> : null}
-          {comments && comments.length ? (
-            <ul>
-              {comments.map((c) => (
-                <li key={c.id} className="dc-comment">
-                  <Avatar name={c.author.name} src={c.author.is_club ? t.club.logo : null} size={32} />
-                  <div>
-                    <p className="dc-comment-who">
-                      {c.author.name}
-                      {c.author.is_club ? <span className="dc-comment-club">Club</span> : null}
-                      <small>
-                        <time dateTime={c.created_at || undefined}>{timeAgo(c.created_at)}</time>
-                      </small>
-                    </p>
-                    <p>{c.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
+        <ThreadComments clubLogo={t.club.logo} />
       </div>
     </ThreadReader>
   );
