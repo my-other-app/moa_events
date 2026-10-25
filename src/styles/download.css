@@ -2,3 +2,8 @@
     background-color: #0eb39a;
     box-shadow: none;
 }
+.download-error {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: #fff;
+}
