@@ -110,7 +110,11 @@ describe("checking a file", () => {
     const bytes = new TextEncoder().encode("%PDF-1.4 the certificate");
     const real = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), (b) => b.toString(16).padStart(2, "0")).join("");
     const { sha256Hex } = await import("@/utils/certcode");
-    check({ fetchImpl: answer(200, { available: true, sha256: [real] }), digest: sha256Hex, file: new File([bytes], "c.pdf", { type: "application/pdf" }) });
+    // Node's File, from the same realm as crypto.subtle, as in a browser.
+    // jsdom's File hands back its own realm's ArrayBuffer, which Node 20's
+    // digest() refuses.
+    const { File: SameRealmFile } = await import("node:buffer");
+    check({ fetchImpl: answer(200, { available: true, sha256: [real] }), digest: sha256Hex, file: new SameRealmFile([bytes], "c.pdf", { type: "application/pdf" }) });
     expect(await screen.findByText("This file is exactly the one we issued.")).toBeInTheDocument();
   });
 });

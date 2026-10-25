@@ -197,8 +197,12 @@ describe("a club's page", () => {
     show("/clubs/circuit-society", { ...page, club: { ...page.club, events_held: 9 }, past: six });
     const region = await screen.findByRole("region", { name: "Past events" }, { timeout: 5000 });
     fireEvent.click(within(region).getByRole("button", { name: "Show more" }));
-    await waitFor(() => expect(within(region).queryByRole("button", { name: "Show more" })).toBeNull());
-    expect(within(region).queryByText(/Showing/)).toBeNull();
+    // The button reads "Loading…" while the request is out, so its label going
+    // is not yet the answer: wait for the count to go with it.
+    await waitFor(() => {
+      expect(within(region).queryByRole("button", { name: "Show more" })).toBeNull();
+      expect(within(region).queryByText(/Showing/)).toBeNull();
+    });
     expect(within(region).queryByRole("alert")).toBeNull();
     expect(within(region).getAllByRole("article")).toHaveLength(6);
   });

@@ -1,4 +1,7 @@
 import { webcrypto, createHash } from "node:crypto";
+// A Blob from the same realm as webcrypto, as in a browser. jsdom's Blob hands
+// back its own realm's ArrayBuffer, which Node 20's digest() refuses.
+import { Blob } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import { CODE_PATTERN, NUMBER_PATTERN, certificateCodeFrom, certificateNumberFrom, certificateNumberOf, parseVerification, sha256Hex } from "./certcode";
 
