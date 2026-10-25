@@ -36,8 +36,10 @@ const EMAIL = /[A-Z0-9._%+-]+(?:@|%40)[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}/gi;
 // number written with a leading +. Not an epoch, an id from 1-5, a price.
 const MOBILE = /(^|[^\d+])((?:\+?91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5})(?!\d)/g;
 const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
-// The last segment of these addresses is a code that opens the page.
-const CODED = /\/(tickets|certificates|verify)\/(?!\[)[^/?#\s"'<>]+/g;
+// The last segment of these addresses is a code that opens the page (a
+// waiting list's claim link, /claim/{token}, and the API's
+// /waitlist/offers/{token}, are its only credential).
+const CODED = /\/(tickets|certificates|verify|claim|offers)\/(?!\[)[^/?#\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
 
 export function maskText(text) {

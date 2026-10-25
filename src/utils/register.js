@@ -1,5 +1,6 @@
 import { formatWhen } from "./format";
 import { picksToPayload } from "./picks";
+import { discountRefusal, ticketTypeRefusal } from "./ticketing";
 
 /**
  * What the registration flow works out without touching the page: which
@@ -218,9 +219,15 @@ export function suggestEmail(email) {
 
 /* ---------- the steps ---------- */
 
-/** Only the steps this event's form has: the details always, then its questions and its shelf if it has them, then review. */
-export function stepsFor({ questions = [], items = [] } = {}) {
+/**
+ * Only the steps this event's form has: the ticket when there is a choice of
+ * them (docs/TICKETING.md: `requires_choice`, or a hidden type a link names
+ * beside the others), the details always, then its questions and its shelf
+ * if it has them, then review.
+ */
+export function stepsFor({ questions = [], items = [], chooseTicket = false } = {}) {
   return [
+    chooseTicket && { id: "ticket", label: "Ticket", title: "Choose your ticket" },
     { id: "details", label: "Details", title: "Your details" },
     questions.length > 0 && { id: "questions", label: "Questions", title: "A few questions" },
     items.length > 0 && { id: "addons", label: "Add-ons", title: "Add to your ticket" },
@@ -245,8 +252,23 @@ export function stepsFor({ questions = [], items = [] } = {}) {
  * there, so leaving it out after taking every pick off kept charging for the
  * earlier picks on the way back to pay. An event with nothing on its shelf
  * still sends no `store`, as it never did.
+ *
+ * `ticket_type_id` goes only when a ticket was chosen (or a link named one),
+ * and `discount_code` only when one was typed: an event with one ticket and
+ * no code sends exactly what it always did.
  */
-export function buildPayload({ values, questions, answers, ref, items = [], picks = {}, whatsapp = false, clubUpdates = false }) {
+export function buildPayload({
+  values,
+  questions,
+  answers,
+  ref,
+  items = [],
+  picks = {},
+  whatsapp = false,
+  clubUpdates = false,
+  ticketTypeId = null,
+  discountCode = null,
+}) {
   let details = {};
   if (questions.length > 0) {
     details = undefined;
@@ -266,6 +288,9 @@ export function buildPayload({ values, questions, answers, ref, items = [], pick
   // Only when ticked: unticked is the server's default, and the form's old shape stays as it was.
   if (wantsWhatsapp(values, whatsapp)) payload.whatsapp_opt_in = true;
   if (wantsWhatsapp(values, clubUpdates)) payload.club_updates_whatsapp = true;
+  if (ticketTypeId !== null && ticketTypeId !== undefined) payload.ticket_type_id = Number(ticketTypeId);
+  const code = typeof discountCode === "string" ? discountCode.trim() : "";
+  if (code) payload.discount_code = code;
   return payload;
 }
 
@@ -318,6 +343,9 @@ const when = (iso) => {
  */
 function closedCopy(errors, status) {
   const reason = typeof errors?.closed_reason === "string" ? errors.closed_reason : null;
+  if (reason === "cancelled") {
+    return { reason, title: "This event was cancelled", message: "The organisers called it off, so it isn't taking registrations. Nothing was charged." };
+  }
   if (reason === "deadline_passed") {
     const at = when(errors.closed_at);
     return { reason, title: "Registration has closed", message: at ? `Registration closed on ${at} IST. The organisers aren't taking new registrations.` : "The organisers aren't taking new registrations." };
@@ -345,14 +373,20 @@ function closedCopy(errors, status) {
  *   awaiting   REGISTRATION_AWAITING_PAYMENT (409): this address has a
  *              registration waiting for payment: Finish payment
  *   closed     REGISTRATIONS_CLOSED: 400 with errors.closed_reason
- *              ("deadline_passed" + closed_at, "not_started" + opens_at), or
- *              409 when the event takes no more right now. {reason, title, message}
- *   full       EVENT_FULL (400, errors.max_participants)
+ *              ("deadline_passed" + closed_at, "not_started" + opens_at,
+ *              "cancelled": the club called the event off), or 409 when the
+ *              event takes no more right now. {reason, title, message}
+ *   full       EVENT_FULL (400, errors.max_participants); `waitlist` when
+ *              errors.waitlist says its waiting list can be joined instead
  *   soldout    SOLD_OUT / ITEM_UNAVAILABLE (422, errors {item_id, variant_id,
  *              available}): the add-on is marked on the form
  *   fields     fields the server named, shown beside them: INVALID_ANSWERS
  *              (errors {question_key: message}), CLUB_EMAIL and EMAIL_MISMATCH
- *              (the email), the older shapes
+ *              (the email), the ticket (`ticket_type`: TICKET_TYPE_REQUIRED,
+ *              _NOT_FOUND, _NOT_ON_SALE, _SOLD_OUT, _LIMIT; `ticketTypes` says
+ *              the types should be read again, `waitlist` that the sold-out
+ *              one's list can be joined), the discount code (`discount_code`:
+ *              DISCOUNT_CODE_*), the older shapes
  *   network    no answer at all: try again
  *   auth       signed in, but the sign-in ran out and couldn't be renewed:
  *              nothing was sent as a guest; sign in again, or go on as one
@@ -383,12 +417,29 @@ export function describeRegisterError(error, questionKeys = []) {
   if (code === "REGISTRATIONS_CLOSED") return { kind: "closed", ...closedCopy(errors, status) };
   if (code === "EVENT_FULL") {
     const n = Number(errors?.max_participants);
+    const waitlist = errors?.waitlist === true;
     return {
       kind: "full",
       title: "This event is full",
-      message: `${n > 0 ? `All ${n} seats are taken.` : "Every seat is taken."} Keep an eye on the event page in case one opens up.`,
+      message: `${n > 0 ? `All ${n} seats are taken.` : "Every seat is taken."} ${
+        waitlist ? "Join the waiting list and we'll email you if a place opens up." : "Keep an eye on the event page in case one opens up."
+      }`,
+      ...(waitlist ? { waitlist: true } : {}),
     };
   }
+  const typeLine = ticketTypeRefusal(code, errors);
+  if (typeLine) {
+    return {
+      kind: "fields",
+      fields: { ticket_type: typeLine },
+      message: null,
+      ticketTypes: true,
+      waitlist: code === "TICKET_TYPE_SOLD_OUT" && errors?.waitlist === true,
+      code,
+    };
+  }
+  const codeLine = discountRefusal(code);
+  if (codeLine) return { kind: "fields", fields: { discount_code: codeLine }, message: null, code };
   if ((code === "SOLD_OUT" || code === "ITEM_UNAVAILABLE") && errors?.item_id !== undefined && errors?.item_id !== null) {
     return {
       kind: "soldout",
@@ -439,6 +490,8 @@ export function loadDraft(eventId) {
       picks: d.picks && typeof d.picks === "object" ? d.picks : {},
       whatsapp: d.whatsapp === true,
       clubUpdates: d.clubUpdates === true,
+      // The ticket chosen, when the event sells more than one.
+      ...(Number.isInteger(d.ticketType) && d.ticketType > 0 ? { ticketType: d.ticketType } : {}),
     };
   } catch {
     return null;
@@ -554,9 +607,14 @@ export function applyStockRefusal(items, picks, { itemId, variantId = null, avai
 
 /* ---------- the order ---------- */
 
-/** The order, line by line: the ticket (null = paid, amount unknown) and every add-on picked. */
-export function orderLines({ fee, items = [], picks = {} }) {
-  const lines = [{ id: "ticket", label: "Ticket", amount: fee }];
+/**
+ * The order, line by line: the ticket (null = paid, amount unknown; `ticket`
+ * names its type when there is a choice of them), what a discount code took
+ * off it (`discount`: {code, amount}, a negative line), and every add-on picked.
+ */
+export function orderLines({ fee, items = [], picks = {}, ticket = null, discount = null }) {
+  const lines = [ticket ? { id: "ticket", label: "Ticket", sub: ticket, amount: fee } : { id: "ticket", label: "Ticket", amount: fee }];
+  if (discount && Number(discount.amount) > 0) lines.push({ id: "discount", label: "Discount", sub: discount.code, amount: -Number(discount.amount) });
   for (const item of items) {
     const p = picks[item.id];
     if (!p || !p.qty) continue;
@@ -575,5 +633,10 @@ export const fieldId = (key) => `rg-f-${String(key).replace(/[^A-Za-z0-9_-]/g, "
 
 const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 });
 
-/** "₹1,340". */
-export const rupees = (n) => `₹${INR.format(Number(n) || 0)}`;
+const INR_PAISE = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** "₹1,340"; with paise, both places: "₹159.20" (a discount code's share), never "₹159.2". */
+export const rupees = (n) => {
+  const v = Number(n) || 0;
+  return `₹${Number.isInteger(Math.round(v * 100) / 100) ? INR.format(v) : INR_PAISE.format(v)}`;
+};

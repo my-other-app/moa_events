@@ -106,11 +106,16 @@ export function payOrder(order, prefill = {}) {
  *   refused       the order was refused: `error` says why (EVENT_ENDED, ...)
  *   start         no order came back
  *   dismissed | load | verify   as payOrder
+ *
+ * `token`: pay as this access token rather than the session (a waiting-list
+ * claim's guest, see api/payments.js).
  */
-export async function finishPayment({ eventId, registrationId, prefill = {} }) {
+export async function finishPayment({ eventId, registrationId, prefill = {}, token = null }) {
   let order;
   try {
-    order = await paymentsApi.createPaymentOrder(String(eventId), String(registrationId));
+    order = token
+      ? await paymentsApi.createPaymentOrder(String(eventId), String(registrationId), { token })
+      : await paymentsApi.createPaymentOrder(String(eventId), String(registrationId));
   } catch (error) {
     if (error?.code === "ALREADY_PAID") return { outcome: "paid", already: true, error: null, amount: 0 };
     if (error?.code === "NOTHING_TO_PAY") return { outcome: "nothing_due", error: null, amount: 0 };
@@ -134,6 +139,11 @@ const NOT_CHARGED = "Nothing was charged.";
 /** The order was refused, by code. */
 const ORDER_REFUSALS = {
   EVENT_ENDED: { tone: "calm", title: "This event is over", text: "It can't be paid for any more, so nothing was charged." },
+  EVENT_CANCELLED: {
+    tone: "calm",
+    title: "This event was cancelled",
+    text: "It can't be paid for, so nothing was charged. Anything already paid for it is being refunded.",
+  },
   EVENT_FULL: { tone: "calm", title: "This event filled up", text: "Every seat was taken before your payment, so nothing was charged." },
   REGISTRATION_NOT_FOUND: {
     tone: "error",

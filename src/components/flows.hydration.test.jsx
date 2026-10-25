@@ -37,6 +37,7 @@ const Compete = (await import("./compete.jsx")).default;
 const Play = (await import("./play.jsx")).default;
 const Feedback = (await import("./feedback.jsx")).default;
 const Ticket = (await import("./ticket.jsx")).default;
+const Claim = (await import("./claim.jsx")).default;
 const Certificate = (await import("./certificate.jsx")).default;
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
@@ -121,6 +122,8 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     ["/feedback/123/reg-1?k=tok", () => <Feedback eventId="123" registrationId="reg-1" k="tok" />, null],
     ["/tickets/MOA-1", () => <Ticket ticketid="MOA-1" />, "Loading ticket details"],
     ["/certificates/MOA-1", () => <Certificate ticketid="MOA-1" />, null],
+    // A waiting list's offer: who is signed in and the offer are the browser's to read.
+    ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", () => <Claim token="Xy3abcdefghijklmnopqrstuvwxyz012" />, "Loading your offer"],
   ])("%s hydrates without a mismatch", async (path, make, text) => {
     // The quiz's player is in storage: read once the page is up, never in the first paint.
     localStorage.setItem("moa.live.player.123", JSON.stringify({ player_key: "k", name: "Sneha" }));

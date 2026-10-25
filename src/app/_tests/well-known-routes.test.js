@@ -79,6 +79,8 @@ describe(AASA, () => {
     ["/events/hack-night-04/live", true],
     ["/events/123/live", true],
     ["/play/123", true],
+    // A waiting list's claim link: the app's own claim screen.
+    ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", true],
     // So do the city pages, which the app has no screen for.
     ["/events/in", false],
     ["/events/in/kochi", false],

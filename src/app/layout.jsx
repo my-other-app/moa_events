@@ -18,6 +18,7 @@ import "@/styles/cards-hero.css";
 import "@/styles/event-page.css";
 import "@/styles/register.css";
 import "@/styles/ticket.css";
+import "@/styles/ticketing.css";
 import "@/styles/registerbutton.css";
 import "@/styles/download.css";
 import "@/styles/notfound.css";

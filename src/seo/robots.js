@@ -20,6 +20,7 @@ export const DISALLOW = [
   "/certificates/",
   "/feedback/",
   "/play/",
+  "/claim/",
 ];
 
 export const ALLOW = ["/", "/events/rss.xml", "/clubs/*/rss.xml", "/media/", "/og/"];

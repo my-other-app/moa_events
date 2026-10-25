@@ -1,0 +1,507 @@
+/*
+ * Ticket types, discount codes, the waiting list, the claim page and
+ * cancelled events (the API's docs/TICKETING.md), in the registration's
+ * look: the tokens are discover.css's (--dc-*) and register.css's (--rg-*,
+ * set again here for the parts that also sit on the event page).
+ *
+ *   rg-tt-*  the ticket picker          rg-code-*  the discount code
+ *   wl-*     the waiting list           ep-tt-*    the event page's tickets
+ *   cl-*     the claim page             cx-*       a cancelled event's note
+ */
+
+.wl,
+.ep-tickets,
+.cx-note {
+  --rg-field: #d1d5db;
+  --rg-field-hover: #9ca3af;
+  --rg-bad: #b91c1c;
+  --rg-bad-line: #dc2626;
+  --rg-pick: #fdffd6;
+  --tk-good: #15803d;
+  --tk-off: #9ca3af;
+}
+.rg {
+  --tk-good: #15803d;
+  --tk-off: #9ca3af;
+}
+
+/* ---------- the ticket picker ---------- */
+
+.rg-tt .rg-choices {
+  gap: 10px;
+}
+.rg-tt:focus {
+  outline: none;
+}
+.rg-tt-row {
+  display: grid;
+  gap: 4px;
+}
+.rg-tt-choice {
+  align-items: flex-start;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.rg-tt-choice .rg-choice-mark {
+  margin-top: 2px;
+}
+.rg-tt-body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 3px;
+  min-width: 0;
+}
+.rg-tt-name {
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.rg-tt-desc {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-text);
+}
+.rg-tt-note {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.rg-tt-note.is-warn {
+  color: #b45309;
+}
+.rg-tt-price {
+  flex: 0 0 auto;
+  font-family: var(--dc-display);
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--dc-ink);
+}
+.rg-choice.is-off {
+  border-style: dashed;
+  background: var(--dc-sunken);
+  cursor: not-allowed;
+}
+.rg-choice.is-off .rg-tt-name,
+.rg-choice.is-off .rg-tt-price {
+  color: var(--dc-muted);
+}
+.dc-scope .rg-choice.is-off input {
+  cursor: not-allowed;
+}
+.rg-tt-wait {
+  justify-self: start;
+  margin-left: 16px;
+  font-size: 14px;
+}
+
+/* ---------- the discount code ---------- */
+
+.rg-code {
+  margin-bottom: 16px;
+}
+.rg-code-row {
+  display: flex;
+  gap: 8px;
+}
+.dc-scope .rg-code-row .rg-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dc-scope .rg-code-row .rg-input::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.rg-code-apply.dc-btn {
+  flex: 0 0 auto;
+  min-height: 52px;
+  gap: 8px;
+}
+.rg-code.is-applied {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  background: #f0fdf4;
+}
+.rg-code-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--tk-good);
+  color: #fff;
+}
+.rg-code-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  color: var(--dc-ink);
+}
+.rg-code-text strong {
+  letter-spacing: 0.04em;
+}
+.rg-lines li.is-discount .rg-line-amount {
+  color: var(--tk-good);
+  font-weight: 700;
+}
+
+/* ---------- the waiting list ---------- */
+
+.wl {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 18px;
+  border: 1px solid var(--dc-line);
+  border-radius: 14px;
+  background: #fff;
+}
+.wl-title {
+  font-family: var(--dc-display);
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--dc-ink);
+}
+.wl-status {
+  display: grid;
+  gap: 10px;
+}
+.wl-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dc-link-soft);
+}
+.wl-entry.is-offered {
+  background: var(--rg-pick);
+  box-shadow: inset 0 0 0 1px #e9ef8a;
+}
+.wl-entry-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--dc-ink);
+}
+.wl-entry-title {
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.wl-entry-text,
+.wl-note,
+.wl-offer-text,
+.wl-join-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--dc-text);
+}
+.wl-leave-btn {
+  justify-self: start;
+}
+.wl-leave {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+  font-size: 14px;
+  color: var(--dc-ink);
+}
+.wl-leave-actions,
+.wl-join-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.wl-problem {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rg-bad);
+}
+.wl-problem.is-good {
+  color: var(--tk-good);
+}
+.wl-offer {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.wl-join {
+  display: grid;
+  gap: 14px;
+}
+.wl-join-title {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--dc-ink);
+}
+.wl-fields {
+  gap: 18px;
+}
+
+/* ---------- the event page's tickets ---------- */
+
+.ep-tickets .wl {
+  margin-top: 16px;
+}
+.ep-tt-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ep-tt {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--dc-line);
+  border-radius: 14px;
+  background: #fff;
+}
+.ep-tt.is-off {
+  background: var(--dc-sunken);
+}
+.ep-tt-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.ep-tt-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.ep-tt-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--dc-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.ep-tt-desc {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-text);
+}
+.ep-tt-note {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.ep-tt-note.is-warn {
+  color: #b45309;
+}
+.ep-tt-side {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 4px;
+}
+.ep-tt-price {
+  font-family: var(--dc-display);
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--dc-ink);
+}
+.ep-tt-go {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-link);
+}
+.ep-tt-go:hover {
+  text-decoration: underline;
+}
+
+/* ---------- a cancelled event ---------- */
+
+.dc-pill--cancelled {
+  background: #b91c1c;
+  color: #fff;
+}
+.ep-cancelled,
+.cx-note {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-left: 4px solid #b91c1c;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: var(--dc-ink);
+}
+.ep-cancelled {
+  margin: 14px 0 4px;
+}
+.ep-cancelled-title,
+.cx-title {
+  font-weight: 800;
+  font-size: 17px;
+  color: #991b1b;
+}
+.ep-cancelled-reason,
+.cx-reason,
+.rg-cancel-reason {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dc-ink);
+}
+.ep-cancelled-why,
+.cx-reason span,
+.rg-cancel-reason span {
+  font-weight: 700;
+}
+.ep-cancelled-text,
+.cx-when,
+.cx-refund {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--dc-text);
+}
+.cx-refund strong {
+  color: var(--dc-ink);
+}
+.cx-note.is-compact {
+  gap: 2px;
+  margin-top: 8px;
+  padding: 10px 12px;
+}
+.cx-note.is-compact .cx-title {
+  font-size: 15px;
+}
+.cx-note.is-compact .cx-reason,
+.cx-note.is-compact .cx-refund {
+  font-size: 13px;
+}
+.ep-cta--cancelled .ep-cta-price {
+  color: #b91c1c;
+}
+.ep-cta-refund {
+  display: none;
+}
+@media (min-width: 960px) {
+  .ep-cta-refund {
+    display: block;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--dc-muted);
+  }
+}
+.rg-refund {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f0fdf4;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dc-ink);
+}
+
+/* My tickets */
+.me-pill--cancelled {
+  background: #b91c1c;
+  color: #fff;
+}
+.me-ticket.is-cancelled .me-ticket-number {
+  text-decoration: line-through;
+  color: var(--dc-muted);
+}
+.me-ticket-type {
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.me-nothing {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+
+/* The ticket's own page */
+.ticket-cancelled {
+  width: 360px;
+  max-width: 100%;
+  margin-bottom: 14px;
+  font-family: var(--dc-font, inherit);
+}
+.ticket.is-cancelled {
+  filter: grayscale(1);
+}
+.qr-section--void {
+  gap: 6px;
+}
+.ticket-void {
+  padding: 6px 18px;
+  border: 3px solid #fff;
+  border-radius: 8px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(-6deg);
+}
+
+/* ---------- the claim page ---------- */
+
+.cl-offer {
+  display: grid;
+  gap: 18px;
+}
+.cl-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: -6px;
+  border-radius: 999px;
+  background: var(--dc-primary);
+  color: var(--dc-accent);
+}
+.cl-note {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--dc-link-soft);
+  font-size: 14px;
+  color: var(--dc-ink);
+}
+.cl-who {
+  margin: 0;
+}
+.cl-order {
+  margin: 0;
+}
+.cl-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.cl-actions > .dc-btn {
+  gap: 8px;
+  min-height: 52px;
+  padding-left: 26px;
+  padding-right: 26px;
+  font-size: 22px;
+}
+.cl-ended {
+  max-width: 640px;
+  margin: 24px auto 0;
+}

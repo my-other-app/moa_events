@@ -23,6 +23,10 @@
  *   /feedback/{event}/{reg}?k=      the survey from the email
  *   /events/{slug}/live             the live room (native in the app)
  *   /play/{event}                   the quiz, as a player
+ *   /claim/{token}                  a waiting list's offer: claim the place
+ *                                   that opened up, or pass it on
+ *                                   (moa_mobileapp#69; the app's Android
+ *                                   intent filter lists /claim/ too)
  *
  * What stays in the browser, and why:
  *   - the feeds (rss.xml) under /events, /clubs and /topics: a feed reader's
@@ -63,6 +67,7 @@ export const APP_PATHS = [
   "/topics/*",
   "/feedback/*",
   "/play/*",
+  "/claim/*",
 ];
 
 /** The paths that stay in the browser, checked first (the first match wins). */

@@ -1,4 +1,5 @@
 import { SITE_URL } from "@/config";
+import { cancelledLine } from "./cancelled";
 import { TZ, formatDate, formatTime, formatWhen } from "./format";
 
 /**
@@ -113,12 +114,16 @@ const LOW_SEATS = 10;
  *   full    "Event full"                     (disabled)
  *   live    "Join the live room", headed "Happening now"
  *   ended   "This event has ended"           (disabled)
+ *   cancelled  "Event cancelled"             (disabled; the club called it off)
  *
  * `note` is the line under the price; `tone: "warn"` when it is urgent.
  */
 export function registerState(event, now = Date.now()) {
   const register = eventPath(event, "register");
   const left = seatsLeft(event);
+  if (event.status === "cancelled") {
+    return { kind: "cancelled", label: "Event cancelled", note: cancelledLine(event.cancellation) };
+  }
   if (event.status === "ended") {
     const when = formatDate(event.ends_at || event.starts_at);
     return { kind: "ended", label: "This event has ended", note: when ? `Ended ${when}` : null };

@@ -14,6 +14,7 @@ import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
 import { EventCover } from "../discover/cover";
 import Icon from "../discover/icons";
 import { FinishPaymentButton } from "../register/finishpayment";
+import { CancelledNote, ownState, useEventStates } from "../cancelled";
 
 /**
  * The signed-in person's own pages: /me/tickets and /me/following. Their
@@ -172,14 +173,16 @@ function Thumb({ event }) {
  * payment is paid right here (Finish payment); on a server that can't say
  * which registration it is, the event's form takes over, as it always did.
  */
-function TicketRow({ item, past, onPaid }) {
+function TicketRow({ item, past, onPaid, state = null }) {
   const router = useRouter();
   const e = item.event;
   const when = whenLine(e.starts_at);
   const where = e.is_online ? "Online" : e.location_name || "Venue to be announced";
   const ticketPath = `/tickets/${encodeURIComponent(item.ticket_id)}`;
+  // Called off by the club (docs: club_ops): said on the row, with the refund for a ticket that was paid for.
+  const cancelled = state?.status === "cancelled";
   return (
-    <li className={`me-ticket${past ? " is-past" : ""}`}>
+    <li className={`me-ticket${past ? " is-past" : ""}${cancelled ? " is-cancelled" : ""}`}>
       <div className="me-ticket-main">
         <Thumb event={e} />
         <div className="me-ticket-info">
@@ -203,10 +206,20 @@ function TicketRow({ item, past, onPaid }) {
                 Attended
               </span>
             ) : null}
-            {item.awaitingPayment ? (
+            {cancelled ? <span className="me-pill me-pill--cancelled">Cancelled</span> : null}
+            {item.awaitingPayment && !cancelled ? (
               <span className="me-pill">{past ? "Payment not completed" : "Awaiting payment"}</span>
             ) : null}
+            {item.ticketType ? <span className="me-ticket-type">{item.ticketType}</span> : null}
           </p>
+          {cancelled ? (
+            <CancelledNote
+              compact
+              cancellation={state.cancellation}
+              paid={e.has_fee && !item.awaitingPayment}
+              className="me-cancelled"
+            />
+          ) : null}
         </div>
       </div>
       <div className="me-ticket-stub">
@@ -216,7 +229,9 @@ function TicketRow({ item, past, onPaid }) {
         </div>
         <div className="me-ticket-actions">
           {item.awaitingPayment ? (
-            past ? null : (
+            past || cancelled ? (
+              cancelled ? <span className="me-nothing">Nothing to pay</span> : null
+            ) : (
               <FinishPaymentButton
                 eventId={e.id}
                 className="dc-btn dc-btn--sm"
@@ -250,6 +265,10 @@ function Tickets({ email }) {
   const upcoming = useAccountList((offset) => accountApi.myEvents({ ended: false, offset, limit: TICKETS_PAGE }), TICKETS_PAGE, email);
   const past = useAccountList((offset) => accountApi.myEvents({ ended: true, offset, limit: TICKETS_PAGE }), TICKETS_PAGE, email);
   const [paid, setPaid] = useState(null);
+  // Whether an upcoming event was cancelled: the list doesn't say, each event's page does (the first page's worth).
+  const unsaid = upcoming.items.filter((t) => !ownState(t.event)).slice(0, TICKETS_PAGE);
+  const states = useEventStates(unsaid.map((t) => t.event.slug));
+  const stateOf = (t) => ownState(t.event) || (t.event.slug ? states[t.event.slug] : null) || null;
 
   // Paid from a row: say so, and read the lists again (the row becomes a ticket).
   const onPaid = (event) => {
@@ -293,7 +312,7 @@ function Tickets({ email }) {
             <>
               <ul className="me-tickets">
                 {upcoming.items.map((t) => (
-                  <TicketRow key={t.ticket_id} item={t} onPaid={onPaid} />
+                  <TicketRow key={t.ticket_id} item={t} onPaid={onPaid} state={stateOf(t)} />
                 ))}
               </ul>
               <ShowMore list={upcoming} label="Show more" />
@@ -314,7 +333,7 @@ function Tickets({ email }) {
             </h2>
             <ul className="me-tickets">
               {past.items.map((t) => (
-                <TicketRow key={t.ticket_id} item={t} past onPaid={onPaid} />
+                <TicketRow key={t.ticket_id} item={t} past onPaid={onPaid} state={ownState(t.event)} />
               ))}
             </ul>
             <ShowMore list={past} label="Show older" />

@@ -53,6 +53,8 @@ export function registerEvent(e) {
     registration_open: e.registration_open,
     category: e.category,
     url: e.url,
+    // Why a cancelled event was called off, for the page that says so.
+    ...(e.cancellation ? { cancellation: e.cancellation } : {}),
   };
 }
 

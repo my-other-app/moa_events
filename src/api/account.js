@@ -1,5 +1,6 @@
 import apiClient from "./client";
 import { parseClub, parseClubRef, parseComment, parsePoll } from "./discover";
+import { ticketTypeName } from "@/utils/ticketing";
 
 /**
  * The signed-in person's side of the API: signing in (with Google, or an
@@ -39,13 +40,17 @@ export function parseMyEvent(e) {
   const startMs = starts ? new Date(starts).getTime() : NaN;
   const ends = Number.isFinite(startMs) && hours > 0 ? new Date(startMs + hours * 3600 * 1000).toISOString() : null;
   const category = obj(o.category);
+  // The ticket's type, and whether the event was cancelled, once the list says them (docs/TICKETING.md, club_ops).
+  const typeName = ticketTypeName(o);
   return {
     ticket_id: o.ticket_id,
     attended: Boolean(o.is_attended),
     certificate: Boolean(str(o.certificate_url)),
     // A paid event's registration whose payment never went through: not a ticket yet.
     awaitingPayment: Boolean(o.has_fee) && o.is_paid === false,
+    ...(typeName ? { ticketType: typeName } : {}),
     event: {
+      ...(o.status === "cancelled" ? { status: "cancelled", cancellation: obj(o.cancellation) } : {}),
       id: o.id,
       slug: str(o.slug),
       name: str(o.name) || "Untitled event",

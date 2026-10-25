@@ -2,6 +2,7 @@ import { Link } from "@/lib/router";
 import { formatCount, formatPrice, imageUrl, statusPill } from "@/utils/format";
 import { safeHref } from "@/utils/linkify";
 import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
+import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
 import { Img } from "./img";
 import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
@@ -99,6 +100,7 @@ export function RegisterCard({ event }) {
   const when = whenLine(event.starts_at);
   const taken = event.capacity && left !== null ? Math.min(event.capacity, Math.max(0, event.capacity - left)) : 0;
   const showMeter = event.capacity && (state.kind === "open" || state.kind === "full");
+  const cancelled = state.kind === "cancelled";
   return (
     <div className={`ep-cta ep-cta--${state.kind}`} role="region" aria-label="Registration">
       {when ? (
@@ -110,7 +112,7 @@ export function RegisterCard({ event }) {
       <div className="ep-cta-row">
         <div className="ep-cta-info">
           {state.eyebrow ? <p className="ep-cta-eyebrow">{state.eyebrow}</p> : null}
-          <p className="ep-cta-price">{formatPrice(event.has_fee, event.fee)}</p>
+          <p className="ep-cta-price">{cancelled ? "Cancelled" : formatPrice(event.has_fee, event.fee)}</p>
           {state.note ? <p className={`ep-cta-note${state.tone === "warn" ? " is-warn" : ""}`}>{state.note}</p> : null}
         </div>
         <div className="ep-cta-go">
@@ -132,6 +134,31 @@ export function RegisterCard({ event }) {
           </span>
         </div>
       ) : null}
+      {cancelled ? <p className="ep-cta-refund">Anyone who paid online is being refunded in full.</p> : null}
+    </div>
+  );
+}
+
+/**
+ * A cancelled event, said at the top of its page: that it is off, the
+ * club's reason, and what happens to the money. The page stays up (its link
+ * is in emails and on posters), but nothing on it can be registered or paid.
+ */
+export function CancelledNotice({ event }) {
+  if (event.status !== "cancelled") return null;
+  const c = event.cancellation || {};
+  return (
+    <div className="ep-cancelled" role="note" aria-label="This event was cancelled">
+      <p className="ep-cancelled-title">{CANCELLED_TITLE}</p>
+      {c.reason ? (
+        <p className="ep-cancelled-reason">
+          <span className="ep-cancelled-why">The organisers said:</span> {c.reason}
+        </p>
+      ) : null}
+      <p className="ep-cancelled-text">
+        {cancelledLine(c)}. Tickets for it are no longer valid, and anyone who paid online is being refunded in full — it goes back the way they paid,
+        usually within 5–7 working days.
+      </p>
     </div>
   );
 }

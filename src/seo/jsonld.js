@@ -49,11 +49,11 @@ function endOf(event) {
 /**
  * schema.org's availability for the ticket: InStock while registration is
  * open, PreOrder before it opens, SoldOut once it is full or closed (or the
- * event is over).
+ * event is over, or cancelled).
  */
 export function availability(event, now = Date.now()) {
   if (event.status === "full") return "SoldOut";
-  if (event.status === "ended") return "SoldOut";
+  if (event.status === "ended" || event.status === "cancelled") return "SoldOut";
   if (event.registration_open) return "InStock";
   const opens = event.reg_opens_at ? new Date(event.reg_opens_at) : null;
   if (opens && !Number.isNaN(opens.getTime()) && opens.getTime() > now) return "PreOrder";
@@ -93,8 +93,10 @@ const STATUS_WORDS = {
  * schema.org's eventStatus. An event that has happened (or is happening) as
  * planned stays EventScheduled: Google reads the dates for "past", and
  * EventScheduled is what it asks for an event that wasn't called off or moved.
+ * An event its club cancelled says so in its own `status` too.
  */
 export function eventStatus(event) {
+  if (event.status === "cancelled") return "EventCancelled";
   return STATUS_WORDS[String(event.event_status || "").toLowerCase()] || "EventScheduled";
 }
 

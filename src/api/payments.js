@@ -23,8 +23,8 @@ export const UPDATE_APP_TO_PAY = "UPDATE_APP_TO_PAY";
  *
  * The codes (utils/payment.js says what each means to the person):
  *   orders   ALREADY_PAID 409, NOTHING_TO_PAY 422, EVENT_ENDED 409,
- *            EVENT_FULL 400, REGISTRATION_NOT_FOUND 404, EVENT_NOT_FOUND 404,
- *            UPDATE_APP_TO_PAY 409, GATEWAY_UNAVAILABLE 503
+ *            EVENT_CANCELLED 409, EVENT_FULL 400, REGISTRATION_NOT_FOUND 404,
+ *            EVENT_NOT_FOUND 404, UPDATE_APP_TO_PAY 409, GATEWAY_UNAVAILABLE 503
  *   verify   ORDER_NOT_FOUND 404, ALREADY_PAID 409, PAYMENT_ORDER_MISMATCH 400,
  *            UNSUPPORTED_PAYMENT_METHOD 400, PAYMENT_NOT_FOUND 404
  */
@@ -57,8 +57,13 @@ export const paymentsApi = {
      * leaves it out. The same call pays for a registration made a moment ago
      * and finishes one left unpaid (My tickets, the event page): the server
      * takes it until the event ends, past the registration deadline too.
+     *
+     * `token`: an access token to pay with instead of the session's. A
+     * waiting-list claim made while signed in as another address registers
+     * the offer's address as a guest of its own, and only that guest's
+     * token can pay for it.
      */
-    createPaymentOrder: async (eventId, eventRegistrationId) => {
+    createPaymentOrder: async (eventId, eventRegistrationId, { token = null } = {}) => {
         try {
             const response = await apiClient.post(
                 "/api/v1/payments/orders",
@@ -69,7 +74,9 @@ export const paymentsApi = {
                         event_registration_id: eventRegistrationId,
                     },
                 },
-                { params: { checkout: CHECKOUT_VERSION } }
+                token
+                    ? { params: { checkout: CHECKOUT_VERSION }, skipAuth: true, headers: { Authorization: `Bearer ${token}` } }
+                    : { params: { checkout: CHECKOUT_VERSION } }
             );
             return response.data;
         } catch (error) {
