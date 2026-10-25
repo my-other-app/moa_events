@@ -53,8 +53,8 @@ export function forgetPlayer(eventId) {
   }
 }
 
-/** Whether the room has anything worth a strip on the event page. */
+/** Whether the room has anything worth a strip on the event page: from the strip's own body (`qa.has_questions`) or the room's feed (`questions`). */
 export function roomIsActive(feed) {
   if (!feed) return false;
-  return Boolean(feed.banner || feed.poll || feed.quiz?.live || (feed.questions && feed.questions.length > 0));
+  return Boolean(feed.banner || feed.poll || feed.quiz?.live || feed.qa?.has_questions || (feed.questions && feed.questions.length > 0));
 }

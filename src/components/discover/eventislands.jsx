@@ -195,11 +195,12 @@ export function SectionNav({ items }) {
 
 /**
  * The strips over the page while something is on: the live room and the
- * competition, if any. While the event is live the room is pushed (the
- * stream the live room uses, src/api/liveStream.js; polled every half
- * minute where there is none); before, it is polled every half minute, as
- * it always was, so readers of upcoming events hold no stream; once the
- * event has ended it is read once.
+ * competition, if any. The room's strip is its small `banner` view (a few
+ * hundred bytes, the same for everyone; the feed on an API from before it).
+ * While the event is live it is pushed (src/api/liveStream.js; polled every
+ * half minute where there is no stream); before, it is polled every half
+ * minute, so readers of upcoming events hold no stream; once the event has
+ * ended it is read once.
  */
 export function LiveStrips({ event }) {
   const [live, setLive] = useState(null);
@@ -220,11 +221,11 @@ export function LiveStrips({ event }) {
   }, [id]);
 
   useEffect(() => {
-    if (happening) return subscribe("room", { eventId: id, interval: 30000 }, setLive);
+    if (happening) return subscribe("banner", { eventId: id, interval: 30000 }, setLive);
     let alive = true;
     const look = () =>
       liveApi
-        .fetchFeed(id)
+        .fetchBanner(id)
         .then((f) => alive && setLive(f))
         .catch(() => {});
     look();

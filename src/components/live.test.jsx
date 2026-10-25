@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 vi.mock("@/api/live", () => ({
   errorLine: (e, f) => e?.response?.data?.message || f,
   liveApi: {
     fetchFeed: vi.fn(),
+    fetchBanner: vi.fn(),
     ask: vi.fn(),
     vote: vi.fn(),
     respond: vi.fn(),
@@ -89,7 +90,7 @@ describe("the live room", () => {
 });
 
 describe("the quiz, played", () => {
-  it("answers the open question and shows the verdict", async () => {
+  it("answers the open question and shows the verdict at once on an API from before", async () => {
     localStorage.setItem("moa.live.player.68", JSON.stringify({ player_key: "secret-key", name: "Sneha" }));
     liveApi.playState.mockResolvedValue({ status: "live", title: "Edge AI warm-up quiz", name: "Sneha", score: 0, current_index: 0, total: 4, rank: null, leaderboard: [], question: { id: "q1", prompt: "RAM on an ESP32-S3?", options: [{ key: "a", label: "512 KB" }, { key: "b", label: "8 MB" }], seconds: 20, time_left: 17, my_answer: null, my_points: null, correct_key: null } });
     liveApi.answer.mockResolvedValue({ correct: true, points: 930, score: 930, correct_key: "a" });
@@ -100,6 +101,62 @@ describe("the quiz, played", () => {
     expect(await screen.findByText("Right — +930")).toBeInTheDocument();
     expect(screen.getByText("930 points")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /8 MB/ })).toBeDisabled();
+  });
+
+  it("locks the answer in, then shows the verdict when the API reveals it — not at the local clock's 0", async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem("moa.live.player.68", JSON.stringify({ player_key: "secret-key", name: "Sneha" }));
+      const options = [{ key: "a", label: "512 KB" }, { key: "b", label: "8 MB" }];
+      const open = { status: "live", title: "Edge AI warm-up quiz", name: "Sneha", score: 120, current_index: 0, total: 4, rank: null, leaderboard: [], question: { id: "q1", prompt: "RAM on an ESP32-S3?", options, seconds: 20, time_left: 3, my_answer: null, my_points: null, my_correct: null, correct_key: null } };
+      const grace = { ...open, question: { ...open.question, time_left: 0, my_answer: "b" } };
+      const told = { ...open, score: 120, rank: 2, leaderboard: [{ rank: 1, name: "Rohan", score: 930 }, { rank: 2, name: "Sneha", score: 120 }], question: { ...open.question, time_left: 0, my_answer: "b", my_points: 0, my_correct: false, correct_key: "a" } };
+      liveApi.playState.mockResolvedValueOnce(open).mockResolvedValueOnce(grace).mockResolvedValue(told);
+      liveApi.answer.mockResolvedValue({ correct: null, points: null, score: 120, answered: true });
+      at("/play/68", <Play eventId="68" />, "/play/:id");
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole("button", { name: /8 MB/ }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(liveApi.answer).toHaveBeenCalledWith("68", "secret-key", "b");
+      expect(screen.getByText("Answer locked in")).toBeInTheDocument();
+      expect(screen.queryByText("Not that one")).toBeNull();
+      expect(screen.getByRole("button", { name: /8 MB/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /8 MB/ }).className).not.toContain("is-wrong");
+
+      // The clock says 0 but answers still count: nothing told yet.
+      await act(() => vi.advanceTimersByTimeAsync(2000));
+      expect(screen.getByText("Answer locked in — the answer is coming")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /8 MB/ }).className).not.toContain("is-wrong");
+
+      // Answers close: the verdict and the right answer.
+      await act(() => vi.advanceTimersByTimeAsync(2000));
+      expect(screen.getByText("Not that one")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /512 KB/ }).className).toContain("is-right");
+      expect(screen.getByRole("button", { name: /8 MB/ }).className).toContain("is-wrong");
+      expect(screen.getByText("2nd right now")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows a right answer's points from the state once revealed", async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem("moa.live.player.68", JSON.stringify({ player_key: "secret-key", name: "Sneha" }));
+      const options = [{ key: "a", label: "512 KB" }, { key: "b", label: "8 MB" }];
+      const base = { status: "live", title: "Quiz", name: "Sneha", score: 0, current_index: 0, total: 1, rank: null, leaderboard: [] };
+      liveApi.playState
+        .mockResolvedValueOnce({ ...base, question: { id: "q1", prompt: "Pick", options, seconds: 20, time_left: 10, my_answer: "a", my_points: null, my_correct: null, correct_key: null } })
+        .mockResolvedValue({ ...base, score: 930, rank: 1, question: { id: "q1", prompt: "Pick", options, seconds: 20, time_left: 0, my_answer: "a", my_points: 930, my_correct: true, correct_key: "a" } });
+      at("/play/68", <Play eventId="68" />, "/play/:id");
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByText("Answer locked in")).toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(2000));
+      expect(screen.getByText("Right — +930")).toBeInTheDocument();
+      expect(screen.getByText("930 points")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("sends people without a player back to the room", async () => {

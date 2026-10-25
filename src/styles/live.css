@@ -388,6 +388,9 @@
 .play-flash.is-wrong {
   color: #b91c1c;
 }
+.play-flash.is-locked {
+  color: #374151;
+}
 
 /* The survey. */
 .survey-q {
