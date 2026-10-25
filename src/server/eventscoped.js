@@ -57,7 +57,8 @@ export function registerEvent(e) {
 }
 
 /** The club as those parts name it. */
-export const registerClub = (club) => (club ? { name: club.name, slug: club.slug || null } : null);
+export const registerClub = (club) =>
+  club ? { name: club.name, slug: club.slug || null, ...(club.whatsapp_updates === true ? { whatsapp_updates: true } : {}) } : null;
 
 const WORDS = { register: "Register", live: "Live", compete: "Competition" };
 

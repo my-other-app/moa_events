@@ -236,7 +236,9 @@ export function stepsFor({ questions = [], items = [] } = {}) {
  * that asks nothing), the tracking link's code when there is one, and the
  * shelf picks. Unanswered optional questions are left out, as an untouched
  * field always was. `whatsapp_opt_in: true` goes only when the WhatsApp box
- * is ticked with a phone number in.
+ * is ticked with a phone number in, and `club_updates_whatsapp: true` only
+ * when "Get updates from <club> on WhatsApp" is (the form shows that box only
+ * for a club that offers it, and passes `clubUpdates` false otherwise).
  *
  * `store` goes whenever the event has a shelf, as `[]` when nothing is
  * picked. The server re-places a registration's order only when `store` is
@@ -244,7 +246,7 @@ export function stepsFor({ questions = [], items = [] } = {}) {
  * earlier picks on the way back to pay. An event with nothing on its shelf
  * still sends no `store`, as it never did.
  */
-export function buildPayload({ values, questions, answers, ref, items = [], picks = {}, whatsapp = false }) {
+export function buildPayload({ values, questions, answers, ref, items = [], picks = {}, whatsapp = false, clubUpdates = false }) {
   let details = {};
   if (questions.length > 0) {
     details = undefined;
@@ -263,6 +265,7 @@ export function buildPayload({ values, questions, answers, ref, items = [], pick
   if (items.length > 0) payload.store = picksToPayload(items, picks);
   // Only when ticked: unticked is the server's default, and the form's old shape stays as it was.
   if (wantsWhatsapp(values, whatsapp)) payload.whatsapp_opt_in = true;
+  if (wantsWhatsapp(values, clubUpdates)) payload.club_updates_whatsapp = true;
   return payload;
 }
 
@@ -435,6 +438,7 @@ export function loadDraft(eventId) {
       answers: strings(d.answers),
       picks: d.picks && typeof d.picks === "object" ? d.picks : {},
       whatsapp: d.whatsapp === true,
+      clubUpdates: d.clubUpdates === true,
     };
   } catch {
     return null;

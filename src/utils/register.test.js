@@ -6,10 +6,12 @@ import {
   forgetDone,
   keepDone,
   loadDone,
+  loadDraft,
   myRegistration,
   orderLines,
   parseQuestions,
   questionControl,
+  saveDraft,
   stepsFor,
   suggestEmail,
   validateAnswer,
@@ -373,6 +375,29 @@ describe("WhatsApp", () => {
     });
     expect(buildPayload({ values, questions: [], answers: {}, ref: null, whatsapp: false })).not.toHaveProperty("whatsapp_opt_in");
     expect(buildPayload({ values: { ...values, phone: " " }, questions: [], answers: {}, ref: null, whatsapp: true })).not.toHaveProperty("whatsapp_opt_in");
+  });
+
+  it("asks for the club's updates only when that box is ticked with a number in", () => {
+    const values = { name: "Asha Rao", email: "asha@example.org", phone: "98765 43210" };
+    const base = { values, questions: [], answers: {}, ref: null };
+    expect(buildPayload({ ...base, clubUpdates: true })).toEqual({
+      full_name: "Asha Rao",
+      email: "asha@example.org",
+      phone: "98765 43210",
+      additional_details: {},
+      club_updates_whatsapp: true,
+    });
+    expect(buildPayload({ ...base, whatsapp: true, clubUpdates: true })).toMatchObject({ whatsapp_opt_in: true, club_updates_whatsapp: true });
+    expect(buildPayload({ ...base, whatsapp: true })).not.toHaveProperty("club_updates_whatsapp");
+    expect(buildPayload(base)).not.toHaveProperty("club_updates_whatsapp");
+    expect(buildPayload({ ...base, values: { ...values, phone: " " }, clubUpdates: true })).not.toHaveProperty("club_updates_whatsapp");
+  });
+
+  it("keeps the club's box in the tab's draft", () => {
+    saveDraft("124", { values: { name: "A", email: "", phone: "" }, answers: {}, picks: {}, whatsapp: false, clubUpdates: true });
+    expect(loadDraft("124")).toMatchObject({ whatsapp: false, clubUpdates: true });
+    saveDraft("124", { values: {}, answers: {}, picks: {} });
+    expect(loadDraft("124").clubUpdates).toBe(false);
   });
 
   it("puts the server's WHATSAPP_NUMBER beside the phone number", () => {
