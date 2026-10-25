@@ -14,6 +14,7 @@ vi.mock("@/api/live", () => ({
   errorLine: (e, f) => e?.response?.data?.message || f,
   liveApi: {
     fetchFeed: vi.fn(),
+    fetchBanner: vi.fn(),
     ask: vi.fn(),
     vote: vi.fn(),
     respond: vi.fn(),
@@ -224,49 +225,58 @@ describe("the quiz, pushed", () => {
 });
 
 describe("the event page's live strip", () => {
-  const banner = { banner: { kind: "general", text: "Round two in ten minutes" }, poll: null, quiz: null, questions: [] };
+  const banner = { event: { id: 123, status: "live" }, banner: { kind: "general", text: "Round two in ten minutes" }, poll: null, quiz: { live: false, title: null }, qa: { open: true, has_questions: false } };
 
-  it("is pushed while the event is live", () => {
+  it("is pushed while the event is live, as the small banner view with no key", () => {
     render(strips("live"));
     expect(FakeEventSource.instances).toHaveLength(1);
-    expect(FakeEventSource.last.url).toContain("/api/v1/events/123/live/stream?view=room&key=");
+    expect(FakeEventSource.last.url).toContain("/api/v1/events/123/live/stream?view=banner");
+    expect(FakeEventSource.last.query.get("key")).toBeNull();
     push(banner, 1);
     expect(screen.getByText("Round two in ten minutes")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the live room" })).toHaveAttribute("href", "/events/hack-night-04/live");
     push({ ...banner, banner: null }, 2);
     expect(screen.queryByText("Round two in ten minutes")).toBeNull();
+    // The floor has questions: the strip says so.
+    push({ ...banner, banner: null, qa: { open: true, has_questions: true } }, 3);
+    expect(screen.getByText("Questions are being taken from the floor")).toBeInTheDocument();
+    push({ ...banner, banner: null, poll: { id: "p1", kind: "choice", prompt: "Which track?" } }, 4);
+    expect(screen.getByText("Which track?")).toBeInTheDocument();
+    expect(liveApi.fetchBanner).not.toHaveBeenCalled();
     expect(liveApi.fetchFeed).not.toHaveBeenCalled();
   });
 
-  it("falls back to the half-minute poll on today's API", async () => {
+  it("falls back to the half-minute poll of the strip on today's API", async () => {
     vi.useFakeTimers();
-    liveApi.fetchFeed.mockResolvedValue(banner);
+    liveApi.fetchBanner.mockResolvedValue(banner);
     render(strips("live"));
     act(() => FakeEventSource.last.refuse());
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(screen.getByText("Round two in ten minutes")).toBeInTheDocument();
-    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
-    expect(liveApi.fetchFeed).toHaveBeenCalledWith(123);
+    expect(liveApi.fetchBanner).toHaveBeenCalledTimes(1);
+    expect(liveApi.fetchBanner).toHaveBeenCalledWith(123);
     await act(() => vi.advanceTimersByTimeAsync(29999));
-    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
+    expect(liveApi.fetchBanner).toHaveBeenCalledTimes(1);
     await act(() => vi.advanceTimersByTimeAsync(1));
-    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(2);
+    expect(liveApi.fetchBanner).toHaveBeenCalledTimes(2);
+    expect(liveApi.fetchFeed).not.toHaveBeenCalled();
   });
 
-  it("before the event, polls every half minute and holds no stream; after it, reads once", async () => {
+  it("before the event, polls the strip every half minute and holds no stream; after it, reads once", async () => {
     vi.useFakeTimers();
-    liveApi.fetchFeed.mockResolvedValue(banner);
+    liveApi.fetchBanner.mockResolvedValue(banner);
     const upcoming = render(strips("upcoming"));
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(screen.getByText("Round two in ten minutes")).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(30000));
-    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(2);
+    expect(liveApi.fetchBanner).toHaveBeenCalledTimes(2);
     upcoming.unmount();
 
     vi.clearAllMocks();
     render(strips("ended"));
     await act(() => vi.advanceTimersByTimeAsync(5 * 60 * 1000));
-    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
+    expect(liveApi.fetchBanner).toHaveBeenCalledTimes(1);
+    expect(liveApi.fetchFeed).not.toHaveBeenCalled();
     expect(FakeEventSource.instances).toHaveLength(0);
   });
 });

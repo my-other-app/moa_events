@@ -3,7 +3,7 @@
  *
  * The API can send a live view as server-sent events:
  *
- *   GET /api/v1/events/{id}/live/stream?view=room|quiz
+ *   GET /api/v1/events/{id}/live/stream?view=room|quiz|banner
  *
  * Every `snapshot` is exactly the JSON body the view's poll returns right
  * now, for this browser (its own `voted` / `mine` / `my_response`; the
@@ -41,10 +41,20 @@
  * it. It cannot read a refused answer either: when one closes the source,
  * the same address is asked once with fetch to learn the status.
  */
+import { getSession, guestToken } from "@/auth/session";
 import { API_BASE_URL } from "@/config";
 import { isBot } from "@/seo/bots";
 import { liveKey } from "@/utils/live";
 import { liveApi } from "./live";
+
+/**
+ * Whether the room's calls go as a person (an account, or a registration's
+ * guest token): the API then counts their votes and answers as that person,
+ * and shows them as theirs. An EventSource cannot send the token, so its
+ * snapshots would show the browser's own flags instead: such a visitor's room
+ * is polled (each poll carries the token), never streamed.
+ */
+const asPerson = () => Boolean(getSession() || guestToken());
 
 export const TIMING = Object.freeze({
   /** The stream's `retry:` (EventSource keeps the server's value to itself). */
@@ -65,12 +75,20 @@ export const TIMING = Object.freeze({
   probeTimeout: 10 * 1000,
 });
 
-/** Each view: its poll (the body the stream's snapshots carry), today's interval, and its credentials. */
+/** Each view: its poll (the body the stream's snapshots carry), today's interval, its credentials, and whether it may stream. */
 const VIEWS = {
   room: {
     interval: 5000,
     poll: ({ eventId }) => liveApi.fetchFeed(eventId),
     query: () => ({ key: liveKey() }),
+    who: () => "",
+    streamable: () => !asPerson(),
+  },
+  /** The event page's strip: the same for everyone, so no key. */
+  banner: {
+    interval: 30000,
+    poll: ({ eventId }) => liveApi.fetchBanner(eventId),
+    query: () => ({}),
     who: () => "",
   },
   quiz: {
@@ -130,7 +148,7 @@ class Channel {
     this.params = params;
     this.subs = new Set();
     this.every = spec.interval;
-    this.streams = canStream();
+    this.streams = canStream() && (spec.streamable ? spec.streamable() : true);
     this.body = undefined;
     this.lastId = null;
     this.es = null;
@@ -431,7 +449,7 @@ class Channel {
  * every refused poll, as the page's own poll did. A function is taken as
  * `snapshot`. Returns the unsubscribe.
  *
- *   view     "room" (params: eventId) or "quiz" (params: eventId, player)
+ *   view     "room" or "banner" (params: eventId), or "quiz" (params: eventId, player)
  *   params   also `interval`: the poll's, when not the view's usual one
  *
  * Whoever subscribes to a view that is already open shares its stream, and

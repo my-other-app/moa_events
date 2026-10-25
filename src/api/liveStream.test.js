@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeEventSource } from "@/test/eventsource";
 import { API_BASE_URL } from "@/config";
 
-vi.mock("@/api/live", () => ({ liveApi: { fetchFeed: vi.fn(), playState: vi.fn() } }));
+vi.mock("@/api/live", () => ({ liveApi: { fetchFeed: vi.fn(), fetchBanner: vi.fn(), playState: vi.fn() } }));
 
 const { liveApi } = await import("@/api/live");
 const { subscribe, TIMING } = await import("./liveStream");
@@ -42,6 +42,7 @@ beforeEach(() => {
   // No jitter, unless a test asks for it.
   vi.spyOn(Math, "random").mockReturnValue(0);
   liveApi.fetchFeed.mockResolvedValue(feed());
+  liveApi.fetchBanner.mockResolvedValue({ event: { id: 68 }, banner: null, poll: null, quiz: { live: false }, qa: { open: true, has_questions: false } });
   liveApi.playState.mockResolvedValue({ status: "live", name: "Sneha", score: 0 });
 });
 
@@ -85,6 +86,26 @@ describe("snapshots", () => {
     last().snapshot({ status: "live", name: "Sneha", score: 930 }, 3);
     expect(seen).toEqual([{ status: "live", name: "Sneha", score: 930 }]);
     expect(liveApi.playState).not.toHaveBeenCalled();
+  });
+
+  it("opens the strip's stream with no key, and polls the strip every 30 s where there is none", async () => {
+    const id = nextEvent();
+    const seen = [];
+    follow("banner", { eventId: id }, (s) => seen.push(s));
+    expect(last().url).toBe(`${API_BASE_URL}/api/v1/events/${id}/live/stream?view=banner`);
+    last().snapshot({ event: { id }, banner: { text: "Doors at 6" } }, 2);
+    expect(seen.map((s) => s.banner.text)).toEqual(["Doors at 6"]);
+
+    // On an API without streams: the strip's poll, every half minute.
+    const other = nextEvent();
+    follow("banner", { eventId: other }, () => {});
+    last().refuse();
+    await tick();
+    expect(liveApi.fetchBanner).toHaveBeenCalledWith(other);
+    const calls = liveApi.fetchBanner.mock.calls.length;
+    await tick(30000);
+    expect(liveApi.fetchBanner.mock.calls.length).toBe(calls + 1);
+    expect(liveApi.fetchFeed).not.toHaveBeenCalled();
   });
 
   it("ignores a frame it cannot read, and keeps the stream", () => {
@@ -475,6 +496,19 @@ describe("no stream at all", () => {
     expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
     await tick(5000);
     expect(liveApi.fetchFeed).toHaveBeenCalledTimes(2);
+  });
+
+  it("for a visitor who is someone (a sign-in, a registration's guest token): the room is polled, the quiz and the strip still stream", async () => {
+    localStorage.setItem("access_token", "guest-token");
+    follow("room", { eventId: nextEvent() }, () => {});
+    expect(sources()).toHaveLength(0);
+    await tick();
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(1);
+    await tick(5000);
+    expect(liveApi.fetchFeed).toHaveBeenCalledTimes(2);
+    follow("quiz", { eventId: nextEvent(), player: "pk" }, () => {});
+    follow("banner", { eventId: nextEvent() }, () => {});
+    expect(sources()).toHaveLength(2);
   });
 
   it("without EventSource: the poll, as before", async () => {

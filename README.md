@@ -71,7 +71,7 @@ One helper decides (`src/seo/demo.js`). A club is demo when the API says `is_dem
 
 ## App links
 
-`/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` tell iOS and Android that the MyOtherApp app may open `/events` and `/events/…`, `/clubs` and `/clubs/…`, `/threads` and `/threads/…`, `/topics` and `/topics/…`, `/tickets/…`, `/certificates/…` and `/feedback/…`. The live room (`/events/{slug}/live`), the feeds, `/play`, `/api`, `/og`, `/media`, `/for-clubs` and `/pricing` stay in the browser on iPhone. What is claimed, and why, is in `src/seo/appLinks.js`. Only `myotherapp.in` is claimed: `www.` and `events.` redirect, and neither Apple nor Google follows a redirect for these files.
+`/.well-known/apple-app-site-association` and `/.well-known/assetlinks.json` tell iOS and Android that the MyOtherApp app may open `/events` and `/events/…`, `/clubs` and `/clubs/…`, `/threads` and `/threads/…`, `/topics` and `/topics/…`, `/tickets/…`, `/certificates/…`, `/feedback/…`, and the live room and quiz (`/events/{slug}/live`, `/play/…`), which the app shows natively. The feeds, `/api`, `/og`, `/media`, `/for-clubs` and `/pricing` stay in the browser on iPhone. What is claimed, and why, is in `src/seo/appLinks.js`. Only `myotherapp.in` is claimed: `www.` and `events.` redirect, and neither Apple nor Google follows a redirect for these files.
 
 Check them after a deploy:
 

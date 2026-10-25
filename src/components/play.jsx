@@ -11,11 +11,17 @@ const MARK = ["▲", "◆", "●", "■", "★", "✚"];
 
 /**
  * The quiz, played: the lobby while the host waits, each question with its
- * clock, the right answer once the clock is out, the board at the end. Its
+ * clock, the right answer once answers close, the board at the end. Its
  * server half (src/app/play/[eventId]/page.jsx) hands over the event's id;
  * who is playing is in this browser's storage, read once the page is up.
  * The player's state is pushed (src/api/liveStream.js), or asked for every
  * 2 seconds where it cannot be.
+ *
+ * The API keeps the answer to itself while answers are open: an answer is
+ * "locked in" (its response says `correct: null`), and whether it was right,
+ * its points and the right answer come with the state once the clock and a
+ * short grace are out (`correct_key`, `my_correct`, `my_points`). An API from
+ * before says it at once (`correct` true or false); both are shown.
  */
 const Play = ({ eventId }) => {
   const [player, setPlayer] = useState(null);
@@ -71,7 +77,11 @@ const Play = ({ eventId }) => {
     try {
       const r = await liveApi.answer(eventId, player.player_key, key);
       setFlash(r);
-      setState((s) => ({ ...s, score: r.score, question: { ...s.question, my_answer: key, my_points: r.points, correct_key: r.correct_key } }));
+      setState((s) => ({
+        ...s,
+        score: r.score,
+        question: { ...s.question, my_answer: key, my_points: r.points ?? null, correct_key: r.correct_key ?? s.question.correct_key ?? null },
+      }));
     } catch (e) {
       setError(errorLine(e, "That did not land."));
     }
@@ -97,7 +107,10 @@ const Play = ({ eventId }) => {
   if (!state) return <p></p>;
 
   const q = state.question;
-  const reveal = q && (q.correct_key || left === 0);
+  // Shown once the API says which it was: not at the local clock's 0, while answers still count.
+  const reveal = Boolean(q?.correct_key);
+  const verdict = !q?.my_answer ? null : q.my_correct != null ? q.my_correct : flash && flash.correct != null ? flash.correct : null;
+  const points = q?.my_points ?? flash?.points ?? 0;
   return (
     <div className="live-page">
       <div className="live-top">
@@ -150,8 +163,12 @@ const Play = ({ eventId }) => {
               );
             })}
           </div>
-          {flash && <p className={`play-flash ${flash.correct ? "is-right" : "is-wrong"}`}>{flash.correct ? `Right — +${flash.points}` : "Not that one"}</p>}
-          {!flash && q.my_answer && q.my_points != null && <p className="play-flash is-right">{q.my_points > 0 ? `+${q.my_points}` : "Not that one"}</p>}
+          {q.my_answer && verdict === null && (
+            <p className="play-flash is-locked" role="status">
+              Answer locked in{left === 0 ? " — the answer is coming" : ""}
+            </p>
+          )}
+          {verdict !== null && <p className={`play-flash ${verdict ? "is-right" : "is-wrong"}`}>{verdict ? `Right — +${points}` : "Not that one"}</p>}
           {!q.my_answer && left === 0 && <p className="play-flash is-wrong">Time is up</p>}
           <div className="play-score">
             <span>{state.score} points</span>

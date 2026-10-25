@@ -21,16 +21,13 @@
  *   /certificates/{id}              the certificate
  *   /topics, /topics/{slug}         the topics, a topic
  *   /feedback/{event}/{reg}?k=      the survey from the email
+ *   /events/{slug}/live             the live room (native in the app)
+ *   /play/{event}                   the quiz, as a player
  *
  * What stays in the browser, and why:
- *   - /events/{slug}/live: the live room is this site's page in the app too
- *     (it opens it in an in-app browser), so claiming it would only add a
- *     hop for the people in the room, most of whom scanned a QR on the
- *     screen. It also keeps the app's in-app browser from being handed the
- *     room's address back.
  *   - the feeds (rss.xml) under /events, /clubs and /topics: a feed reader's
  *     link, not a page.
- *   - /play, /api, /og, /media, /for-clubs, /pricing: web-only pages and the
+ *   - /api, /og, /media, /for-clubs, /pricing: web-only pages and the
  *     server's own addresses. They sit outside the claimed paths anyway;
  *     they are listed so a wider claim later can't take them.
  *   - /events/in and /clubs/in/…: the city pages ("Events in Kochi") are
@@ -38,9 +35,12 @@
  *     read /events/in as an event called "in").
  *   - the home page, the policies, /about and /me: not claimed.
  *
- * Android's intent filters cannot leave a path out, so there the app is
- * handed /events/{slug}/live too; its router opens the event with the room,
- * and sends anything it can't show to the browser.
+ * The live room and the quiz were left to the browser while the app showed
+ * them as this site's page; the app has them as screens of its own now
+ * (moa_mobileapp#65), so a QR on the screen opens them there.
+ *
+ * Android's intent filters cannot leave a path out: its router sends
+ * anything it can't show to the browser.
  */
 
 /** The iOS app: Team ID and bundle id. */
@@ -62,6 +62,7 @@ export const APP_PATHS = [
   "/topics",
   "/topics/*",
   "/feedback/*",
+  "/play/*",
 ];
 
 /** The paths that stay in the browser, checked first (the first match wins). */
@@ -70,12 +71,9 @@ export const BROWSER_PATHS = [
   ["/events/in/*", "The city pages are the site's own"],
   ["/clubs/in", "The city pages are the site's own"],
   ["/clubs/in/*", "The city pages are the site's own"],
-  ["/events/*/live", "The live room is the web page in the app too"],
-  ["/events/*/live/*", "The live room is the web page in the app too"],
   ["/events/rss.xml", "A feed"],
   ["/clubs/*/rss.xml", "A feed"],
   ["/topics/*/rss.xml", "A feed"],
-  ["/play/*", "The quiz, joined from the live room"],
   ["/api/*", "The server's functions"],
   ["/og/*", "Share pictures"],
   ["/media/*", "Pictures"],

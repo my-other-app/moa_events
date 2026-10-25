@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { fullEvent, sparseEvent } from "@/test/eventFixture";
 
 vi.mock("@/api/client", () => ({ default: { get: vi.fn(), post: vi.fn() } }));
-vi.mock("@/api/live", () => ({ liveApi: { fetchFeed: vi.fn(() => Promise.reject(new Error("no room"))) } }));
+vi.mock("@/api/live", () => ({ liveApi: { fetchFeed: vi.fn(() => Promise.reject(new Error("no room"))), fetchBanner: vi.fn(() => Promise.reject(new Error("no room"))) } }));
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn(() => Promise.reject(new Error("none"))) } }));
 
 const { parseEventPage } = await import("@/api/discover");
@@ -206,10 +206,11 @@ describe("an event's page", () => {
   });
 
   it("keeps the live-room strip while the room is on", async () => {
-    liveApi.fetchFeed.mockResolvedValue({ banner: { kind: "general", text: "Round two in ten minutes" }, poll: null, quiz: null, questions: [] });
+    liveApi.fetchBanner.mockResolvedValue({ event: { id: 123, status: "published" }, banner: { kind: "general", text: "Round two in ten minutes" }, poll: null, quiz: { live: false, title: null }, qa: { open: true, has_questions: false } });
     show(fullEvent());
     expect(await screen.findByText("Round two in ten minutes")).toBeInTheDocument();
-    expect(liveApi.fetchFeed).toHaveBeenCalledWith(123);
+    expect(liveApi.fetchBanner).toHaveBeenCalledWith(123);
+    expect(liveApi.fetchFeed).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "Open the live room" })).toHaveAttribute("href", "/events/hack-night-04/live");
   });
 });
