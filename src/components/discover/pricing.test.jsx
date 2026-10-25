@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { plansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
+import { plansResponse, pricedPlansResponse, quotaPlansResponse, trialPlansResponse } from "@/test/plansFixture";
 
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn() } }));
@@ -289,5 +289,33 @@ describe("with the monthly messages (the backend's message_quotas)", () => {
     expect(cellsOf(table, "WhatsApp messages a month")).toEqual(["—Not included", "50", "250", "1,000", "Custom"]);
     expect(cellsOf(table, "Each extra email")).toEqual(["—Not included", "₹0.10", "₹0.10", "₹0.10", "Custom"]);
     expect(cellsOf(table, "Each extra WhatsApp message")).toEqual(["—Not included", "₹1", "₹1", "₹1", "Custom"]);
+  });
+});
+
+
+describe("with the pricing of 2026-10-25 (the backend's pricing_adjust)", () => {
+  const pricedData = () => parsePlans(pricedPlansResponse());
+  const cellsOf = (table, rowName) =>
+    within(within(table).getByRole("rowheader", { name: rowName }).closest("tr"))
+      .getAllByRole("cell")
+      .map((td) => td.textContent);
+
+  it("puts the promotional cap and the ₹1.50 extra on the cards, and what the trial allows under them", () => {
+    show(pricedData());
+    const pro = within(card("Pro"));
+    expect(pro.getByText("20,000 emails / 1,000 WhatsApp (up to 200 promotional) a month")).toBeInTheDocument();
+    expect(pro.getByText("Extra: ₹0.10 per email, ₹1.50 per WhatsApp")).toBeInTheDocument();
+    expect(screen.getByText("The 14-day Pro trial has everything in Pro, with 2,000 emails, 50 WhatsApp messages and 50 AI actions a month.")).toBeInTheDocument();
+  });
+
+  it("compares WhatsApp with its promotional cap, AI actions, and the new extra price", () => {
+    show(pricedData());
+    const table = screen.getByRole("table");
+    expect(cellsOf(table, "WhatsApp messages a month")).toEqual([
+      "—Not included", "50 (up to 10 promotional)", "250 (up to 50 promotional)", "1,000 (up to 200 promotional)", "Custom",
+    ]);
+    expect(cellsOf(table, "AI actions a month")).toEqual(["—Not included", "20", "150", "500", "Unlimited"]);
+    expect(cellsOf(table, "Each extra WhatsApp message")).toEqual(["—Not included", "₹1.50", "₹1.50", "₹1.50", "Custom"]);
+    expect(within(table).queryByRole("rowheader", { name: /promotional|marketing/i })).toBeNull();
   });
 });

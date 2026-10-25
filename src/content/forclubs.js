@@ -196,6 +196,7 @@ export function clubFaq({ yearlyMonthsFree = null, contactEmail = "support@myoth
       q: "How does the free trial work?",
       a: [
         "Every new club gets 14 days of Pro, free, from the day it's approved. No card, nothing to cancel.",
+        "The trial has everything in Pro, with smaller monthly allowances for emails, WhatsApp messages and AI actions; the plans above say how many.",
         "Pick a plan any time during the trial and nothing is charged until the trial ends; your plan starts then. One trial per club.",
       ],
     },
