@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { competitionApi, errorLine } from "@/api/competition";
+import { formatTime, formatWhen } from "@/utils/format";
 
 /**
  * A team's side of the competition, from their ticket: pick a track and
  * make a team or join an open one, say you are looking for teammates,
- * hand in the links before the close, book a mentor's slot, and see the
- * board once the organisers make it public.
+ * rename the team, change its track or leave it (until the organisers lock
+ * the teams), hand in the links before the close, book a mentor's slot, and
+ * see the board once the organisers make it public. Times are India time,
+ * as the organisers set them, whatever the visitor's clock.
  */
-const fmtTime = (iso) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-const fmtWhen = (iso) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const fmtWhen = (iso) => `${formatWhen(iso)} IST`;
 
 function Section({ title, sub, children }) {
   return (
@@ -116,8 +118,11 @@ function TeamUp({ eventId, me, onChange, say }) {
 function MyTeam({ eventId, me, onChange, say }) {
   const t = me.team;
   const [fields, setFields] = useState(t.submission.fields);
+  const [teamName, setTeamName] = useState(t.name);
   const [busy, setBusy] = useState(false);
   useEffect(() => setFields(t.submission.fields), [t.submission.fields]);
+  useEffect(() => setTeamName(t.name), [t.name]);
+  const newName = teamName.trim();
   const run = async (fn) => {
     setBusy(true);
     try {
@@ -137,6 +142,20 @@ function MyTeam({ eventId, me, onChange, say }) {
             <li key={m.registration_id}>{m.name}</li>
           ))}
         </ul>
+        {!me.teams_locked ? (
+          <form
+            className="cp-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newName && newName !== t.name) run(() => competitionApi.renameTeam(eventId, { name: newName }));
+            }}
+          >
+            <input className="cp-input" value={teamName} onChange={(e) => setTeamName(e.target.value)} maxLength={80} disabled={busy} aria-label="Team name" />
+            <button type="submit" className="live-btn is-ghost" disabled={busy || !newName || newName === t.name}>
+              Rename
+            </button>
+          </form>
+        ) : null}
         {me.tracks.length ? (
           <div className="cp-row">
             <select className="cp-input" value={t.track_id ?? ""} disabled={busy || me.teams_locked} aria-label="Track" onChange={(e) => run(() => competitionApi.renameTeam(eventId, { track_id: e.target.value ? Number(e.target.value) : null }))}>
@@ -190,7 +209,7 @@ function MyTeam({ eventId, me, onChange, say }) {
                   const taken = s.team_id !== null && !mine;
                   return (
                     <button key={s.id} type="button" className={`cp-slot${mine ? " is-mine" : taken ? " is-taken" : ""}`} disabled={busy || taken} onClick={() => run(() => (mine ? competitionApi.free(eventId, s.id) : competitionApi.book(eventId, s.id)))}>
-                      {fmtTime(s.starts_at)}
+                      {formatTime(s.starts_at)}
                       <small>{mine ? "Yours" : taken ? "Taken" : "Free"}</small>
                     </button>
                   );
