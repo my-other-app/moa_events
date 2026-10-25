@@ -2,6 +2,7 @@ import { Link } from "@/lib/router";
 import { CLUBS_URL } from "@/config";
 import { commonFeatures, startFreeLabel, startFreeUrl, yearlyOffer } from "@/utils/pricing";
 import { ClubFaq, ClubsCta } from "./clubsparts";
+import { CreditPacks } from "./creditpacks";
 import { Pricing } from "./pricing";
 import Icon from "./icons";
 
@@ -9,12 +10,14 @@ const COMMON_SHOWN = 7;
 
 /**
  * The plans on a page of their own: the cards, every limit and feature side
- * by side, the questions, and the way in. Rendered on the server
- * (src/app/pricing/page.jsx) from the plans it read (`plans`, null when it
- * couldn't: the cards then load in the browser); /pricing#compare lands on
- * the table, which is in the HTML.
+ * by side, the top-up packs, the questions, and the way in. Rendered on the
+ * server (src/app/pricing/page.jsx) from the plans it read (`plans`, null
+ * when it couldn't: the cards then load in the browser) and the packs
+ * (`packs`, parseCreditPacks' result; null: no packs section);
+ * /pricing#compare lands on the table and /pricing#top-ups on the packs,
+ * both in the HTML.
  */
-export function PricingView({ plans = null }) {
+export function PricingView({ plans = null, packs = null }) {
   const offer = yearlyOffer(plans?.yearlyMonthsFree);
   const common = plans ? commonFeatures(plans.plans).slice(0, COMMON_SHOWN) : [];
   const trial = plans?.trial ?? null;
@@ -60,6 +63,8 @@ export function PricingView({ plans = null }) {
       </section>
 
       <Pricing data={plans} compare="table" />
+
+      <CreditPacks data={packs} />
 
       <ClubFaq yearlyMonthsFree={plans?.yearlyMonthsFree ?? null} />
       <ClubsCta />
