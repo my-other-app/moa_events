@@ -92,3 +92,26 @@ The Vercel project `moa-events` deploys `main` on every merge (Vercel's Git inte
 The framework is Next.js, set in `vercel.json`, which overrides the project's own Framework Preset. That preset still says **Vite** from before the move: set it to Next.js in the project's Settings → Build and Deployment so the two agree.
 
 Images from S3 are presigned links that expire: pages never embed them, they point at `/media/...`, which redirects to the current link (see the migration doc).
+
+### Self-hosted (the Oracle box)
+
+The site also builds as a container for the one-box setup in moa_backend
+(`ops/server`, `docs/MOVE_TO_ORACLE.md`), which replaces Vercel at the cutover:
+
+- `Dockerfile`: `next build` with `NEXT_OUTPUT=standalone` (next.config.mjs
+  turns standalone output on only then, so Vercel builds are unchanged), a
+  `node:22-alpine` runner as the unprivileged `node` user, a health check,
+  `.next/cache` kept in a volume on the box (Next's data cache, so ISR and
+  `/api/revalidate` work as on Vercel).
+- `deploy/build/production.env` and `staging.env`: the public build-time
+  values (`NEXT_PUBLIC_*`, `ANDROID_APP_SHA256`), baked into each
+  environment's image. Public values only; secrets are GitHub secrets.
+- `.github/workflows/image.yml`: builds linux/amd64 + linux/arm64 and pushes
+  `ghcr.io/my-other-app/moa-website:<sha>` (staging: `staging-<sha>`); on
+  push only once the repository variable `ORACLE_IMAGES` is `true`. It can
+  deploy through the box's deploy gate.
+- Run-time settings (`API_BASE_URL`, `REVALIDATE_SECRET`, `API_SITE_TOKEN`,
+  `DEMO_*`) live on the box, not in the image.
+- What Vercel's edge did is done there by Cloudflare and Caddy: the
+  `www.`/`events.` redirects, the visitor's address (`X-Forwarded-For`) and
+  place (Cloudflare's location headers, passed on as `x-vercel-ip-*`).

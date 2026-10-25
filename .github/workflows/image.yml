@@ -1,0 +1,232 @@
+name: Image
+
+# The site as a container image for the self-hosted Oracle box
+# (moa_backend: ops/server, docs/MOVE_TO_ORACLE.md): built for linux/amd64
+# and linux/arm64 and pushed to ghcr.io/my-other-app/moa-website as
+#   production  <sha>, <short sha>, latest            (deploy/build/production.env)
+#   staging     staging-<sha>, staging-<short sha>, staging   (deploy/build/staging.env)
+# NEXT_PUBLIC_* values are baked into the bundles, so each environment has
+# its own image. Vercel's deploys are unaffected.
+#
+# On a push to main it runs once the repository variable ORACLE_IMAGES is
+# "true" (so main stays green until production.env is filled in), building
+# production, and staging too when STAGING_ENABLED is "true"; with
+# AUTO_DEPLOY_STAGING "true" as well, the staging box is then deployed. By
+# hand (Run workflow) it builds the chosen environment and can deploy it.
+#
+# Secrets (names only): SENTRY_AUTH_TOKEN (source maps, optional),
+# API_SITE_TOKEN / STAGING_API_SITE_TOKEN (the API reads while prerendering,
+# optional); for deploys, on the production and staging Environments:
+# ORACLE_SSH_HOST, ORACLE_SSH_USER, ORACLE_SSH_KEY, ORACLE_SSH_KNOWN_HOSTS,
+# TS_OAUTH_CLIENT_ID and TS_OAUTH_SECRET (optional, Tailscale).
+#
+# arm64 builds natively on GitHub's arm64 runners (free in public
+# repositories; in private ones since January 2026, against the plan's
+# minutes); the repository variable ARM64_RUNNER=qemu emulates it on x86.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which image"
+        type: choice
+        options: [production, staging, both]
+        default: production
+      deploy:
+        description: "Then deploy it to that environment's box (not with both)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: image-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/my-other-app/moa-website
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch' || vars.ORACLE_IMAGES == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      environments: ${{ steps.plan.outputs.environments }}
+    steps:
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          CHOSEN: ${{ inputs.environment }}
+          STAGING: ${{ vars.STAGING_ENABLED }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            case "$CHOSEN" in
+              both) envs='["production","staging"]' ;;
+              staging) envs='["staging"]' ;;
+              *) envs='["production"]' ;;
+            esac
+          elif [ "$STAGING" = "true" ]; then
+            envs='["production","staging"]'
+          else
+            envs='["production"]'
+          fi
+          echo "environments=$envs" >> "$GITHUB_OUTPUT"
+          echo "Building: $envs"
+
+  build:
+    name: build (${{ matrix.environment }}, ${{ matrix.arch }})
+    needs: plan
+    strategy:
+      fail-fast: true
+      matrix:
+        environment: ${{ fromJSON(needs.plan.outputs.environments) }}
+        arch: [amd64, arm64]
+    runs-on: ${{ (matrix.arch == 'arm64' && vars.ARM64_RUNNER != 'qemu') && (vars.ARM64_RUNNER || 'ubuntu-24.04-arm') || 'ubuntu-24.04' }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the build values (deploy/build/${{ matrix.environment }}.env)
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          file="deploy/build/$ENVIRONMENT.env"
+          [ -f "$file" ] || { echo "::error::$file is missing"; exit 1; }
+          if grep -nvE '^\s*(#.*)?$|^[A-Z_][A-Z0-9_]*=[^"'"'"']*$' "$file"; then
+            echo "::error::$file: every line must be KEY=value with no quotes (the lines above)"
+            exit 1
+          fi
+          required="NEXT_PUBLIC_API_BASE_URL"
+          if [ "$ENVIRONMENT" = "production" ]; then
+            required="$required NEXT_PUBLIC_GOOGLE_CLIENT_ID ANDROID_APP_SHA256"
+          fi
+          missing=""
+          for key in $required; do
+            grep -qE "^$key=.+" "$file" || missing="$missing $key"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::$file has no value for:$missing (copy them from the Vercel project's Production variables)"
+            exit 1
+          fi
+
+      - name: Emulate arm64
+        if: matrix.arch == 'arm64' && vars.ARM64_RUNNER == 'qemu'
+        uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.title=moa-website
+            org.opencontainers.image.description=myotherapp.in (${{ matrix.environment }})
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_ENVIRONMENT=${{ matrix.environment }}
+          secret-files: |
+            build_env=deploy/build/${{ matrix.environment }}.env
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
+            api_site_token=${{ matrix.environment == 'staging' && secrets.STAGING_API_SITE_TOKEN || secrets.API_SITE_TOKEN }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=website-${{ matrix.environment }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=website-${{ matrix.environment }}-${{ matrix.arch }},mode=max
+          provenance: false
+
+      - name: Keep the digest for the publish job
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.environment }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: publish (${{ matrix.environment }})
+    needs: [plan, build]
+    strategy:
+      matrix:
+        environment: ${{ fromJSON(needs.plan.outputs.environments) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.environment }}-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag both architectures as one image
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          set -euo pipefail
+          prefix=""
+          [ "$ENVIRONMENT" = "staging" ] && prefix="staging-"
+          tags=(-t "$IMAGE:$prefix$GITHUB_SHA" -t "$IMAGE:$prefix${GITHUB_SHA::7}")
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            if [ "$ENVIRONMENT" = "staging" ]; then tags+=(-t "$IMAGE:staging"); else tags+=(-t "$IMAGE:latest"); fi
+          fi
+          sources=()
+          for digest in *; do sources+=("$IMAGE@sha256:$digest"); done
+          [ "${#sources[@]}" -eq 2 ] || { echo "::error::expected 2 digests (amd64, arm64), found ${#sources[@]}"; exit 1; }
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
+          docker buildx imagetools inspect "$IMAGE:$prefix$GITHUB_SHA"
+          echo "### $IMAGE:$prefix${GITHUB_SHA::7} ($ENVIRONMENT, amd64 + arm64)" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: deploy (${{ github.event_name == 'push' && 'staging' || inputs.environment }})
+    needs: publish
+    if: >-
+      (github.event_name == 'push' && vars.STAGING_ENABLED == 'true' && vars.AUTO_DEPLOY_STAGING == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.deploy && inputs.environment != 'both')
+    runs-on: ubuntu-24.04
+    environment: ${{ github.event_name == 'push' && 'staging' || inputs.environment }}
+    concurrency:
+      group: oracle-${{ github.event_name == 'push' && 'staging' || inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/oracle-deploy
+        with:
+          command: deploy website ${{ (github.event_name == 'push' || inputs.environment == 'staging') && 'staging-' || '' }}${{ github.sha }}
+          host: ${{ secrets.ORACLE_SSH_HOST }}
+          user: ${{ secrets.ORACLE_SSH_USER }}
+          ssh-key: ${{ secrets.ORACLE_SSH_KEY }}
+          known-hosts: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
+          tailscale-oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          tailscale-oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
