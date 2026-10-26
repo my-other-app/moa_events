@@ -188,7 +188,7 @@ export function EventView({ page }) {
 
         <div className="ep-side">
           <Poster event={event} />
-          <RegisterCard event={event} />
+          <RegisterCard event={event} club={club} />
         </div>
 
         <div className="ep-body">

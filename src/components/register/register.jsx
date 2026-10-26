@@ -36,6 +36,7 @@ import {
 import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { CANCELLED_TITLE, REFUND_DETAIL, REFUND_NOTE, cancelledLine } from "@/utils/cancelled";
 import { ticketingApi } from "@/api/ticketing";
+import { clubName as clubLabel, parseApproval, requiresApproval } from "@/utils/requests";
 import { anyPaid, defaultType, liveEntries, needsPicker, onSale, parseTicketing, ticketTypeName, typeById, typePrice, waitlistTypes } from "@/utils/ticketing";
 import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
@@ -46,6 +47,7 @@ import { CheckField, QuestionField, TextField } from "./fields";
 import { PayNote, Spinner, useFinishPayment } from "./finishpayment";
 import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
+import Requested from "./requested";
 import Success from "./success";
 import { DiscountCodeField, linkedTypeFrom, TicketPicker, useDiscountCode, useEventTicketing, WaitlistPanel } from "./tickets";
 
@@ -65,7 +67,12 @@ import { DiscountCodeField, linkedTypeFrom, TicketPicker, useDiscountCode, useEv
  *   Review    what was entered and the total (with a discount code, checked
  *             as it is typed, on a paid ticket), then Confirm (nothing to
  *             pay) or Pay
- * then "You're in" with the ticket. `?ticket_type=` (a hidden type a club
+ * then "You're in" with the ticket. An event whose club confirms each place
+ * (registration approval: `requires_approval`) has no add-ons step and
+ * nothing to pay yet: Review sends a request ("Request a place"), and the
+ * answer's `approval` shows "You're on the waiting list" with a link to the
+ * request's page instead of a ticket. The form always says it understands
+ * that (`accepts_approval`), so the server decides. `?ticket_type=` (a hidden type a club
  * shared) chooses that ticket. The step is in the address (?step=),
  * changed with the browser's own history (Next follows it, and the server
  * isn't asked again), so the phone's back button steps back; what was typed
@@ -201,7 +208,7 @@ function AwaitingActions({ eventId, onPaid }) {
 }
 
 /** What went wrong with the registration, said once and calmly, with the way forward. `extra`: more under it (the waiting list). */
-function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, onPaid, extra = null }) {
+function Problem({ problem, event, club = null, signedIn, onRetry, onChangeEmail, onSignIn, onPaid, extra = null }) {
   const box = useRef(null);
   // Said where the eye is: the checkout closes over the top of a long page.
   useEffect(() => {
@@ -252,6 +259,20 @@ function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, o
     tone = "info";
     title = "Your registration is waiting for payment";
     actions = <AwaitingActions eventId={String(event.id)} onPaid={onPaid} />;
+  } else if (problem.kind === "declined") {
+    // The club confirms each place, and said no to this person already: plainly, with the way back.
+    tone = "calm";
+    title = "You can't request a place again";
+    text = `${clubLabel(club)} couldn't offer you a place at this event, so another request can't be sent from this email.`;
+    actions = backToEvent;
+  } else if (problem.kind === "approval") {
+    tone = "calm";
+    title = "This event's places are confirmed by the club";
+    actions = (
+      <button type="button" className="dc-btn dc-btn--ghost dc-btn--sm" onClick={() => window.location.reload()}>
+        Reload the page
+      </button>
+    );
   } else if (problem.kind === "closed" || problem.kind === "full") {
     tone = "calm";
     title = problem.title;
@@ -640,7 +661,10 @@ function Flow({ event, club, info, onDone }) {
   const ready = info.status === "ready" && items !== null && tix.ready;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
   const infoFee = Number(info.data?.reg_fee) > 0 ? Number(info.data.reg_fee) : null;
-  const shelf = useMemo(() => items || [], [items]);
+  // The club confirms each place (registration approval): the form sends a request, and nothing is paid yet.
+  // A request carries no add-ons (the API keeps none with it), so the shelf isn't offered.
+  const approval = requiresApproval(info.data, event);
+  const shelf = useMemo(() => (approval ? [] : items || []), [items, approval]);
   const chooseTicket = needsPicker(ticketing);
   const steps = useMemo(() => stepsFor({ questions, items: shelf, chooseTicket }), [questions, shelf, chooseTicket]);
 
@@ -669,6 +693,8 @@ function Flow({ event, club, info, onDone }) {
   const addOns = picksTotal(shelf, picks);
   const total = fee === null ? null : Math.max(0, fee - discount) + addOns;
   const pays = total === null || total > 0;
+  // Paid now, at the end of the form: never for a request (a confirmed paid place gets a link to pay).
+  const paysNow = pays && !approval;
   const ticketLabel = chooseTicket || namesType ? chosen?.name || null : null;
   const lines = useMemo(
     () => orderLines({ fee, items: shelf, picks, ticket: ticketLabel, discount: discount > 0 ? { code: applied.code, amount: discount } : null }),
@@ -680,6 +706,8 @@ function Flow({ event, club, info, onDone }) {
   // (`whatsapp_updates`): the form's GET /events/info says it freshest; until it does, the event
   // page's club. Without the flag at all, the box never shows and nothing is sent.
   const formClub = info.data?.club;
+  // The club that confirms each place, named as the form or the event page names it.
+  const confirmerClub = formClub?.name ? formClub : club;
   const offersUpdates = typeof formClub?.whatsapp_updates === "boolean" ? formClub.whatsapp_updates : offersClubUpdates(club);
   const clubName = formClub?.name || club?.name || "";
   const byClubUpdates = offersUpdates && wantsWhatsapp(values, clubUpdates);
@@ -849,6 +877,26 @@ function Flow({ event, club, info, onDone }) {
     scrollTop();
   };
 
+  /** The club confirms each place: a request went in, not a registration. */
+  const requested = (asked) => {
+    busy.current = false;
+    setPhase("idle");
+    clearDraft(eventId);
+    window.history.replaceState(null, "", hrefFor(null));
+    onDone({
+      eventId,
+      kind: "request",
+      request: { id: asked.id, token: asked.token, path: asked.path, status: asked.status },
+      name: values.name,
+      email: values.email,
+      account: submittedAs.current,
+      pays,
+      amount: total ?? 0,
+      ...(ticketLabel ? { ticket_type: ticketLabel } : {}),
+    });
+    scrollTop();
+  };
+
   const showError = (error) => {
     const p = describeRegisterError(error, questions.map((q) => q.key));
     // The tickets changed under the form (sold out, off sale, full): read them again.
@@ -926,6 +974,12 @@ function Flow({ event, club, info, onDone }) {
     let responseData = null;
     try {
       responseData = await eventsApi.registerForEvent(eventId, payload);
+      // The club confirms each place: a request, with no ticket and nothing to pay yet.
+      const asked = parseApproval(responseData);
+      if (asked) {
+        requested(asked);
+        return;
+      }
       if (!responseData || !responseData.ticket_id) {
         setProblem({ kind: "message", message: "The registration didn't go through — no ticket came back. Try again." });
         release();
@@ -1009,18 +1063,35 @@ function Flow({ event, club, info, onDone }) {
   }
 
   const isReview = step.id === "review";
-  const title = isReview ? (pays ? "Review and pay" : "Review and confirm") : step.title;
+  const title = isReview ? (approval ? "Review and send" : pays ? "Review and pay" : "Review and confirm") : step.title;
+  const confirmer = clubLabel(confirmerClub);
   const ledes = {
     ticket: `${club?.name || "The organisers"} sell${club?.name ? "s" : ""} more than one kind of ticket for this event. Pick yours.`,
-    details: accountEmail ? "It takes a minute. Your ticket comes by email and lands in your MyOtherApp app." : "It takes a minute. Your ticket comes by email.",
+    details: approval
+      ? `It takes a minute. ${confirmer} confirms each place, and your ticket comes by email when they do.`
+      : accountEmail
+        ? "It takes a minute. Your ticket comes by email and lands in your MyOtherApp app."
+        : "It takes a minute. Your ticket comes by email.",
     questions: `${club?.name || "The organisers"} would like to know a little more. Questions marked * need an answer.`,
     addons: "Paid together with your registration and collected at the event. Skip it if you don't want anything.",
-    review: "Check everything is right before you go ahead.",
+    review: approval
+      ? `Check everything is right, then send your request. ${confirmer} confirms each place${pays ? ", and you pay only once they do" : ""}.`
+      : "Check everything is right before you go ahead.",
   };
   const suggestion = touched.email ? suggestEmail(values.email) : null;
   const busyNow = phase !== "idle";
-  const go = isReview ? (pays ? (total === null ? "Continue to payment" : `Pay ${rupees(total)}`) : "Confirm registration") : editing ? "Save and review" : "Continue";
-  const busyLabel = phase === "paying" ? "Opening payment…" : "Registering…";
+  const go = isReview
+    ? approval
+      ? "Request a place"
+      : pays
+        ? total === null
+          ? "Continue to payment"
+          : `Pay ${rupees(total)}`
+        : "Confirm registration"
+    : editing
+      ? "Save and review"
+      : "Continue";
+  const busyLabel = phase === "paying" ? "Opening payment…" : approval ? "Sending your request…" : "Registering…";
   const problemHere = problem && (problem.step || "review") === step.id;
 
   return (
@@ -1256,13 +1327,20 @@ function Flow({ event, club, info, onDone }) {
                 <Lines lines={lines} total={total} />
                 <p className="rg-mailnote">
                   <Icon name="mail" size={16} />
-                  <span>
-                    Your ticket goes to <strong>{values.email}</strong>
-                    {accountEmail ? " and into your MyOtherApp app" : ""}
-                    {pays ? " once the payment goes through." : "."}
-                  </span>
+                  {approval ? (
+                    <span>
+                      We&rsquo;ll email <strong>{values.email}</strong> as soon as {clubLabel(confirmerClub, { start: false })} confirms your place
+                      {pays ? ", with a link to pay." : ", with your ticket."}
+                    </span>
+                  ) : (
+                    <span>
+                      Your ticket goes to <strong>{values.email}</strong>
+                      {accountEmail ? " and into your MyOtherApp app" : ""}
+                      {pays ? " once the payment goes through." : "."}
+                    </span>
+                  )}
                 </p>
-                {pays ? (
+                {paysNow ? (
                   <p className="rg-paynote">
                     <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
                       <rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -1279,6 +1357,7 @@ function Flow({ event, club, info, onDone }) {
             <Problem
               problem={problem}
               event={event}
+              club={confirmerClub}
               signedIn={Boolean(accountEmail)}
               onRetry={submit}
               onChangeEmail={changeEmail}
@@ -1321,7 +1400,8 @@ function Flow({ event, club, info, onDone }) {
                 </button>
               ) : null}
               <p className={`rg-bar-total${isReview ? " is-review" : ""}`}>
-                <span>Total</span>
+                {/* A request pays nothing now: what the ticket costs, once the club confirms. */}
+                <span>{approval ? "Price" : "Total"}</span>
                 <strong>{total === null ? "Paid" : total > 0 ? rupees(total) : "Free"}</strong>
               </p>
               <button type="submit" className="dc-btn rg-go" disabled={busyNow}>
@@ -1398,7 +1478,7 @@ export default function Register({ event, club = null }) {
     });
 
   let body;
-  if (done) body = <Success event={event} club={club} ticket={done} />;
+  if (done) body = done.kind === "request" ? <Requested event={event} club={club} done={done} /> : <Success event={event} club={club} ticket={done} />;
   else if (cancelled) body = <CancelledPanel event={event} club={club} mine={mine} />;
   else if (mine?.state === "unpaid" && !ended)
     body = <FinishPanel event={event} club={club} registration={mine} onPaid={(r) => (mine.ticketId ? paidNow(r, mine.ticketId) : info.retry())} />;

@@ -38,8 +38,9 @@ const MOBILE = /(^|[^\d+])((?:\+?91[\s-]?|0)?[6-9]\d{4}[\s-]?\d{5})(?!\d)/g;
 const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
 // The last segment of these addresses is a code that opens the page (a
 // waiting list's claim link, /claim/{token}, and the API's
-// /waitlist/offers/{token}, are its only credential).
-const CODED = /\/(tickets|certificates|verify|claim|offers)\/(?!\[)[^/?#\s"'<>]+/g;
+// /waitlist/offers/{token}, are its only credential; so are a request's
+// status link, /requests/{token}, and the API's /registration-requests/{token}).
+const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests)\/(?!\[)[^/?#\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
 
 export function maskText(text) {

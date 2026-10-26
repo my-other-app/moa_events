@@ -101,6 +101,8 @@ export function parseTicketing(raw) {
     soldOut: o.sold_out === true,
     waitlist: { enabled: wl.enabled === true, offerHours: hours && hours > 0 ? hours : 24 },
     viewerWaitlist: Array.isArray(o.viewer_waitlist) ? o.viewer_waitlist.map(parseWaitlistEntry).filter(Boolean) : [],
+    // The club confirms each place (registration approval): the form sends a request, not a registration.
+    requiresApproval: o.requires_approval === true,
   };
 }
 
@@ -372,9 +374,12 @@ const OFFER_STATUSES = new Set(["offered", "expired", "claimed", "left", "remove
 
 /**
  * GET /waitlist/offers/{token}, as the claim page reads it:
- *   {id, status, event: {id, slug, name, starts_at, location_name, poster}, ticketType: {id, name, price, isFree},
+ *   {id, status, reason, event: {id, slug, name, starts_at, location_name, poster, club}, ticketType: {id, name, price, isFree},
  *    fullName, email, phone, expiresAt, needsEmail, needsPayment, registrationId}
- * null when it isn't one.
+ * `reason`: "approved" when the place is one the club confirmed (a
+ * registration request on a paid ticket: the claim is its pay link), else
+ * null (a place that opened up on the waiting list). `event.club`: {name}
+ * when the API says it (on the event, or beside it). null when it isn't one.
  */
 export function parseOffer(d) {
   const o = obj(d);
@@ -382,9 +387,11 @@ export function parseOffer(d) {
   const tt = obj(o?.ticket_type) || {};
   if (!o || !ev || ev.id === null || ev.id === undefined || !str(ev.name)) return null;
   const price = Math.max(0, num(tt.price) ?? 0);
+  const club = obj(ev.club) || obj(o.club);
   return {
     id: o.id === null || o.id === undefined ? null : String(o.id),
     status: OFFER_STATUSES.has(o.status) ? o.status : "removed",
+    reason: o.reason === "approved" ? "approved" : null,
     event: {
       id: ev.id,
       slug: str(ev.slug),
@@ -392,6 +399,7 @@ export function parseOffer(d) {
       starts_at: iso(ev.event_datetime) || iso(ev.starts_at),
       location_name: str(ev.location_name),
       poster: ev.poster || null,
+      club: club && str(club.name) ? { name: str(club.name) } : null,
     },
     ticketType: { id: idOf(tt.id), name: str(tt.name) || "Ticket", price, isFree: price === 0 },
     fullName: str(o.full_name) || "",

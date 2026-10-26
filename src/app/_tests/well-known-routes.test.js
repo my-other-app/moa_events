@@ -81,6 +81,8 @@ describe(AASA, () => {
     ["/play/123", true],
     // A waiting list's claim link: the app's own claim screen.
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", true],
+    // A request for a place (the club confirms each one): the app's own status screen.
+    ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", true],
     // So do the city pages, which the app has no screen for.
     ["/events/in", false],
     ["/events/in/kochi", false],

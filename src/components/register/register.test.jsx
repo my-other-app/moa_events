@@ -143,6 +143,7 @@ describe("registering for a paid event", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
     });
     expect(paymentsApi.createPaymentOrder).toHaveBeenCalledWith("123", "reg-1");
     expect(eventsApi.registerForEvent.mock.invocationCallOrder[0]).toBeLessThan(paymentsApi.createPaymentOrder.mock.invocationCallOrder[0]);
@@ -283,6 +284,7 @@ describe("registering for a free event", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
       ref: "x7k2m9pq",
     });
     expect(paymentsApi.createPaymentOrder).not.toHaveBeenCalled();
@@ -782,6 +784,7 @@ describe("the WhatsApp box", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
       whatsapp_opt_in: true,
     });
   });
@@ -876,6 +879,7 @@ describe("the club's updates on WhatsApp", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
       club_updates_whatsapp: true,
     });
   });

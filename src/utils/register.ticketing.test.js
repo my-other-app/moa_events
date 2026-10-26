@@ -25,14 +25,15 @@ describe("the payload", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
       ticket_type_id: 12,
       discount_code: "early20",
     });
   });
 
-  it("is exactly what it always was for one ticket and no code", () => {
+  it("is what it always was for one ticket and no code, saying it understands requests", () => {
     const old = buildPayload(base);
-    expect(old).toEqual({ full_name: "Asha Rao", email: "asha@example.org", phone: "98765 43210", additional_details: {} });
+    expect(old).toEqual({ full_name: "Asha Rao", email: "asha@example.org", phone: "98765 43210", additional_details: {}, accepts_approval: true });
     expect(buildPayload({ ...base, ticketTypeId: null, discountCode: "  " })).toEqual(old);
   });
 });

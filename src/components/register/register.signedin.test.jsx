@@ -109,6 +109,7 @@ describe("registering signed in", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
     });
     expect(screen.getByText("It’s in your MyOtherApp app")).toBeInTheDocument();
     expect(screen.queryByText("Your ticket is also in your email.")).toBeNull();
@@ -139,6 +140,7 @@ describe("registering signed in", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
     });
     expect(paymentsApi.createPaymentOrder).toHaveBeenCalledWith("123", "reg-1");
     expect(eventsApi.registerForEvent.mock.invocationCallOrder[0]).toBeLessThan(paymentsApi.createPaymentOrder.mock.invocationCallOrder[0]);
@@ -327,6 +329,7 @@ describe("registering signed out, with sign-in on", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
     });
     expect(screen.getByText("Your ticket is also in your email.")).toBeInTheDocument();
     expect(screen.queryByText("It’s in your MyOtherApp app")).toBeNull();
@@ -400,6 +403,7 @@ describe("registering signed out, with sign-in on", () => {
       email: "ravi@example.org",
       phone: "98765 00000",
       additional_details: {},
+      accepts_approval: true,
     });
     expect(screen.getByText("It’s in your MyOtherApp app")).toBeInTheDocument();
   });

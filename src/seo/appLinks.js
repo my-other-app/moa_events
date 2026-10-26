@@ -27,6 +27,10 @@
  *                                   that opened up, or pass it on
  *                                   (moa_mobileapp#69; the app's Android
  *                                   intent filter lists /claim/ too)
+ *   /requests/{token}               a request for a place, where the club
+ *                                   confirms each one: where it stands,
+ *                                   withdrawing it (moa_mobileapp's
+ *                                   feat/registration-approval)
  *
  * What stays in the browser, and why:
  *   - the feeds (rss.xml) under /events, /clubs and /topics: a feed reader's
@@ -68,6 +72,7 @@ export const APP_PATHS = [
   "/feedback/*",
   "/play/*",
   "/claim/*",
+  "/requests/*",
 ];
 
 /** The paths that stay in the browser, checked first (the first match wins). */
