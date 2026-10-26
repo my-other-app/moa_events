@@ -717,6 +717,8 @@ export function parseEventDetail(e) {
       postal_code: (v) => (typeof v === "string" || typeof v === "number" ? str(String(v)) : null),
       // Only on a cancelled event: why, and when (src/utils/cancelled.js).
       cancellation: (v, all) => (all.status === "cancelled" ? parseCancellation(v) || { reason: null, cancelled_at: null } : null),
+      // The club confirms each place (registration approval): "Request a place", not "Register".
+      requires_approval: flag,
     }),
   };
 }

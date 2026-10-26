@@ -108,7 +108,8 @@ const LOW_SEATS = 10;
  * What the register button says and does, from the event's status and
  * whether registration is open. Exactly one of these:
  *
- *   open    "Register"                       → the form
+ *   open    "Register"                       → the form ("Request a place"
+ *                                            when the club confirms each place)
  *   soon    "Registration opens 18 Oct"      (disabled)
  *   closed  "Registration closed"            (disabled)
  *   full    "Event full"                     (disabled)
@@ -120,6 +121,8 @@ const LOW_SEATS = 10;
  */
 export function registerState(event, now = Date.now()) {
   const register = eventPath(event, "register");
+  // The club confirms each place (registration approval): the form sends a request.
+  const go = event.requires_approval === true ? "Request a place" : "Register";
   const left = seatsLeft(event);
   if (event.status === "cancelled") {
     return { kind: "cancelled", label: "Event cancelled", note: cancelledLine(event.cancellation) };
@@ -135,7 +138,7 @@ export function registerState(event, now = Date.now()) {
       href: eventPath(event, "live"),
       eyebrow: "Happening now",
       note: "Polls, questions and the quiz are in the live room.",
-      also: event.registration_open ? { label: "Register", href: register } : null,
+      also: event.registration_open ? { label: go, href: register } : null,
     };
   }
   if (event.status === "full" || (left === 0 && event.registration_open)) {
@@ -144,12 +147,12 @@ export function registerState(event, now = Date.now()) {
   if (event.registration_open) {
     const closes = formatWhen(event.reg_closes_at);
     if (left !== null && left <= LOW_SEATS) {
-      return { kind: "open", label: "Register", href: register, note: `Only ${left} ${left === 1 ? "seat" : "seats"} left`, tone: "warn" };
+      return { kind: "open", label: go, href: register, note: `Only ${left} ${left === 1 ? "seat" : "seats"} left`, tone: "warn" };
     }
     if (event.status === "closing_soon") {
-      return { kind: "open", label: "Register", href: register, note: closes ? `Closing soon · closes ${closes}` : "Registration closes soon", tone: "warn" };
+      return { kind: "open", label: go, href: register, note: closes ? `Closing soon · closes ${closes}` : "Registration closes soon", tone: "warn" };
     }
-    return { kind: "open", label: "Register", href: register, note: closes ? `Registration closes ${closes}` : null };
+    return { kind: "open", label: go, href: register, note: closes ? `Registration closes ${closes}` : null };
   }
   const opens = valid(event.reg_opens_at);
   if (opens && opens.getTime() > now) {

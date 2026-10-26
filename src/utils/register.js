@@ -256,6 +256,12 @@ export function stepsFor({ questions = [], items = [], chooseTicket = false } = 
  * `ticket_type_id` goes only when a ticket was chosen (or a link named one),
  * and `discount_code` only when one was typed: an event with one ticket and
  * no code sends exactly what it always did.
+ *
+ * `accepts_approval: true` always goes: this form understands an event whose
+ * club confirms each place (registration approval), and is then answered
+ * with a request (`approval`) instead of a ticket. Without it such an event
+ * refuses with 409 APPROVAL_REQUIRED; any other event, and a server without
+ * requests, ignores it.
  */
 export function buildPayload({
   values,
@@ -283,6 +289,7 @@ export function buildPayload({
     phone: values.phone,
     additional_details: details,
     ...(ref ? { ref } : {}),
+    accepts_approval: true,
   };
   if (items.length > 0) payload.store = picksToPayload(items, picks);
   // Only when ticked: unticked is the server's default, and the form's old shape stays as it was.
@@ -368,6 +375,11 @@ function closedCopy(errors, status) {
  * shapes (a 409 with no code, `message` as an object of fields, FastAPI's
  * 422 list) are still read.
  *
+ *   declined   REQUEST_DECLINED (409): the club confirms each place and has
+ *              declined a request from this person for this event already
+ *   approval   APPROVAL_REQUIRED (409): the club confirms each place and the
+ *              request didn't say this form understands that (it always
+ *              does): reload and send it again
  *   duplicate  ALREADY_REGISTERED (409 from the public form, 400 signed in),
  *              or a code-less 409 / "already registered": the app, My tickets
  *   awaiting   REGISTRATION_AWAITING_PAYMENT (409): this address has a
@@ -411,6 +423,12 @@ export function describeRegisterError(error, questionKeys = []) {
     return { kind: "network", message: "Check your connection and try again — you won't be registered twice." };
   }
   const code = typeof data?.error_code === "string" ? data.error_code : null;
+  if (code === "REQUEST_DECLINED") {
+    return { kind: "declined", message: "The club couldn't offer you a place at this event, so another request can't be sent from this email." };
+  }
+  if (code === "APPROVAL_REQUIRED") {
+    return { kind: "approval", message: "The club confirms each place at this event now. Reload this page and send your details again: they go to the club as a request." };
+  }
   if (code === "REGISTRATION_AWAITING_PAYMENT") {
     return { kind: "awaiting", message: said || "This email already has a registration for this event that is waiting for payment." };
   }
@@ -522,6 +540,8 @@ const doneKey = (eventId) => `moa.register.done.${eventId}`;
  * The ticket the form just made, so reloading the page shows it again
  * rather than an empty form. Kept for this tab while the page is open: the
  * page forgets it when it is left (registering a friend next starts afresh).
+ * For an event whose club confirms each place it is the request sent
+ * instead (`kind: "request"`, with `request.token` for its status page).
  */
 export function keepDone(eventId, ticket) {
   try {
@@ -534,7 +554,9 @@ export function keepDone(eventId, ticket) {
 export function loadDone(eventId) {
   try {
     const t = JSON.parse(sessionStorage.getItem(doneKey(eventId)) || "null");
-    return t && typeof t === "object" && String(t.eventId) === String(eventId) && t.ticket_id ? t : null;
+    if (!t || typeof t !== "object" || String(t.eventId) !== String(eventId)) return null;
+    if (t.kind === "request") return t.request && typeof t.request === "object" ? t : null;
+    return t.ticket_id ? t : null;
   } catch {
     return null;
   }

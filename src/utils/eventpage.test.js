@@ -59,6 +59,18 @@ describe("the event page's arithmetic", () => {
     expect(kind({ status: "ended" })).toMatchObject({ kind: "ended", label: "This event has ended", note: "Ended 18 Oct 2026" });
   });
 
+  it("asks for a place instead of registering when the club confirms each one", () => {
+    const kind = (over) => registerState(event({ requires_approval: true, ...over }), NOW);
+    expect(kind({})).toMatchObject({ kind: "open", label: "Request a place", href: "/events/hack-night-04/register" });
+    expect(kind({ capacity: 60, seats_left: 3 })).toMatchObject({ kind: "open", label: "Request a place", note: "Only 3 seats left" });
+    expect(kind({ status: "live" }).also).toEqual({ label: "Request a place", href: "/events/hack-night-04/register" });
+    // Nothing to ask for: the button says what it always said.
+    expect(kind({ status: "full" })).toMatchObject({ kind: "full", label: "Event full" });
+    expect(kind({ registration_open: false })).toMatchObject({ kind: "closed", label: "Registration closed" });
+    // Without the setting (an older server, or the club's off), it is Register.
+    expect(registerState(event({ requires_approval: false }), NOW).label).toBe("Register");
+  });
+
   it("shortens text for previews at a word", () => {
     expect(summary("short")).toBe("short");
     expect(summary("one two three four five six", 15)).toBe("one two three…");

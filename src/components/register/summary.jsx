@@ -50,14 +50,19 @@ export function Lines({ lines, total }) {
   );
 }
 
-export function Summary({ event, club, lines = null, total = null, picked = false }) {
+/**
+ * `place`: false when the event's venue isn't known here (a request's page:
+ * the API's request doesn't carry it), so nothing is said of it rather than
+ * "Venue to be announced".
+ */
+export function Summary({ event, club, lines = null, total = null, picked = false, place = true }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   const sched = scheduleLines(event);
   const tile = dateTile(event.starts_at);
   const where = event.is_online ? "Online" : event.location_name || "Venue to be announced";
   const left = seatsLeft(event);
-  const brief = [whenLine(event.starts_at), where].filter(Boolean).join(" · ");
+  const brief = [whenLine(event.starts_at), place ? where : null].filter(Boolean).join(" · ");
   const hasOrder = Array.isArray(lines);
 
   return (
@@ -87,15 +92,17 @@ export function Summary({ event, club, lines = null, total = null, picked = fals
             </span>
           </li>
         ) : null}
-        <li>
-          <span className="ep-tile ep-tile--icon" aria-hidden="true">
-            <Icon name={event.is_online ? "monitor" : "pin"} size={20} />
-          </span>
-          <span className="rg-sum-fact">
-            <span className="rg-sum-where">{where}</span>
-            {event.is_online ? <span>The joining link comes with your ticket</span> : null}
-          </span>
-        </li>
+        {place ? (
+          <li>
+            <span className="ep-tile ep-tile--icon" aria-hidden="true">
+              <Icon name={event.is_online ? "monitor" : "pin"} size={20} />
+            </span>
+            <span className="rg-sum-fact">
+              <span className="rg-sum-where">{where}</span>
+              {event.is_online ? <span>The joining link comes with your ticket</span> : null}
+            </span>
+          </li>
+        ) : null}
       </ul>
 
       {hasOrder ? (

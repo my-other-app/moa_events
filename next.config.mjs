@@ -39,8 +39,8 @@ export const VERIFY_RESULT_HEADERS = [
 ];
 
 /**
- * A waiting list's claim link (/claim/{token}): the token is the offer's
- * only credential. Never kept by a browser or a cache, framed or indexed,
+ * A waiting list's claim link (/claim/{token}), and a request's status link
+ * (/requests/{token}): the token is the offer's (the request's) only credential. Never kept by a browser or a cache, framed or indexed,
  * and never passed on in a Referer: other sites (Razorpay's checkout among
  * them) are told only the site's origin, never the address.
  */
@@ -91,6 +91,8 @@ const nextConfig = {
       { source: "/certificates/:ticketid", headers: VERIFY_RESULT_HEADERS },
       // A waiting list's offer: its address is the claim's credential.
       { source: "/claim/:token", headers: CLAIM_HEADERS },
+      // A request for a place (registration approval): its address is the request's only credential too.
+      { source: "/requests/:token", headers: CLAIM_HEADERS },
     ];
   },
   async redirects() {

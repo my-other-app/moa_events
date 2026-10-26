@@ -231,6 +231,21 @@ describe("what an event may carry", () => {
     expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("app:///_next/server/app/claim/[token]/page.js");
   });
 
+  it("masks a request's status token, on the site's page and in the API's address", async () => {
+    const out = await send({
+      request: { url: "https://myotherapp.in/requests/Rq7abcdefghijklmnopqrstuvwxyz012" },
+      breadcrumbs: [
+        { message: "GET https://api.myotherapp.in/api/v1/registration-requests/Rq7abcdefghijklmnopqrstuvwxyz012" },
+        { message: "POST https://api.myotherapp.in/api/v1/registration-requests/Rq7abcdefghijklmnopqrstuvwxyz012/withdraw" },
+      ],
+      exception: { values: [{ value: "x", stacktrace: { frames: [{ filename: "app:///_next/server/app/requests/[token]/page.js" }] } }] },
+    });
+    expect(out.request.url).toBe("https://myotherapp.in/requests/[code]");
+    expect(out.breadcrumbs[0].message).toBe("GET https://api.myotherapp.in/api/v1/registration-requests/[code]");
+    expect(out.breadcrumbs[1].message).toBe("POST https://api.myotherapp.in/api/v1/registration-requests/[code]/withdraw");
+    expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("app:///_next/server/app/requests/[token]/page.js");
+  });
+
   it("leaves numbers that are not phones alone", async () => {
     const { options } = await fresh();
     expect(options.maskText("at 1729771234567, order 12345, ₹799, 2026-10-24T19:40:58+05:30, /verify")).toBe(

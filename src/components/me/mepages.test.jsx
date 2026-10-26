@@ -498,3 +498,111 @@ describe("My tickets: ticket types and cancelled events", () => {
     expect(within(screen.getByRole("region", { name: /Past/ })).getByText("Early bird")).toBeInTheDocument();
   });
 });
+
+describe("My tickets: requests waiting for the club (registration approval)", () => {
+  const T1 = "Rq7abcdefghijklmnopqrstuvwxyz001";
+  const T2 = "Rq7abcdefghijklmnopqrstuvwxyz002";
+  const CLAIM = "Cl4im-token-abcdefghijklmnop";
+  const req = (over = {}) => ({
+    id: "r1",
+    token: T1,
+    status: "pending",
+    event: { id: 903, slug: "maker-night", name: "Maker Night", event_datetime: "2026-11-08T18:00:00+05:30", poster: null, club: { name: "Circuit Society", slug: "circuit-society" } },
+    ticket_type: { id: 3, name: "Student" },
+    full_name: "Asha Rao",
+    submitted_at: "2026-10-26T10:15:00+05:30",
+    decided_at: null,
+    decline_note: null,
+    ticket_id: null,
+    pay: null,
+    ...over,
+  });
+  const MINE = [
+    req(),
+    req({ id: "r2", token: T2, status: "approved", event: { ...req().event, id: 904, slug: "solder-lab", name: "Solder Lab" }, pay: { amount: 199, pay_by: "2026-10-27T10:15:00+05:30", claim_token: CLAIM } }),
+    // Registered already: it is a ticket now, in the list below.
+    req({ id: "r3", status: "approved", ticket_id: "MOA9", event: { ...req().event, id: 905, slug: "old", name: "Registered Already" } }),
+    req({ id: "r4", status: "declined", event: { ...req().event, id: 906, slug: "no", name: "Declined One" } }),
+  ];
+
+  /** The account's lists, and /registration-requests/mine as `mine` says (a function: its answer, or a throw). */
+  function answerWith(mine) {
+    get.mockImplementation(async (url, config) => {
+      if (url === "/api/v1/user/profile/me") return { data: PROFILE };
+      if (url === "/api/v1/events/list") return pageOf(config.params.is_ended ? PAST : UPCOMING);
+      if (url === "/api/v1/registration-requests/mine") return mine();
+      throw new Error(`unexpected GET ${url}`);
+    });
+  }
+  const notFound = () => {
+    throw Object.assign(new Error("Request failed with status code 404"), { response: { status: 404, data: { detail: "Not Found" } } });
+  };
+  const asked = () => get.mock.calls.filter(([url]) => url === "/api/v1/registration-requests/mine").length;
+
+  it("signed in: the open requests, each with its page, and paying a confirmed one", async () => {
+    enableSignIn();
+    signInAs();
+    answerWith(() => ({ data: { items: MINE } }));
+    show("/me/tickets");
+    const group = await screen.findByRole("region", { name: /Waiting for confirmation/ });
+    const rows = within(group).getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    expect(within(group).getByRole("heading", { level: 2 })).toHaveTextContent("Waiting for confirmation 2");
+
+    expect(within(rows[0]).getByRole("link", { name: "Maker Night" })).toHaveAttribute("href", "/events/maker-night");
+    expect(within(rows[0]).getByText("Waiting for confirmation")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Student")).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/confirms each place/)).toHaveTextContent("Circuit Society confirms each place. Your ticket comes by email when they confirm yours.");
+    expect(within(rows[0]).getByRole("link", { name: "Your request for Maker Night" })).toHaveAttribute("href", `/requests/${T1}`);
+
+    expect(within(rows[1]).getByText("Confirmed")).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/confirmed your place/)).toHaveTextContent("Circuit Society confirmed your place. Pay ₹199 by Tue, 27 Oct · 10:15 AM IST to get your ticket.");
+    expect(within(rows[1]).getByRole("link", { name: "Pay ₹199 for Solder Lab" })).toHaveAttribute("href", `/claim/${CLAIM}`);
+    expect(within(rows[1]).getByRole("link", { name: "Your request for Solder Lab" })).toHaveAttribute("href", `/requests/${T2}`);
+
+    expect(within(group).queryByText("Registered Already")).toBeNull();
+    expect(within(group).queryByText("Declined One")).toBeNull();
+    // The tickets are there as ever.
+    expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
+  });
+
+  it("shows nothing from a server without requests (404), and the tickets as ever", async () => {
+    enableSignIn();
+    signInAs();
+    answerWith(notFound);
+    show("/me/tickets");
+    expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
+    await waitFor(() => expect(asked()).toBe(1));
+    expect(screen.queryByRole("region", { name: /Waiting for confirmation/ })).toBeNull();
+  });
+
+  it("shows nothing when there are none open", async () => {
+    enableSignIn();
+    signInAs();
+    answerWith(() => ({ data: { items: [MINE[2], MINE[3]] } }));
+    show("/me/tickets");
+    expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
+    await waitFor(() => expect(asked()).toBe(1));
+    expect(screen.queryByRole("region", { name: /Waiting for confirmation/ })).toBeNull();
+  });
+
+  it("signed out, with the guest token a registration here left: that guest's requests, under the way in", async () => {
+    enableSignIn();
+    localStorage.setItem("access_token", "guest-a");
+    answerWith(() => ({ data: { items: [MINE[0]] } }));
+    show("/me/tickets");
+    expect(await screen.findByRole("heading", { name: "Your tickets, in one place" })).toBeInTheDocument();
+    const group = await screen.findByRole("region", { name: /Waiting for confirmation/ });
+    expect(within(group).getByRole("link", { name: "Your request for Maker Night" })).toHaveAttribute("href", `/requests/${T1}`);
+    localStorage.removeItem("access_token");
+  });
+
+  it("signed out with no guest token: nothing asked", async () => {
+    enableSignIn();
+    answerWith(() => ({ data: { items: MINE } }));
+    show("/me/tickets");
+    expect(await screen.findByRole("heading", { name: "Your tickets, in one place" })).toBeInTheDocument();
+    expect(asked()).toBe(0);
+    expect(screen.queryByRole("region", { name: /Waiting for confirmation/ })).toBeNull();
+  });
+});

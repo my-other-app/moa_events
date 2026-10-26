@@ -4,9 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { accountApi } from "@/api/account";
+import { requestsApi } from "@/api/requests";
 import { useAuth } from "@/auth/context";
+import { guestToken } from "@/auth/session";
 import { eventPath, whenLine } from "@/utils/eventpage";
-import { imageUrl } from "@/utils/format";
+import { formatWhen, imageUrl } from "@/utils/format";
+import { rupees } from "@/utils/register";
+import { openRequests, requestPath } from "@/utils/requests";
 import { VerifyBanner } from "../auth/verifyemail";
 import { SitePage } from "../discover/chrome";
 import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
@@ -22,6 +26,9 @@ import { CancelledNote, ownState, useEventStates } from "../cancelled";
  * the same neutral first paint on the server and in the browser, then, once
  * the browser has read who is signed in: the list, or the way in. In a build
  * without sign-in, each points to the app, where these have always lived.
+ * My tickets also lists the requests still waiting on a club that confirms
+ * each place (registration approval), for an account or for the guest a
+ * registration here left, when the API has them.
  */
 
 const TICKETS_PAGE = 20;
@@ -257,6 +264,115 @@ function TicketRow({ item, past, onPaid, state = null }) {
   );
 }
 
+/* ---------- requests waiting for the club ---------- */
+
+/**
+ * One request for a place at an event whose club confirms each place: the
+ * event, and where it stands. Waiting: its page (and withdrawing it there).
+ * Confirmed and not yet paid: pay on the claim page, or its page.
+ */
+function RequestRow({ request }) {
+  const e = request.event;
+  const when = whenLine(e.starts_at);
+  const page = requestPath(request.token);
+  const pay = request.status === "approved" ? request.pay : null;
+  const payBy = pay ? formatWhen(pay.payBy) : null;
+  const amount = pay && pay.amount > 0 ? rupees(pay.amount) : null;
+  return (
+    <li className="me-ticket me-request">
+      <div className="me-ticket-main">
+        <Thumb event={e} />
+        <div className="me-ticket-info">
+          {when ? (
+            <p className="me-ticket-when">
+              <time dateTime={e.starts_at}>{when}</time>
+            </p>
+          ) : null}
+          <h3 className="me-ticket-name">
+            {e.slug || e.id ? <Link href={eventPath(e)}>{e.name}</Link> : e.name}
+          </h3>
+          <p className="me-ticket-meta">
+            {e.club?.name ? <span>by {e.club.name}</span> : null}
+            <span className={`me-pill${pay ? " me-pill--yes" : ""}`}>{request.status === "approved" ? "Confirmed" : "Waiting for confirmation"}</span>
+            {request.ticketType ? <span className="me-ticket-type">{request.ticketType.name}</span> : null}
+          </p>
+          <p className="me-request-line">
+            {request.status === "approved"
+              ? pay
+                ? `${e.club?.name || "The club"} confirmed your place. Pay${amount ? ` ${amount}` : ""}${payBy ? ` by ${payBy} IST` : ""} to get your ticket.`
+                : `${e.club?.name || "The club"} confirmed your place: your ticket is on its way by email.`
+              : `${e.club?.name || "The club"} confirms each place. Your ticket comes by email when they confirm yours.`}
+          </p>
+        </div>
+      </div>
+      <div className="me-ticket-stub">
+        <div className="me-ticket-code">
+          <p className="me-ticket-kicker">Request</p>
+          <p className="me-ticket-number me-request-state">{request.status === "approved" ? (pay ? "To pay" : "Confirmed") : "Waiting"}</p>
+        </div>
+        <div className="me-ticket-actions">
+          {pay ? (
+            <Link className="dc-btn dc-btn--sm" href={`/claim/${encodeURIComponent(pay.claimToken)}`} aria-label={`Pay${amount ? ` ${amount}` : ""} for ${e.name}`}>
+              {amount ? `Pay ${amount}` : "Pay now"}
+            </Link>
+          ) : null}
+          {page ? (
+            <Link className={pay ? "me-cert" : "dc-btn dc-btn--sm"} href={page} aria-label={`Your request for ${e.name}`}>
+              {pay ? "Request details" : "View request"}
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * "Waiting for confirmation": the reader's requests still open (waiting, or
+ * confirmed and not yet paid), from GET /registration-requests/mine, sent
+ * with the account's token or, signed out, the guest token a registration
+ * left. Nothing at all while it loads, when there are none, from a server
+ * without requests (404) or when it fails: the tickets are this page's job.
+ */
+function WaitingRequests({ who }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setItems(null);
+    Promise.resolve()
+      .then(() => requestsApi.mine())
+      .then(
+        (list) => alive && setItems(list ? openRequests(list) : []),
+        () => alive && setItems([]),
+      );
+    return () => {
+      alive = false;
+    };
+  }, [who]);
+  if (!items || !items.length) return null;
+  return (
+    <section className="me-section me-requests" aria-labelledby="me-waiting">
+      <h2 className="me-section-title" id="me-waiting">
+        Waiting for confirmation <small>{items.length}</small>
+      </h2>
+      <ul className="me-tickets">
+        {items.map((r, i) => (
+          <RequestRow key={r.id || r.token || i} request={r} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Signed out, with a guest's token from a registration here: that guest's requests (read once the page is up). */
+function GuestRequests() {
+  const [guest, setGuest] = useState(false);
+  useEffect(() => {
+    setGuest(Boolean(guestToken()));
+  }, []);
+  return guest ? <WaitingRequests who="guest" /> : null;
+}
+
 function TicketsSkeleton() {
   return <Reading label="Loading your tickets" />;
 }
@@ -350,6 +466,7 @@ function Tickets({ email }) {
           Payment received — your ticket for {paid} is ready.
         </p>
       ) : null}
+      <WaitingRequests who={email} />
       {body}
     </>
   );
@@ -359,17 +476,25 @@ export function MyTicketsPage() {
   const auth = useAuth();
   let content;
   if (!auth.enabled) {
-    content = <InTheApp icon="ticket" title="Your tickets are in the app" text="Every ticket you get is in the MyOtherApp app, and in your email." />;
+    content = (
+      <>
+        <InTheApp icon="ticket" title="Your tickets are in the app" text="Every ticket you get is in the MyOtherApp app, and in your email." />
+        <GuestRequests />
+      </>
+    );
   } else if (!auth.ready) {
     content = <Reading label="Loading your tickets" />;
   } else if (auth.status !== "signed-in") {
     content = (
-      <SignInPrompt
-        icon="ticket"
-        reason="tickets"
-        title="Your tickets, in one place"
-        text="Sign in with the Google account or email you use in the MyOtherApp app to see every ticket — the ones from here and from the app."
-      />
+      <>
+        <SignInPrompt
+          icon="ticket"
+          reason="tickets"
+          title="Your tickets, in one place"
+          text="Sign in with the Google account or email you use in the MyOtherApp app to see every ticket — the ones from here and from the app."
+        />
+        <GuestRequests />
+      </>
     );
   } else {
     content = (

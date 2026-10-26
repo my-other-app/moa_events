@@ -95,8 +95,33 @@ describe("a guest token sent with a different email", () => {
   });
 });
 
+describe("a request instead of a registration (the club confirms each place)", () => {
+  const APPROVAL = { id: "r1", status: "pending", submitted_at: "2026-10-26T10:15:00+05:30", token: "Rq7abcdefghijklmnopqrstuvwxyz012", status_url: "https://myotherapp.in/requests/Rq7abcdefghijklmnopqrstuvwxyz012" };
+
+  it("keeps a new guest's token exactly as a registration's", async () => {
+    serve((config) =>
+      reply(config, 200, { approval: APPROVAL, event_registration_id: null, auth_token: { access_token: "request-guest", refresh_token: "request-guest-refresh" } })
+    );
+    const data = await eventsApi.registerForEvent("62", { ...BODY, accepts_approval: true });
+    expect(data.approval).toEqual(APPROVAL);
+    expect(JSON.parse(seen[0].data)).toEqual({ ...BODY, accepts_approval: true });
+    expect(localStorage.getItem("access_token")).toBe("request-guest");
+    expect(localStorage.getItem("refresh_token")).toBe("request-guest-refresh");
+  });
+
+  it("leaves the stored token when none comes back", async () => {
+    localStorage.setItem("access_token", "same-guest");
+    serve((config) => reply(config, 200, { approval: APPROVAL, event_registration_id: null }));
+    await eventsApi.registerForEvent("62", { ...BODY, accepts_approval: true });
+    expect(seen[0].auth).toBe("Bearer same-guest");
+    expect(localStorage.getItem("access_token")).toBe("same-guest");
+  });
+});
+
 describe("what a refusal carries to the form", () => {
   it.each([
+    [409, "REQUEST_DECLINED", "The club has declined a request from you for this event."],
+    [409, "APPROVAL_REQUIRED", "This event needs the club to confirm each place. Update the app, or register on myotherapp.in."],
     [409, "ALREADY_REGISTERED", "This email is already registered for this event. Your ticket was sent to it; sign in to the MyOtherApp app with this email to see it."],
     [409, "REGISTRATION_AWAITING_PAYMENT", "This email already has a registration for this event that is waiting for payment."],
     [400, "CLUB_EMAIL", "This email belongs to a club's account. Register with your own email."],

@@ -112,6 +112,7 @@ describe("the payload", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
     });
   });
 
@@ -140,6 +141,7 @@ describe("the payload", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: { college: "COEP" },
+      accepts_approval: true,
       ref: "x7k2m9pq",
       store: [{ item_id: "tee", variant_id: "m", qty: 2 }],
     });
@@ -290,6 +292,18 @@ describe("the refusals the server names by code (backend#68), and the shapes bef
   it("an older server's 409 without a code is still the duplicate", () => {
     expect(describeRegisterError({ status: 409, data: { message: "Already here." } }).kind).toBe("duplicate");
   });
+
+  it("an event whose club confirms each place: a request declined before, and one sent without saying the form understands that", () => {
+    expect(describeRegisterError({ status: 409, data: envelope("Declined before.", "REQUEST_DECLINED") })).toEqual({
+      kind: "declined",
+      message: "The club couldn't offer you a place at this event, so another request can't be sent from this email.",
+    });
+    // Never a duplicate, though both are 409s.
+    expect(describeRegisterError({ status: 409, data: envelope("This event needs the club to confirm each place.", "APPROVAL_REQUIRED") })).toEqual({
+      kind: "approval",
+      message: "The club confirms each place at this event now. Reload this page and send your details again: they go to the club as a request.",
+    });
+  });
 });
 
 describe("the signed-in person's own registration (GET /events/info/{id})", () => {
@@ -342,6 +356,14 @@ describe("the ticket just made, kept for a reload", () => {
     sessionStorage.setItem("moa.register.done.124", "{not json");
     expect(loadDone("124")).toBeNull();
   });
+
+  it("keeps a request sent instead, when the club confirms each place", () => {
+    const sent = { eventId: "124", kind: "request", request: { id: "r1", token: "Rq7abcdefghijklmnopqrstuvwxyz012", path: "/requests/Rq7abcdefghijklmnopqrstuvwxyz012" }, name: "Asha" };
+    keepDone("124", sent);
+    expect(loadDone("124")).toEqual(sent);
+    keepDone("124", { eventId: "124", kind: "request" });
+    expect(loadDone("124")).toBeNull();
+  });
 });
 
 describe("WhatsApp", () => {
@@ -371,6 +393,7 @@ describe("WhatsApp", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
       whatsapp_opt_in: true,
     });
     expect(buildPayload({ values, questions: [], answers: {}, ref: null, whatsapp: false })).not.toHaveProperty("whatsapp_opt_in");
@@ -385,6 +408,7 @@ describe("WhatsApp", () => {
       email: "asha@example.org",
       phone: "98765 43210",
       additional_details: {},
+      accepts_approval: true,
       club_updates_whatsapp: true,
     });
     expect(buildPayload({ ...base, whatsapp: true, clubUpdates: true })).toMatchObject({ whatsapp_opt_in: true, club_updates_whatsapp: true });

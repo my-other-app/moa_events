@@ -3,6 +3,7 @@ import { formatCount, formatPrice, imageUrl, statusPill } from "@/utils/format";
 import { safeHref } from "@/utils/linkify";
 import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
+import { approvalNote } from "@/utils/requests";
 import { Img } from "./img";
 import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
@@ -94,8 +95,10 @@ export function Poster({ event }) {
  * The price and the one button, from the event's state. Sticky beside the
  * page on a desk; a bar fixed to the bottom of a phone.
  */
-export function RegisterCard({ event }) {
+export function RegisterCard({ event, club = null }) {
   const state = registerState(event);
+  // The club confirms each place (registration approval): said beside the button while a place can be asked for.
+  const approval = event.requires_approval === true && (state.kind === "open" || (state.kind === "live" && Boolean(state.also)));
   const left = seatsLeft(event);
   const when = whenLine(event.starts_at);
   const taken = event.capacity && left !== null ? Math.min(event.capacity, Math.max(0, event.capacity - left)) : 0;
@@ -123,6 +126,12 @@ export function RegisterCard({ event }) {
           />
         </div>
       </div>
+      {approval ? (
+        <p className="ep-cta-approval">
+          <EpIcon name="check" size={14} />
+          <span>{approvalNote(club)}</span>
+        </p>
+      ) : null}
       {showMeter ? (
         <div className="ep-meter">
           <span className="ep-meter-bar" role="img" aria-label={`${formatCount(taken)} of ${formatCount(event.capacity)} seats taken`}>

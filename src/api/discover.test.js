@@ -229,6 +229,15 @@ describe("a club's updates on WhatsApp", () => {
   });
 });
 
+describe("an event whose club confirms each place", () => {
+  it("keeps requires_approval only when the API says true", () => {
+    const base = sparseEvent();
+    expect(parseEventPage(sparseEvent({ event: { ...base.event, requires_approval: true } })).event.requires_approval).toBe(true);
+    expect(parseEventPage(sparseEvent({ event: { ...base.event, requires_approval: false } })).event).not.toHaveProperty("requires_approval");
+    expect(parseEventPage(sparseEvent()).event).not.toHaveProperty("requires_approval");
+  });
+});
+
 describe("reading an event's page", () => {
   it("reads every part of a full event, and leaves this event out of its own 'more' row", () => {
     const p = parseEventPage(fullEvent());

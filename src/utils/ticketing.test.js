@@ -79,6 +79,12 @@ describe("parseTicketing", () => {
     expect(t.waitlist).toEqual({ enabled: false, offerHours: 24 });
     expect(t.requiresChoice).toBe(false);
   });
+
+  it("says whether the club confirms each place, false when the API doesn't say", () => {
+    expect(parseTicketing(ticketing({ requires_approval: true })).requiresApproval).toBe(true);
+    expect(parseTicketing(ticketing({ requires_approval: "yes" })).requiresApproval).toBe(false);
+    expect(parseTicketing(ticketing()).requiresApproval).toBe(false);
+  });
 });
 
 describe("choosing", () => {
@@ -244,6 +250,17 @@ describe("an offer and a ticket's type", () => {
     });
     expect(parseOffer({ status: "offered" })).toBeNull();
     expect(parseOffer({ status: "bogus", event: { id: 1, name: "X" } }).status).toBe("removed");
+    // A place on the waiting list: no reason, and no club unless the API names one.
+    expect(offer.reason).toBeNull();
+    expect(offer.event.club).toBeNull();
+  });
+
+  it("reads a place the club confirmed (registration approval): the reason, and the club when it is named", () => {
+    const base = { id: "6f1c", status: "offered", ticket_type: { id: 12, name: "Early bird", price: 199 }, full_name: "Asha K" };
+    const onEvent = parseOffer({ ...base, reason: "approved", event: { id: 7, name: "Hack Night 04", club: { name: "Circuit Society" } } });
+    expect(onEvent).toMatchObject({ reason: "approved", event: { club: { name: "Circuit Society" } } });
+    expect(parseOffer({ ...base, reason: "approved", event: { id: 7, name: "Hack Night 04" }, club: { name: "DOTSLASH" } }).event.club).toEqual({ name: "DOTSLASH" });
+    expect(parseOffer({ ...base, reason: "waitlist", event: { id: 7, name: "Hack Night 04" } }).reason).toBeNull();
   });
 
   it("finds the type's name in whichever field carries it", () => {
