@@ -20,6 +20,14 @@ const { PROFILE, resetAuth } = await import("@/test/auth");
 
 const TOKEN = "Rq7abcdefghijklmnopqrstuvwxyz012";
 const CLAIM = "Cl4im-token-abcdefghijklmnop";
+const RAW = {
+  id: "r1",
+  status: "pending",
+  event: { id: 123, slug: "hack-night-04", name: "Hack Night 04", event_datetime: "2026-11-08T18:00:00+05:30", poster: null, club: { name: "Circuit Society", slug: "circuit-society" } },
+  ticket_type: { id: 3, name: "Student" },
+  full_name: "Asha Rao",
+  submitted_at: "2026-10-26T10:15:00+05:30",
+};
 const request = (over = {}) =>
   parseRequest({
     id: "r1",
@@ -110,6 +118,24 @@ describe("a request waiting for the club", () => {
     expect(await heading("You're in")).toBeInTheDocument();
     expect(screen.getByText("Your request changed meanwhile, so it wasn't withdrawn. Here's where it stands now.")).toBeInTheDocument();
     expect(requestsApi.byToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("REQUEST_NOT_WITHDRAWABLE's own copy of the request is shown as it is, without reading it again", async () => {
+    requestsApi.byToken.mockResolvedValue(request());
+    requestsApi.withdraw.mockRejectedValue(
+      apiFailure({
+        response: {
+          status: 409,
+          data: { error_code: "REQUEST_NOT_WITHDRAWABLE", errors: { request: { ...RAW, status: "declined", decline_note: "Full, sorry." } } },
+        },
+      }),
+    );
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Withdraw my request" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, withdraw it" }));
+    expect(await heading("No place this time")).toBeInTheDocument();
+    expect(screen.getByText("Your request changed meanwhile, so it wasn't withdrawn. Here's where it stands now.")).toBeInTheDocument();
+    expect(requestsApi.byToken).toHaveBeenCalledTimes(1);
   });
 
   it("a withdrawal that can't reach the server says so in place", async () => {

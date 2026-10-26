@@ -12,6 +12,7 @@ import {
   needsPicker,
   onSale,
   parseOffer,
+  viewerRequestOf,
   parseTicketing,
   priceRange,
   ticketTypeName,
@@ -84,6 +85,24 @@ describe("parseTicketing", () => {
     expect(parseTicketing(ticketing({ requires_approval: true })).requiresApproval).toBe(true);
     expect(parseTicketing(ticketing({ requires_approval: "yes" })).requiresApproval).toBe(false);
     expect(parseTicketing(ticketing()).requiresApproval).toBe(false);
+  });
+
+  it("reads the signed-in viewer's open request, and only an open one", () => {
+    const T = "Rq7abcdefghijklmnopqrstuvwxyz001";
+    expect(parseTicketing(ticketing({ viewer_request: { id: "r1", status: "pending", token: T, status_url: `https://myotherapp.in/requests/${T}` } })).viewerRequest).toEqual({
+      id: "r1",
+      status: "pending",
+      submittedAt: null,
+      token: T,
+      path: `/requests/${T}`,
+    });
+    expect(parseTicketing(ticketing({ viewer_request: { id: "r1", status: "approved", token: null, status_url: `https://myotherapp.in/requests/${T}` } })).viewerRequest.path).toBe(`/requests/${T}`);
+    expect(parseTicketing(ticketing({ viewer_request: { id: "r1", status: "declined", token: T } })).viewerRequest).toBeNull();
+    expect(parseTicketing(ticketing({ viewer_request: null })).viewerRequest).toBeNull();
+    expect(parseTicketing(ticketing()).viewerRequest).toBeNull();
+    // From the raw object, whether it lists types or not.
+    expect(viewerRequestOf({ viewer_request: { id: "r1", status: "pending", token: T } }).path).toBe(`/requests/${T}`);
+    expect(viewerRequestOf(null)).toBeNull();
   });
 });
 
@@ -259,8 +278,12 @@ describe("an offer and a ticket's type", () => {
     const base = { id: "6f1c", status: "offered", ticket_type: { id: 12, name: "Early bird", price: 199 }, full_name: "Asha K" };
     const onEvent = parseOffer({ ...base, reason: "approved", event: { id: 7, name: "Hack Night 04", club: { name: "Circuit Society" } } });
     expect(onEvent).toMatchObject({ reason: "approved", event: { club: { name: "Circuit Society" } } });
-    expect(parseOffer({ ...base, reason: "approved", event: { id: 7, name: "Hack Night 04" }, club: { name: "DOTSLASH" } }).event.club).toEqual({ name: "DOTSLASH" });
-    expect(parseOffer({ ...base, reason: "waitlist", event: { id: 7, name: "Hack Night 04" } }).reason).toBeNull();
+    expect(parseOffer({ ...base, reason: "approved", event: { id: 7, name: "Hack Night 04" }, club: { name: "DOTSLASH" } }).event.club).toEqual({ name: "DOTSLASH", slug: null });
+    expect(parseOffer({ ...base, reason: "waitlist", event: { id: 7, name: "Hack Night 04", club: { name: "C", slug: "c" } } })).toMatchObject({ reason: null, amount: null, event: { club: { name: "C", slug: "c" } } });
+    // The confirmed price (its code taken off), only on a confirmed place.
+    expect(parseOffer({ ...base, reason: "approved", amount: 159.2, event: { id: 7, name: "Hack Night 04" } }).amount).toBe(159.2);
+    expect(parseOffer({ ...base, reason: "approved", amount: null, event: { id: 7, name: "Hack Night 04" } }).amount).toBeNull();
+    expect(parseOffer({ ...base, reason: "waitlist", amount: 99, event: { id: 7, name: "Hack Night 04" } }).amount).toBeNull();
   });
 
   it("finds the type's name in whichever field carries it", () => {

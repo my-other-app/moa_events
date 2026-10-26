@@ -37,7 +37,19 @@ import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { CANCELLED_TITLE, REFUND_DETAIL, REFUND_NOTE, cancelledLine } from "@/utils/cancelled";
 import { ticketingApi } from "@/api/ticketing";
 import { clubName as clubLabel, parseApproval, requiresApproval } from "@/utils/requests";
-import { anyPaid, defaultType, liveEntries, needsPicker, onSale, parseTicketing, ticketTypeName, typeById, typePrice, waitlistTypes } from "@/utils/ticketing";
+import {
+  anyPaid,
+  defaultType,
+  liveEntries,
+  needsPicker,
+  onSale,
+  parseTicketing,
+  ticketTypeName,
+  typeById,
+  typePrice,
+  viewerRequestOf,
+  waitlistTypes,
+} from "@/utils/ticketing";
 import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
 import { SitePage } from "../discover/chrome";
@@ -517,6 +529,40 @@ function Registered({ event, club, ticketId }) {
       }
     >
       <p className="rg-closed-text">Your ticket for {event.name} is in My tickets, in the MyOtherApp app and in your email.</p>
+    </Panel>
+  );
+}
+
+/**
+ * Signed in, for an event whose club confirms each place: the person asked
+ * for a place already (`ticketing.viewer_request`), and it is still open.
+ * Its page, rather than the form again (which would answer with the same request).
+ */
+function AskedPanel({ event, club, asked }) {
+  const confirmed = asked.status === "approved";
+  return (
+    <Panel
+      event={event}
+      club={club}
+      title={confirmed ? `${clubLabel(club)} confirmed your place` : "You've asked for a place"}
+      actions={
+        <>
+          {asked.path ? (
+            <Link className="dc-btn" href={asked.path}>
+              {confirmed ? "Pay for your ticket" : "See your request"}
+            </Link>
+          ) : null}
+          <Link className="dc-btn dc-btn--ghost" href={eventPath(event)}>
+            Back to the event
+          </Link>
+        </>
+      }
+    >
+      <p className="rg-closed-text">
+        {confirmed
+          ? "Pay to get your ticket: the link is in your email too."
+          : `${clubLabel(club)} confirms each place, and your ticket will come by email as soon as they confirm yours.`}
+      </p>
     </Panel>
   );
 }
@@ -1462,6 +1508,8 @@ export default function Register({ event, club = null }) {
   // The form needs its questions; signed in, the person's own registration matters even when the form is closed.
   const info = useEventInfo(eventId, auth.ready && !done && (open || (signedIn && !ended)), who);
   const mine = signedIn && info.who === who ? myRegistration(info.data) : null;
+  // Signed in, a request for a place still open (the club confirms each one).
+  const asked = signedIn && info.who === who ? viewerRequestOf(info.data?.ticketing) : null;
   // A full event's tickets (the public list, which counts no visit) say whether its waiting list can be joined.
   const { ticketing: closedTickets, reload: reloadClosed } = useEventTicketing(eventId, { enabled: !done && gate.kind === "full" });
 
@@ -1483,6 +1531,7 @@ export default function Register({ event, club = null }) {
   else if (mine?.state === "unpaid" && !ended)
     body = <FinishPanel event={event} club={club} registration={mine} onPaid={(r) => (mine.ticketId ? paidNow(r, mine.ticketId) : info.retry())} />;
   else if (mine?.state === "registered") body = <Registered event={event} club={club} ticketId={mine.ticketId} />;
+  else if (asked && open) body = <AskedPanel event={event} club={club} asked={asked} />;
   else if (open) body = <Flow key={eventId} event={event} club={club} info={info} onDone={finished} />;
   else body = <Closed event={event} club={club} gate={gate} ticketing={closedTickets} onTicketsChanged={reloadClosed} />;
 

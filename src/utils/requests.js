@@ -1,4 +1,7 @@
+import { parseRequestRef, tokenOf } from "./requestlink";
 import { apiFailure } from "./ticketing";
+
+export { requestPath, tokenFromStatusUrl } from "./requestlink";
 
 /**
  * Registration approval ("Confirm each registration"): a club can confirm
@@ -27,26 +30,6 @@ const iso = (v) => {
 };
 const idOf = (v) => (typeof v === "number" || (typeof v === "string" && v.trim() !== "") ? v : null);
 
-/** The request's link token: URL-safe, as the server makes it (and as /requests/{token} accepts it). */
-const TOKEN = /^[A-Za-z0-9_-]{16,128}$/;
-
-/** "https://myotherapp.in/requests/<token>" → "<token>"; null when it isn't one. */
-export function tokenFromStatusUrl(url) {
-  const s = str(url);
-  if (!s) return null;
-  try {
-    const parts = new URL(s, "https://myotherapp.in").pathname.split("/").filter(Boolean);
-    const at = parts.indexOf("requests");
-    const token = at !== -1 ? decodeURIComponent(parts[at + 1] || "") : "";
-    return TOKEN.test(token) ? token : null;
-  } catch {
-    return null;
-  }
-}
-
-/** The site's own address for a request's status: /requests/{token}. Null without a token. */
-export const requestPath = (token) => (token && TOKEN.test(String(token)) ? `/requests/${encodeURIComponent(token)}` : null);
-
 export const REQUEST_STATUSES = new Set(["pending", "approved", "declined", "withdrawn", "lapsed", "closed"]);
 
 /**
@@ -54,7 +37,7 @@ export const REQUEST_STATUSES = new Set(["pending", "approved", "declined", "wit
  *
  *   {id, token, status, event: {id, slug, name, starts_at, location_name, is_online, poster, club},
  *    ticketType: {id, name} | null, fullName, submittedAt, decidedAt, declineNote,
- *    ticketId, pay: {amount, payBy, claimToken} | null}
+ *    ticketId, pay: {amount, payBy, claimToken, claimUrl} | null}
  *
  * `status` is one of REQUEST_STATUSES, or "other" for one this site doesn't
  * know yet. `ticketId` once registered; `pay` only for a confirmed paid
@@ -71,7 +54,7 @@ export function parseRequest(d) {
   const pay = obj(o.pay);
   const claimToken = str(pay?.claim_token);
   const ticket = o.ticket_id === null || o.ticket_id === undefined ? null : str(String(o.ticket_id));
-  const token = str(o.token) && TOKEN.test(o.token.trim()) ? o.token.trim() : tokenFromStatusUrl(o.status_url);
+  const token = tokenOf(o);
   return {
     id: o.id === null || o.id === undefined ? null : String(o.id),
     token,
@@ -92,7 +75,7 @@ export function parseRequest(d) {
     decidedAt: iso(o.decided_at),
     declineNote: str(o.decline_note),
     ticketId: ticket,
-    pay: claimToken ? { amount: Math.max(0, num(pay.amount) ?? 0), payBy: iso(pay.pay_by), claimToken } : null,
+    pay: claimToken ? { amount: Math.max(0, num(pay.amount) ?? 0), payBy: iso(pay.pay_by), claimToken, claimUrl: str(pay.claim_url) } : null,
   };
 }
 
@@ -132,20 +115,11 @@ export function requiresApproval(info, event = null) {
 /**
  * The register call's `approval` (with `accepts_approval: true`, for an
  * event whose club confirms each place): {id, status, submittedAt, token,
- * path}. Null when the answer is a registration.
+ * path}. `token` and `path` are null when the form was sent again, signed
+ * out, for an address with an open request: the API emails the link to the
+ * address instead. Null when the answer is a registration.
  */
-export function parseApproval(data) {
-  const a = obj(obj(data)?.approval);
-  if (!a) return null;
-  const token = str(a.token) && TOKEN.test(a.token.trim()) ? a.token.trim() : tokenFromStatusUrl(a.status_url);
-  return {
-    id: a.id === null || a.id === undefined ? null : String(a.id),
-    status: str(a.status) || "pending",
-    submittedAt: iso(a.submitted_at),
-    token,
-    path: requestPath(token),
-  };
-}
+export const parseApproval = (data) => parseRequestRef(obj(data)?.approval);
 
 const TOO_MANY = "Too many tries in a row. Wait a minute, then try again.";
 
@@ -158,6 +132,8 @@ const TOO_MANY = "Too many tries in a row. Wait a minute, then try again.";
 export function describeRequestError(error) {
   const f = apiFailure(error);
   if (f.status === 404) return { kind: "gone", message: "This link isn't valid." };
+  // REQUEST_NOT_WITHDRAWABLE carries the request as it stands now.
+  if (f.status === 409 && f.errors?.request) return { kind: "changed", message: f.message, request: parseRequest(f.errors.request) };
   if (f.status === 429) return { kind: "limit", message: TOO_MANY };
   if (f.network) return { kind: "network", message: "We couldn't reach MyOtherApp. Check your connection and try again." };
   if (f.status === 409 || f.status === 400 || f.status === 422) return { kind: "changed", message: f.message };

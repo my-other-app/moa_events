@@ -69,8 +69,18 @@ describe("a request, as the API sends it", () => {
   });
 
   it("reads a confirmed paid request's pay link, and a ticket once registered", () => {
-    const paying = parseRequest(REQUEST({ status: "approved", pay: { amount: "199.0", pay_by: "2026-10-27T10:15:00+05:30", claim_token: "Cl4im-token-abcdefghijklmnop" } }));
-    expect(paying.pay).toEqual({ amount: 199, payBy: "2026-10-27T10:15:00+05:30", claimToken: "Cl4im-token-abcdefghijklmnop" });
+    const paying = parseRequest(
+      REQUEST({
+        status: "approved",
+        pay: { amount: "199.0", pay_by: "2026-10-27T10:15:00+05:30", claim_token: "Cl4im-token-abcdefghijklmnop", claim_url: "https://myotherapp.in/claim/Cl4im-token-abcdefghijklmnop" },
+      }),
+    );
+    expect(paying.pay).toEqual({
+      amount: 199,
+      payBy: "2026-10-27T10:15:00+05:30",
+      claimToken: "Cl4im-token-abcdefghijklmnop",
+      claimUrl: "https://myotherapp.in/claim/Cl4im-token-abcdefghijklmnop",
+    });
     expect(parseRequest(REQUEST({ status: "approved", pay: { amount: 199 } })).pay).toBeNull();
     expect(parseRequest(REQUEST({ status: "approved", ticket_id: "MOA7Q4K2X" })).ticketId).toBe("MOA7Q4K2X");
     expect(parseRequest(REQUEST({ status: "declined", decline_note: "  Full up, sorry.  " })).declineNote).toBe("Full up, sorry.");
@@ -132,6 +142,16 @@ describe("the register call's answer", () => {
     expect(parseApproval({ approval: { id: "r1" } }).path).toBeNull();
   });
 
+  it("reads a request sent again, signed out, for an address with one open: no link (it was emailed)", () => {
+    expect(parseApproval({ approval: { id: "r1", status: "pending", submitted_at: "2026-10-26T10:15:00+05:30", token: null, status_url: null } })).toEqual({
+      id: "r1",
+      status: "pending",
+      submittedAt: "2026-10-26T10:15:00+05:30",
+      token: null,
+      path: null,
+    });
+  });
+
   it("is null for a registration", () => {
     expect(parseApproval({ ticket_id: "MOA1", pay_amount: 0 })).toBeNull();
     expect(parseApproval({ approval: null })).toBeNull();
@@ -165,6 +185,9 @@ describe("what a refusal means", () => {
     expect(describeRequestError(fail(429))).toMatchObject({ kind: "limit", message: "Too many tries in a row. Wait a minute, then try again." });
     expect(describeRequestError(apiFailure(new Error("Network Error"))).kind).toBe("network");
     expect(describeRequestError(fail(409, { error_code: "REQUEST_NOT_PENDING" })).kind).toBe("changed");
+    // REQUEST_NOT_WITHDRAWABLE carries the request as it stands.
+    const now = describeRequestError(fail(409, { error_code: "REQUEST_NOT_WITHDRAWABLE", errors: { request: REQUEST({ status: "approved", ticket_id: "MOA1" }) } }));
+    expect(now).toMatchObject({ kind: "changed", request: { status: "approved", ticketId: "MOA1" } });
     expect(describeRequestError(fail(500)).kind).toBe("message");
   });
 });

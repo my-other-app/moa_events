@@ -1,4 +1,5 @@
 import { formatWhen } from "./format";
+import { parseRequestRef } from "./requestlink";
 
 /**
  * Ticket types, discount codes and the waiting list, as the site reads them
@@ -83,7 +84,12 @@ export function parseWaitlistEntry(e) {
  * The event's `ticketing` (GET /events/info/{id}, or GET
  * /events/{id}/ticket-types):
  *
- *   {types, requiresChoice, available, soldOut, waitlist: {enabled, offerHours}, viewerWaitlist}
+ *   {types, requiresChoice, available, soldOut, waitlist: {enabled, offerHours}, viewerWaitlist,
+ *    requiresApproval, viewerRequest}
+ *
+ * `viewerRequest` (signed in, an event whose club confirms each place): the
+ * viewer's open request, pending or confirmed and not yet paid, as
+ * {id, status, token, path}; else null.
  *
  * null when the API has no ticket types (an older server), or sent nothing usable.
  */
@@ -103,8 +109,18 @@ export function parseTicketing(raw) {
     viewerWaitlist: Array.isArray(o.viewer_waitlist) ? o.viewer_waitlist.map(parseWaitlistEntry).filter(Boolean) : [],
     // The club confirms each place (registration approval): the form sends a request, not a registration.
     requiresApproval: o.requires_approval === true,
+    viewerRequest: viewerRequest(o.viewer_request),
   };
 }
+
+/** The viewer's open request (pending, or confirmed and unpaid); anything else is none. */
+function viewerRequest(v) {
+  const r = parseRequestRef(v);
+  return r && (r.status === "pending" || r.status === "approved") ? r : null;
+}
+
+/** `ticketing.viewer_request` from the raw `ticketing`, whatever else it says: {id, status, token, path} or null. */
+export const viewerRequestOf = (raw) => viewerRequest(obj(raw)?.viewer_request);
 
 /** Whether the form shows a choice of tickets: more than one to choose from. */
 export const needsPicker = (ticketing) => Boolean(ticketing && ticketing.types.length > 1);
@@ -378,8 +394,9 @@ const OFFER_STATUSES = new Set(["offered", "expired", "claimed", "left", "remove
  *    fullName, email, phone, expiresAt, needsEmail, needsPayment, registrationId}
  * `reason`: "approved" when the place is one the club confirmed (a
  * registration request on a paid ticket: the claim is its pay link), else
- * null (a place that opened up on the waiting list). `event.club`: {name}
- * when the API says it (on the event, or beside it). null when it isn't one.
+ * null (a place that opened up on the waiting list). `amount`: what a
+ * confirmed place costs, its code taken off (null otherwise). `event.club`:
+ * {name, slug} when the API says it. null when it isn't one.
  */
 export function parseOffer(d) {
   const o = obj(d);
@@ -392,6 +409,7 @@ export function parseOffer(d) {
     id: o.id === null || o.id === undefined ? null : String(o.id),
     status: OFFER_STATUSES.has(o.status) ? o.status : "removed",
     reason: o.reason === "approved" ? "approved" : null,
+    amount: o.reason === "approved" && num(o.amount) !== null ? Math.max(0, num(o.amount)) : null,
     event: {
       id: ev.id,
       slug: str(ev.slug),
@@ -399,7 +417,7 @@ export function parseOffer(d) {
       starts_at: iso(ev.event_datetime) || iso(ev.starts_at),
       location_name: str(ev.location_name),
       poster: ev.poster || null,
-      club: club && str(club.name) ? { name: str(club.name) } : null,
+      club: club && str(club.name) ? { name: str(club.name), slug: str(club.slug) } : null,
     },
     ticketType: { id: idOf(tt.id), name: str(tt.name) || "Ticket", price, isFree: price === 0 },
     fullName: str(o.full_name) || "",

@@ -153,16 +153,18 @@ function OfferForm({ offer, token, onOutcome }) {
     ticketTypeId: type.id,
     email: offer.needsEmail && isEmail(email) ? email.trim() : null,
   });
-  const price = type.price;
-  const discount = offer.needsPayment && code.applied ? Math.min(price, code.applied.discount) : 0;
+  // A place the club confirmed (registration approval): this is its pay link, not a place from the line.
+  // The claim registers what the request said (its name, its code): the price is the one confirmed,
+  // and there is no code to type nor a name to change here.
+  const approved = offer.reason === "approved";
+  const club = clubName(offer.event.club);
+  const price = approved && offer.amount !== null ? offer.amount : type.price;
+  const discount = !approved && offer.needsPayment && code.applied ? Math.min(price, code.applied.discount) : 0;
   const total = Math.max(0, price - discount);
   const lines = orderLines({ fee: price, ticket: type.name, discount: discount > 0 ? { code: code.applied.code, amount: discount } : null });
   const until = formatWhen(offer.expiresAt);
   const first = String(name || offer.fullName || "").trim().split(/\s+/)[0];
   const busy = phase !== "idle";
-  // A place the club confirmed (registration approval): this is its pay link, not a place from the line.
-  const approved = offer.reason === "approved";
-  const club = clubName(offer.event.club);
 
   const clear = (key) => setErrors((e) => (key in e ? Object.fromEntries(Object.entries(e).filter(([k]) => k !== key)) : e));
 
@@ -190,7 +192,9 @@ function OfferForm({ offer, token, onOutcome }) {
     if (busy) return;
     const found = {};
     const n = name.trim();
-    if (n.length < 3) found.name = n ? "Enter your full name — at least 3 letters." : "Enter your full name.";
+    if (approved) {
+      // The request's own name is registered: nothing to check here.
+    } else if (n.length < 3) found.name = n ? "Enter your full name — at least 3 letters." : "Enter your full name.";
     else if (n.length > 100) found.name = "That's too long — keep it under 100 characters.";
     if (offer.needsEmail && !isEmail(email)) found.email = email.trim() ? "That doesn't look like an email address. Check it for typos." : "Enter your email: your ticket is sent here.";
     setErrors(found);
@@ -202,9 +206,9 @@ function OfferForm({ offer, token, onOutcome }) {
     setPhase("claiming");
     try {
       const data = await ticketingApi.claim(token, {
-        full_name: n,
+        ...(approved ? {} : { full_name: n }),
         ...(offer.needsEmail ? { email: email.trim() } : {}),
-        ...(offer.needsPayment && code.toSend ? { discount_code: code.toSend } : {}),
+        ...(!approved && offer.needsPayment && code.toSend ? { discount_code: code.toSend } : {}),
       });
       if (!data || !data.ticket_id) {
         setProblem({ tone: "error", title: "We couldn't claim your place", text: "No ticket came back. Try again — you won't be registered twice." });
@@ -312,6 +316,12 @@ function OfferForm({ offer, token, onOutcome }) {
           ) : null}
 
           <dl className="rg-dl cl-who">
+            {approved && offer.fullName ? (
+              <div>
+                <dt>Name</dt>
+                <dd>{offer.fullName}</dd>
+              </div>
+            ) : null}
             {offer.email ? (
               <div>
                 <dt>Email</dt>
@@ -326,36 +336,40 @@ function OfferForm({ offer, token, onOutcome }) {
             ) : null}
           </dl>
 
-          <div className="rg-fields">
-            <TextField
-              name="cl_name"
-              label="Full name"
-              required
-              value={name}
-              onChange={(v) => {
-                setName(v);
-                clear("name");
-              }}
-              error={errors.name}
-              inputProps={{ type: "text", autoComplete: "name", autoCapitalize: "words", maxLength: 100 }}
-            />
-            {offer.needsEmail ? (
-              <TextField
-                name="cl_email"
-                label="Email"
-                required
-                hint="Your ticket is sent here."
-                value={email}
-                onChange={(v) => {
-                  setEmail(v);
-                  clear("email");
-                }}
-                error={errors.email}
-                inputProps={{ type: "email", autoComplete: "email", inputMode: "email", autoCapitalize: "none", spellCheck: false, placeholder: "you@example.com" }}
-              />
-            ) : null}
-            {offer.needsPayment ? <DiscountCodeField code={code} /> : null}
-          </div>
+          {approved && !offer.needsEmail ? null : (
+            <div className="rg-fields">
+              {approved ? null : (
+                <TextField
+                  name="cl_name"
+                  label="Full name"
+                  required
+                  value={name}
+                  onChange={(v) => {
+                    setName(v);
+                    clear("name");
+                  }}
+                  error={errors.name}
+                  inputProps={{ type: "text", autoComplete: "name", autoCapitalize: "words", maxLength: 100 }}
+                />
+              )}
+              {offer.needsEmail ? (
+                <TextField
+                  name="cl_email"
+                  label="Email"
+                  required
+                  hint="Your ticket is sent here."
+                  value={email}
+                  onChange={(v) => {
+                    setEmail(v);
+                    clear("email");
+                  }}
+                  error={errors.email}
+                  inputProps={{ type: "email", autoComplete: "email", inputMode: "email", autoCapitalize: "none", spellCheck: false, placeholder: "you@example.com" }}
+                />
+              ) : null}
+              {offer.needsPayment && !approved ? <DiscountCodeField code={code} /> : null}
+            </div>
+          )}
 
           <section className="rg-rblock rg-rblock--pay cl-order" aria-label="Your order">
             <Lines lines={lines} total={total} />

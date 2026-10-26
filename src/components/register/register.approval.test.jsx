@@ -162,6 +162,52 @@ describe("a paid event whose club confirms each place", () => {
   });
 });
 
+describe("the form sent again for an address with a request open", () => {
+  it("signed out: the answer has no link, so it says the link was emailed", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ approval: { ...APPROVAL.approval, token: null, status_url: null }, event_registration_id: null });
+    await toReview(asking(paid));
+    go();
+    expect(await heading("You’re on the waiting list")).toBeInTheDocument();
+    expect(screen.getByText(/emailed you the link/)).toHaveTextContent(
+      "We’ve emailed you the link, at asha@example.org. It shows where your request stands, and lets you withdraw it.",
+    );
+    expect(screen.queryByRole("link", { name: "See your request" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Back to the event" })).toHaveAttribute("href", "/events/hack-night-04");
+  });
+
+  it("one the club confirmed already says so, not the waiting list", async () => {
+    eventsApi.registerForEvent.mockResolvedValue({ approval: { ...APPROVAL.approval, status: "approved" }, event_registration_id: null });
+    await toReview(asking(paid));
+    go();
+    expect(await heading("Circuit Society confirmed your place")).toBeInTheDocument();
+    expect(screen.getByText(/has confirmed it/)).toHaveTextContent("You asked for a place at Hack Night 04 already, and Circuit Society has confirmed it.");
+    expect(screen.queryByText(/Nothing has been charged/)).toBeNull();
+    expect(screen.getByRole("link", { name: "See your request" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+  });
+});
+
+describe("signed in, with a request open already", () => {
+  beforeEach(() => {
+    enableSignIn();
+    signInAs();
+  });
+
+  it.each([
+    ["pending", "You've asked for a place", "See your request"],
+    ["approved", "Circuit Society confirmed your place", "Pay for your ticket"],
+  ])("%s: its page instead of the form", async (status, title, go) => {
+    show(asking(paid), { info: { requires_approval: true, ticketing: { types: [], viewer_request: { id: "r1", status, token: TOKEN, status_url: null } } } });
+    expect(await heading(title)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: go })).toHaveAttribute("href", `/requests/${TOKEN}`);
+    expect(screen.queryByLabelText(/^Full name/)).toBeNull();
+  });
+
+  it("a closed one leaves the form", async () => {
+    show(asking(paid), { info: { requires_approval: true, ticketing: { types: [], viewer_request: { id: "r1", status: "declined", token: TOKEN } } } });
+    expect(await heading(/Your details/)).toBeInTheDocument();
+  });
+});
+
 describe("a free event whose club confirms each place", () => {
   it("asks for a place, and the ticket follows by email", async () => {
     eventsApi.registerForEvent.mockResolvedValue(APPROVAL);
@@ -212,6 +258,17 @@ describe("the club's refusals", () => {
     expect(alert).toHaveTextContent("Reload this page and send your details again");
     expect(within(alert).getByRole("button", { name: "Reload the page" })).toBeInTheDocument();
     expect(paymentsApi.createPaymentOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe("add-ons sent after the club turned it on", () => {
+  it("ADD_ONS_NOT_ALLOWED asks for a reload", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(refuse(422, "A request holds no add-ons.", "ADD_ONS_NOT_ALLOWED"));
+    await toReview(paid);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("a request can't include add-ons");
+    expect(within(alert).getByRole("button", { name: "Reload the page" })).toBeInTheDocument();
   });
 });
 
