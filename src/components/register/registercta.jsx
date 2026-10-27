@@ -5,6 +5,7 @@ import Link from "next/link";
 import { eventsApi } from "@/api/events";
 import { useAuth } from "@/auth/context";
 import { myRegistration } from "@/utils/register";
+import { clubName } from "@/utils/requests";
 import { liveEntries, waitlistTypes } from "@/utils/ticketing";
 import { askToJoin } from "./eventtickets";
 import { FinishPaymentButton } from "./finishpayment";
@@ -29,10 +30,15 @@ import { useEventTicketing, useLinkedType } from "./tickets";
  *   in line already                 You're on the waiting list
  *   a link naming a hidden type     Register keeps `?ticket_type=`
  *
+ * and, signed in, for an event whose club confirms each place
+ * (registration approval), the viewer's own open request
+ * (`ticketing.viewer_request`): "View your request" (waiting for the club),
+ * or "Pay for your ticket" (confirmed, not yet paid), both to its page.
+ *
  * GET /events/info/{id} is asked only for someone signed in; a cancelled or
  * ended event asks nothing.
  */
-export function RegisterGo({ eventId, state }) {
+export function RegisterGo({ eventId, state, club = null }) {
   const auth = useAuth();
   const signedIn = auth.ready && auth.status === "signed-in";
   const ended = state.kind === "ended" || state.kind === "cancelled";
@@ -97,6 +103,30 @@ export function RegisterGo({ eventId, state }) {
         </Link>
         <p className="ep-cta-mine" role="status">
           {line}
+        </p>
+      </>
+    );
+  }
+
+  // The club confirms each place, and the viewer has asked for one already: where it stands.
+  const asked = ticketing?.viewerRequest || null;
+  if (asked) {
+    const confirmed = asked.status === "approved";
+    return (
+      <>
+        {asked.path ? (
+          <Link className={`dc-btn ep-cta-btn${confirmed ? "" : " dc-btn--ghost"}`} href={asked.path}>
+            {confirmed ? "Pay for your ticket" : "View your request"}
+          </Link>
+        ) : (
+          <button type="button" className="dc-btn ep-cta-btn" disabled>
+            Request sent
+          </button>
+        )}
+        <p className="ep-cta-mine" role="status">
+          {confirmed
+            ? `${clubName(club)} confirmed your place. Pay to get your ticket.`
+            : `Waiting for ${clubName(club, { start: false })} to confirm your place.`}
         </p>
       </>
     );

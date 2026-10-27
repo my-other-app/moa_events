@@ -379,7 +379,8 @@ function closedCopy(errors, status) {
  *              declined a request from this person for this event already
  *   approval   APPROVAL_REQUIRED (409): the club confirms each place and the
  *              request didn't say this form understands that (it always
- *              does): reload and send it again
+ *              does), or ADD_ONS_NOT_ALLOWED (422: add-ons sent with a
+ *              request, after the club turned it on): reload and send it again
  *   duplicate  ALREADY_REGISTERED (409 from the public form, 400 signed in),
  *              or a code-less 409 / "already registered": the app, My tickets
  *   awaiting   REGISTRATION_AWAITING_PAYMENT (409): this address has a
@@ -428,6 +429,13 @@ export function describeRegisterError(error, questionKeys = []) {
   }
   if (code === "APPROVAL_REQUIRED") {
     return { kind: "approval", message: "The club confirms each place at this event now. Reload this page and send your details again: they go to the club as a request." };
+  }
+  if (code === "ADD_ONS_NOT_ALLOWED") {
+    // Only when the club turned it on after the form loaded with its shelf: a request carries no add-ons.
+    return {
+      kind: "approval",
+      message: "The club confirms each place at this event now, and a request can't include add-ons. Reload this page and send your details again.",
+    };
   }
   if (code === "REGISTRATION_AWAITING_PAYMENT") {
     return { kind: "awaiting", message: said || "This email already has a registration for this event that is waiting for payment." };

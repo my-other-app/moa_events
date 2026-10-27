@@ -259,6 +259,19 @@ describe("a place the club confirmed (registration approval)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pay ₹199" }));
     await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
     expect(paymentsApi.createPaymentOrder).toHaveBeenCalledWith("7", "r5");
+    // The request's own name and code are registered: the page sends neither.
+    expect(ticketingApi.claim).toHaveBeenCalledWith(TOKEN, {});
+  });
+
+  it("charges the price the club confirmed (its code taken off), with no code to type and the request's name as it was", async () => {
+    ticketingApi.offer.mockResolvedValue(approved({ amount: 159.2 }));
+    show();
+    await heading("Circuit Society confirmed your place");
+    expect(screen.getByRole("button", { name: "Pay ₹159.20" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Discount code/)).toBeNull();
+    expect(screen.queryByLabelText(/^Full name/)).toBeNull();
+    expect(screen.getByText("Asha K", { selector: "dd" })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Your order" })).getByText("₹159.20", { selector: ".rg-total strong" })).toBeInTheDocument();
   });
 
   it("releasing the place asks first, in the club's words", async () => {

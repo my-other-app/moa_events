@@ -303,6 +303,11 @@ describe("the refusals the server names by code (backend#68), and the shapes bef
       kind: "approval",
       message: "The club confirms each place at this event now. Reload this page and send your details again: they go to the club as a request.",
     });
+    // Add-ons sent with a request (the club turned it on after the form loaded its shelf).
+    expect(describeRegisterError({ status: 422, data: envelope("A request holds no add-ons.", "ADD_ONS_NOT_ALLOWED") })).toEqual({
+      kind: "approval",
+      message: "The club confirms each place at this event now, and a request can't include add-ons. Reload this page and send your details again.",
+    });
   });
 });
 

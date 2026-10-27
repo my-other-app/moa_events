@@ -24,7 +24,9 @@ import { Summary } from "./register/summary";
  *
  *   GET  /registration-requests/{token}            where it stands
  *   POST /registration-requests/{token}/withdraw   take it back (pending, or
- *                                                  confirmed and not yet paid)
+ *                                                  confirmed and not yet paid);
+ *                                                  409 REQUEST_NOT_WITHDRAWABLE
+ *                                                  carries it as it stands
  *
  * What each status shows:
  *   pending     waiting for the club; Withdraw, after asking
@@ -109,7 +111,7 @@ function Withdraw({ token, label, question, onDone, onChanged }) {
       onDone(await requestsApi.withdraw(token));
     } catch (error) {
       const p = describeRequestError(error);
-      if (p.kind === "gone" || p.kind === "changed") onChanged(p.kind);
+      if (p.kind === "gone" || p.kind === "changed") onChanged(p.kind, p.request || null);
       else setProblem({ tone: p.kind === "limit" ? "calm" : "error", title: "We couldn't withdraw your request", text: p.message });
       setBusy(false);
       setAsking(false);
@@ -423,14 +425,16 @@ export default function RequestStatus({ token }) {
     setNotice("Your request was withdrawn.");
     setLoad((s) => ({ ...s, request: next || { ...s.request, status: "withdrawn" } }));
   };
-  // Withdrawing found it changed (decided meanwhile) or gone: read it again and say so.
-  const changed = (kind) => {
+  // Withdrawing found it changed (decided meanwhile: 409 REQUEST_NOT_WITHDRAWABLE, with the request as it
+  // stands) or gone: show it as it is now (read again when the refusal didn't carry it) and say so.
+  const changed = (kind, now = null) => {
     if (kind === "gone") {
       setLoad({ status: "gone", request: null, problem: null });
       return;
     }
     setNotice("Your request changed meanwhile, so it wasn't withdrawn. Here's where it stands now.");
-    setAttempt((a) => a + 1);
+    if (now) setLoad({ status: "ready", request: now, problem: null });
+    else setAttempt((a) => a + 1);
   };
 
   let body;

@@ -18,6 +18,13 @@ import { Summary } from "./summary";
  *
  * `done`: {kind: "request", request: {id, token, path, status}, name, email,
  * account, pays, amount, ticket_type}, as the form keeps it for a reload.
+ *
+ * The form sent again, signed out, for an address with an open request
+ * already: the API answers with that request but without its link (whoever
+ * typed the address hasn't shown it is theirs), and emails the link to the
+ * address instead. Then this says so, and has no "See your request". A
+ * request the club has confirmed already says that instead of the waiting
+ * list.
  */
 export default function Requested({ event, club, done }) {
   const heading = useRef(null);
@@ -26,6 +33,7 @@ export default function Requested({ event, club, done }) {
   }, []);
   const who = clubName(club);
   const path = done.request?.path || requestPath(done.request?.token);
+  const confirmed = done.request?.status === "approved";
 
   return (
     <div className="rg-layout">
@@ -36,12 +44,33 @@ export default function Requested({ event, club, done }) {
             <Icon name="mail" size={26} />
           </span>
           <h1 className="rg-h1" ref={heading} tabIndex={-1}>
-            You&rsquo;re on the waiting list
+            {confirmed ? `${who} confirmed your place` : <>You&rsquo;re on the waiting list</>}
           </h1>
-          <p className="rg-closed-text">
-            {who} confirms each registration. We&rsquo;ve emailed you, and your ticket will come by email as soon as they confirm your place.
-          </p>
-          {done.pays ? (
+          {confirmed ? (
+            <p className="rg-closed-text">
+              You asked for a place at <strong>{event.name}</strong> already, and {clubName(club, { start: false })} has confirmed it. Your ticket, or the link to
+              pay for it, is in your email.
+            </p>
+          ) : (
+            <p className="rg-closed-text">
+              {who} confirms each registration. We&rsquo;ve emailed you, and your ticket will come by email as soon as they confirm your place.
+            </p>
+          )}
+          {path ? null : (
+            <p className="rq-mine rq-emailed">
+              <Icon name="mail" size={16} />
+              <span>
+                We&rsquo;ve emailed you the link
+                {done.email ? (
+                  <>
+                    , at <strong>{done.email}</strong>
+                  </>
+                ) : null}
+                . It shows where your request stands, and lets you withdraw it.
+              </span>
+            </p>
+          )}
+          {done.pays && !confirmed ? (
             <p className="rg-closed-text">
               Nothing has been charged. If they confirm, the email has a link to pay{done.amount > 0 ? ` ${rupees(done.amount)}` : ""}.
             </p>
