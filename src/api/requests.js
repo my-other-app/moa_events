@@ -3,7 +3,7 @@ import { apiFailure } from "@/utils/ticketing";
 import { parseRequest, parseRequestList } from "@/utils/requests";
 
 /**
- * Registration requests (an event whose club confirms each place), from the
+ * Registration requests (registrations under review, for an event that reviews them), from the
  * browser. Each call throws apiFailure()'s shape ({status, code, errors,
  * message, network, retryAfter}); utils/requests.js reads the answers and
  * says what a refusal means.

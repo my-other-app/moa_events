@@ -70,7 +70,7 @@ function Facts({ event, club, venueLink }) {
   const tile = dateTile(event.starts_at);
   // A cancelled event has no seats to speak of.
   const left = event.status === "cancelled" ? null : seatsLeft(event);
-  // Nobody going yet at an event whose club confirms each place: say that, never how many asked.
+  // Nobody going yet at an event that reviews registrations: "{Club} reviews every registration", never how many registered.
   const confirms = event.requires_approval === true && event.status !== "ended" ? confirmsEachPlace(club) : null;
   const people =
     event.status === "cancelled"

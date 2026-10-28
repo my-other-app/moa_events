@@ -87,13 +87,13 @@ export function parseWaitlistEntry(e) {
  *   {types, requiresChoice, available, soldOut, waitlist: {enabled, offerHours}, viewerWaitlist,
  *    requiresApproval, viewerRequest}
  *
- * `viewerRequest` (signed in, an event whose club confirms each place): the
- * viewer's open request, pending or confirmed and not yet paid, as
- * {id, status, token, path}; else null.
+ * `viewerRequest` (signed in, an event that reviews registrations): the
+ * viewer's open registration, under review or confirmed and not yet paid,
+ * as {id, status, token, path} (and `pay`, when the API says it); else null.
  *
- * An event whose club confirms each place has no waiting list (people
- * simply request a place, and wait in the club's queue): its list reads as
- * off, and no type offers one, whatever an older server still says.
+ * An event that reviews registrations has no waiting list (people simply
+ * register, and the club reviews them): its list reads as off, and no type
+ * offers one, whatever an older server still says.
  *
  * null when the API has no ticket types (an older server), or sent nothing usable.
  */
@@ -111,7 +111,7 @@ export function parseTicketing(raw) {
     soldOut: o.sold_out === true,
     waitlist: { enabled: wl.enabled === true, offerHours: hours && hours > 0 ? hours : 24 },
     viewerWaitlist: Array.isArray(o.viewer_waitlist) ? o.viewer_waitlist.map(parseWaitlistEntry).filter(Boolean) : [],
-    // The club confirms each place (registration approval): the form sends a request, not a registration.
+    // The club reviews every registration (registration approval): the form's goes in under review.
     requiresApproval: o.requires_approval === true,
     viewerRequest: viewerRequest(o.viewer_request),
   };
@@ -196,12 +196,12 @@ export function typeNote(type) {
 /** Whether a ticket can be chosen on the form now. */
 export const onSale = (type) => Boolean(type) && type.status === "on_sale" && (type.available === null || type.available > 0);
 
-/** The types whose waiting list can be joined now (sold out, the list on); none when the club confirms each place. */
+/** The types whose waiting list can be joined now (sold out, the list on); none when the club reviews every registration. */
 export const waitlistTypes = (ticketing) =>
   ticketing && ticketing.waitlist.enabled && !ticketing.requiresApproval ? ticketing.types.filter((t) => t.waitlist) : [];
 
 /**
- * The tickets of an event whose club confirms each place: no waiting list,
+ * The tickets of an event that reviews registrations: no waiting list,
  * the list off and no type offering one. Null stays null.
  */
 export const withoutWaitlist = (ticketing) =>
@@ -330,15 +330,15 @@ export function describeCodeCheck(error) {
   return f.message && f.status < 500 ? sentence(f.message) : "We couldn't check the code just now. Try again in a moment.";
 }
 
-/** An event whose club confirms each place has no waiting list (409 WAITLIST_OFF_ON_APPROVAL_EVENTS). */
-export const WAITLIST_OFF_ON_APPROVAL = "This event has no waiting list: the club confirms each place. Request a place instead, and they'll let you know.";
+/** An event that reviews registrations has no waiting list (409 WAITLIST_OFF_ON_APPROVAL_EVENTS). */
+export const WAITLIST_OFF_ON_APPROVAL = "This event has no waiting list: the club reviews every registration. Register instead, and they'll get back to you.";
 
 /**
  * Joining the waiting list (POST /events/{id}/waitlist):
  *   {field, message}   a field to fix: "email", "phone", "name" or "ticket_type"
  *   {kind, message}    "registered" | "not_needed" | "closed" | "approval" | "limit" | "network" | "message"
  *
- * "approval": the club confirms each place at this event, so there's no
+ * "approval": the club reviews every registration for this event, so there's no
  * waiting list to join (WAITLIST_OFF_ON_APPROVAL_EVENTS).
  */
 export function describeWaitlistError(error) {
@@ -420,10 +420,10 @@ const OFFER_STATUSES = new Set(["offered", "expired", "claimed", "left", "remove
  * GET /waitlist/offers/{token}, as the claim page reads it:
  *   {id, status, reason, event: {id, slug, name, starts_at, location_name, poster, club}, ticketType: {id, name, price, isFree},
  *    fullName, email, phone, expiresAt, needsEmail, needsPayment, registrationId}
- * `reason`: "approved" when the place is one the club confirmed (a
+ * `reason`: "approved" when it is a registration the club confirmed (a
  * registration request on a paid ticket: the claim is its pay link), else
- * null (a place that opened up on the waiting list). `amount`: what a
- * confirmed place costs, its code taken off (null otherwise). `event.club`:
+ * null (a place that opened up on the waiting list). `amount`: what the
+ * confirmed ticket costs, its code taken off (null otherwise). `event.club`:
  * {name, slug} when the API says it. null when it isn't one.
  */
 export function parseOffer(d) {

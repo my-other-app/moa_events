@@ -4,36 +4,57 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { eventPath } from "@/utils/eventpage";
 import { rupees } from "@/utils/register";
-import { clubName, requestPath } from "@/utils/requests";
+import { clubName, requestPath, underReviewNote } from "@/utils/requests";
 import Icon from "../discover/icons";
 import { Summary } from "./summary";
 
 /**
- * After sending the form for an event whose club confirms each place
- * (registration approval): nobody is registered yet, and there is no
- * ticket. What happens next, said once: the club decides, the email came,
- * the ticket (or, for a paid ticket, the link to pay) follows by email. The
- * request's own page (/requests/{token}) says where it stands, and is where
- * it can be withdrawn.
+ * After registering for an event that reviews registrations (registration
+ * approval): the registration is under review, and there is no ticket yet.
+ * What happens next, said once: the club reviews it, the email came, the
+ * ticket (or, for a paid ticket, the link to pay) follows by email if it is
+ * confirmed. The registration's own page (/requests/{token}) says where it
+ * stands, and is where it can be cancelled.
  *
  * `done`: {kind: "request", request: {id, token, path, status}, name, email,
  * account, pays, amount, ticket_type}, as the form keeps it for a reload.
  *
- * The form sent again, signed out, for an address with an open request
- * already: the API answers with that request but without its link (whoever
- * typed the address hasn't shown it is theirs), and emails the link to the
- * address instead. Then this says so, and has no "See your request". A
- * request the club has confirmed already says that instead of the waiting
- * list.
+ * The form sent again, signed out, for an address with an open registration
+ * already: the API answers with that registration but without its link
+ * (whoever typed the address hasn't shown it is theirs), and emails the link
+ * to the address again instead. Then this says "You've already registered",
+ * and has no "See your registration". One the club has confirmed already
+ * says that instead.
  */
 export default function Requested({ event, club, done }) {
   const heading = useRef(null);
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
   }, []);
-  const who = clubName(club);
   const path = done.request?.path || requestPath(done.request?.token);
   const confirmed = done.request?.status === "approved";
+  // Sent again, signed out: no link came back, so it was emailed again.
+  const again = !path && !confirmed;
+  const email = done.email ? <strong>{done.email}</strong> : null;
+
+  let title = <>You&rsquo;re registered!</>;
+  let text = <p className="rg-closed-text">{underReviewNote(club)}</p>;
+  if (confirmed) {
+    title = "Your registration is confirmed";
+    text = (
+      <p className="rg-closed-text">
+        You registered for <strong>{event.name}</strong> already, and {clubName(club, { start: false })} has confirmed it. Your ticket, or the link to pay
+        for it, is in your email.
+      </p>
+    );
+  } else if (again) {
+    title = <>You&rsquo;ve already registered</>;
+    text = (
+      <p className="rg-closed-text">
+        We&rsquo;ve emailed the link to your registration{email ? <> to {email}</> : null} again.
+      </p>
+    );
+  }
 
   return (
     <div className="rg-layout">
@@ -44,35 +65,20 @@ export default function Requested({ event, club, done }) {
             <Icon name="mail" size={26} />
           </span>
           <h1 className="rg-h1" ref={heading} tabIndex={-1}>
-            {confirmed ? `${who} confirmed your place` : <>You&rsquo;re on the waiting list</>}
+            {title}
           </h1>
-          {confirmed ? (
-            <p className="rg-closed-text">
-              You asked for a place at <strong>{event.name}</strong> already, and {clubName(club, { start: false })} has confirmed it. Your ticket, or the link to
-              pay for it, is in your email.
-            </p>
-          ) : (
-            <p className="rg-closed-text">
-              {who} confirms each registration. We&rsquo;ve emailed you, and your ticket will come by email as soon as they confirm your place.
-            </p>
-          )}
-          {path ? null : (
+          {text}
+          {confirmed || again ? null : (
             <p className="rq-mine rq-emailed">
               <Icon name="mail" size={16} />
               <span>
-                We&rsquo;ve emailed you the link
-                {done.email ? (
-                  <>
-                    , at <strong>{done.email}</strong>
-                  </>
-                ) : null}
-                . It shows where your request stands, and lets you withdraw it.
+                We&rsquo;ve emailed you a link to check on your registration{email ? <>, at {email}</> : null}.
               </span>
             </p>
           )}
           {done.pays && !confirmed ? (
             <p className="rg-closed-text">
-              Nothing has been charged. If they confirm, the email has a link to pay{done.amount > 0 ? ` ${rupees(done.amount)}` : ""}.
+              Nothing has been charged. If yours is confirmed, we&rsquo;ll email you a link to pay{done.amount > 0 ? ` ${rupees(done.amount)}` : ""}.
             </p>
           ) : null}
           <dl className="rg-dl rq-facts">
@@ -99,14 +105,14 @@ export default function Requested({ event, club, done }) {
             <p className="rq-mine">
               <Icon name="ticket" size={16} />
               <span>
-                It&rsquo;s in <Link href="/me/tickets">My tickets</Link> too, under Waiting for confirmation.
+                It&rsquo;s in <Link href="/me/tickets">My tickets</Link> too, under &ldquo;Under review&rdquo;.
               </span>
             </p>
           ) : null}
           <div className="rg-closed-actions">
             {path ? (
               <Link className="dc-btn" href={path}>
-                See your request
+                See your registration
               </Link>
             ) : null}
             <Link className={`dc-btn${path ? " dc-btn--ghost" : ""}`} href={eventPath(event)}>

@@ -299,7 +299,7 @@ const DEMO = { is_demo: flag };
 const CLUB_EXTRAS = { ...DEMO, whatsapp_updates: flag };
 /**
  * How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js);
- * and, on a card and on the event's page alike: `requires_approval` (the club confirms each place)
+ * and, on a card and on the event's page alike: `requires_approval` (the club reviews every registration)
  * and `high_demand` (the club has its "High demand" label on). Each kept only when true, so an
  * API without them reads as before.
  */

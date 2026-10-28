@@ -336,6 +336,6 @@ describe("an event whose club confirms each place: no waiting list", () => {
   it("says plainly why joining was refused (409 WAITLIST_OFF_ON_APPROVAL_EVENTS)", () => {
     const p = describeWaitlistError(failure(409, { message: "Waitlist is off on approval events", error_code: "WAITLIST_OFF_ON_APPROVAL_EVENTS" }));
     expect(p).toEqual({ kind: "approval", message: WAITLIST_OFF_ON_APPROVAL });
-    expect(p.message).toBe("This event has no waiting list: the club confirms each place. Request a place instead, and they'll let you know.");
+    expect(p.message).toBe("This event has no waiting list: the club reviews every registration. Register instead, and they'll get back to you.");
   });
 });

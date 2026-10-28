@@ -22,7 +22,7 @@ import { useEventTicketing, useLinkedType, WaitlistPanel } from "./tickets";
  * The register card's button (registercta.jsx) asks to join with
  * askToJoin(): this opens the form and comes into view.
  *
- * An event whose club confirms each place (`approval`, or its tickets say
+ * An event that reviews registrations (`approval`, or its tickets say
  * so) has no waiting list: none is offered or mentioned here.
  */
 

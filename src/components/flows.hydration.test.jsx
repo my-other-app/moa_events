@@ -126,7 +126,7 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     // A waiting list's offer: who is signed in and the offer are the browser's to read.
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", () => <Claim token="Xy3abcdefghijklmnopqrstuvwxyz012" />, "Loading your offer"],
     // A request for a place: where it stands is the browser's to read.
-    ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", () => <RequestStatus token="Rq7abcdefghijklmnopqrstuvwxyz012" />, "Loading your request"],
+    ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", () => <RequestStatus token="Rq7abcdefghijklmnopqrstuvwxyz012" />, "Loading your registration"],
   ])("%s hydrates without a mismatch", async (path, make, text) => {
     // The quiz's player is in storage: read once the page is up, never in the first paint.
     localStorage.setItem("moa.live.player.123", JSON.stringify({ player_key: "k", name: "Sneha" }));
