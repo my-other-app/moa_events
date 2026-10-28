@@ -13,7 +13,7 @@ export const DEFAULT_API_BASE_URL = "https://api.myotherapp.in";
 export const API_BASE_URL = clean(process.env.NEXT_PUBLIC_API_BASE_URL) || DEFAULT_API_BASE_URL;
 
 /** Where "Get the app" sends people. The App Store button shows only once its link is set. */
-export const PLAY_STORE_URL = clean(process.env.NEXT_PUBLIC_PLAY_STORE_URL) || "https://play.google.com/store/apps/details?id=app.myotherapp.com";
+export const PLAY_STORE_URL = clean(process.env.NEXT_PUBLIC_PLAY_STORE_URL) || "https://play.google.com/store/apps/details?id=app.myotherapp.in";
 export const APP_STORE_URL = clean(process.env.NEXT_PUBLIC_APP_STORE_URL) || null;
 
 /** The clubs' own dashboard, for "For clubs". */

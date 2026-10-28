@@ -25,7 +25,7 @@ export default function manifest() {
       { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
-    related_applications: [{ platform: "play", url: PLAY_STORE_URL, id: "app.myotherapp.com" }],
+    related_applications: [{ platform: "play", url: PLAY_STORE_URL, id: "app.myotherapp.in" }],
     prefer_related_applications: true,
   };
 }
