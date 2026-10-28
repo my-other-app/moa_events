@@ -5,6 +5,7 @@
  */
 import { SITE_URL } from "@/config";
 import { eventUrl, summary } from "@/utils/eventpage";
+import { eventHosts, isCohosted, sameClub } from "@/utils/hosts";
 import { demoSettings, isDemoCard, isDemoClub, isDemoThread, withoutDemo } from "./demo";
 import { breadcrumbJsonLd, clubJsonLd, collectionPageJsonLd, discussionPostingJsonLd, eventJsonLd, itemListJsonLd } from "./jsonld";
 import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
@@ -43,12 +44,24 @@ export function eventStructuredData(page) {
     images: eventImages(page),
     clubUrl: club?.slug ? absoluteUrl(clubPagePath(club)) : null,
     clubLogo: club?.logo && club.slug ? absoluteUrl(media.clubLogo(club.slug, "medium")) : null,
-    description: summary(event.about, 500) || eventFactsLine(event, club),
+    // The clubs co-hosting it, each by its page and logo (an older API: none).
+    cohosts: (page.cohosts || []).map((c) => ({
+      name: c.name,
+      url: c.slug ? absoluteUrl(clubPagePath(c)) : null,
+      logo: c.logo && c.slug ? absoluteUrl(media.clubLogo(c.slug, "medium")) : null,
+    })),
+    description: summary(event.about, 500) || eventFactsLine(event, club, page.cohosts),
     speakerImage: (s, i) => (s.photo ? absoluteUrl(media.eventSpeaker(ref, s.id ?? `i${i}`)) : null),
     topics,
   });
   const crumbs = breadcrumbJsonLd([["Home", `${SITE_URL}/`], topics.length ? [topics[0].name, topics[0].url] : ["Events", `${SITE_URL}/events`], [event.name, url]]);
   return [ld, crumbs];
+}
+
+/** An event card's hosts as Organizations (as a club's page names itself): the host club, then each co-host; one alone as itself. */
+function hostOrganizers(card) {
+  const orgs = eventHosts(card).map((h) => ({ "@type": "Organization", name: h.name, url: h.slug ? absoluteUrl(clubPagePath(h)) : null }));
+  return orgs.length === 1 ? orgs[0] : orgs;
 }
 
 /** [Organization (with its upcoming events), BreadcrumbList] for a club's page. `data` is the raw parsed page. */
@@ -64,7 +77,13 @@ export function clubStructuredData(data) {
     description: summary(club.about || club.tagline || "", 500) || null,
     events: data.upcoming.map((card) => {
       const ref = eventRefOf(card);
-      return { card, url: absoluteUrl(eventPagePath(card)), image: absoluteUrl(card.poster ? media.eventPoster(ref, "medium") : media.eventCover(ref)) };
+      return {
+        card,
+        url: absoluteUrl(eventPagePath(card)),
+        image: absoluteUrl(card.poster ? media.eventPoster(ref, "medium") : media.eventCover(ref)),
+        // An event it co-hosts (or another club hosts): organised by every host, the host club first.
+        organizer: isCohosted(card) || (card.club && !sameClub(card.club, club)) ? hostOrganizers(card) : null,
+      };
     }),
   });
   const crumbs = breadcrumbJsonLd([

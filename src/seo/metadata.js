@@ -8,6 +8,7 @@
 import { SITE_URL } from "@/config";
 import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
+import { hostNames, hostsOf } from "@/utils/hosts";
 import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, topicPagePath } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
@@ -56,18 +57,18 @@ export function clubOgVersion(data) {
   return fingerprint(c.name, c.tagline, c.location_name, imageKey(imageUrl(c.cover, "original")), imageKey(imageUrl(c.logo, "medium")), c.followers, data.upcoming.length);
 }
 
-/** One line for an event without a description: when, where, the price, and who. */
-export function eventFactsLine(event, club) {
+/** One line for an event without a description: when, where, the price, and who (the club, and any co-hosts: "Hosted by A and B"). */
+export function eventFactsLine(event, club, cohosts = []) {
   const when = whenLine(event.starts_at);
   const where = event.is_online ? "Online" : event.location_name;
   const facts = [when ? `${when} IST` : null, where, formatPrice(event.has_fee, event.fee)].filter(Boolean).join(" · ");
-  return `${facts}${club ? `. Hosted by ${club.name} on ${SITE_NAME}.` : `. On ${SITE_NAME}.`}`;
+  return `${facts}${club ? `. Hosted by ${hostNames(hostsOf(club, cohosts))} on ${SITE_NAME}.` : `. On ${SITE_NAME}.`}`;
 }
 
 /** An event's page: its canonical /events/{slug}, its own share picture, and its club's feed. `page` is the raw parsed page. */
 export function eventMetadata(page) {
   const { event, club } = page;
-  const description = summary(event.about) || summary(eventFactsLine(event, club));
+  const description = summary(event.about) || summary(eventFactsLine(event, club, page.cohosts));
   const when = whenLine(event.starts_at);
   return pageMetadata({
     title: event.name,

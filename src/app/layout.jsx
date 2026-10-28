@@ -16,6 +16,7 @@ import "@/styles/account.css";
 import "@/styles/signin-email.css";
 import "@/styles/cards-hero.css";
 import "@/styles/event-page.css";
+import "@/styles/hosts.css";
 import "@/styles/register.css";
 import "@/styles/ticket.css";
 import "@/styles/ticketing.css";

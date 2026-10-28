@@ -149,6 +149,9 @@ function offer(event, url) {
   };
 }
 
+/** A club as an Organization, by its page (url, logo: absolute or null). */
+const organization = ({ name, url = null, logo = null }) => ({ "@type": "Organization", "@id": url ? `${url}#organization` : null, name, url, logo: isHttp(logo) ? logo : null });
+
 /**
  * The Event for an event's page.
  *
@@ -156,12 +159,17 @@ function offer(event, url) {
  *   url                     the canonical page (absolute)
  *   images                  absolute picture addresses, the poster's first
  *   clubUrl, clubLogo       absolute, or null
+ *   cohosts                 [{name, url, logo}] (url, logo absolute or null): the clubs co-hosting it
  *   description             plain text
  *   speakerImage(s, i)      an absolute photo address for a speaker, or null
  *   topics                  [{name, url}]: what it is about (its topics' pages, absolute)
+ *
+ * Its organizer is the club; with co-hosts, every host, the club first.
  */
-export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, description = null, speakerImage = () => null, topics = [] }) {
+export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, cohosts = [], description = null, speakerImage = () => null, topics = [] }) {
   if (!event) return null;
+  const host = club ? organization({ name: club.name, url: clubUrl, logo: clubLogo }) : null;
+  const others = host ? cohosts.filter((c) => c && c.name).map(organization) : [];
   const fee = event.has_fee ? positive(event.fee) : 0;
   const pictures = [...(image ? [image] : []), ...images].filter(isHttp);
   const words = [...new Set([...topics.map((t) => t.name), ...(Array.isArray(event.interests) ? event.interests : [])].filter(Boolean))];
@@ -182,9 +190,7 @@ export function eventJsonLd({ event, club = null, speakers = [], url, images = [
     isAccessibleForFree: fee === 0 ? true : null,
     about: topics.map((t) => ({ "@type": "Thing", name: t.name, url: isHttp(t.url) ? t.url : null })),
     keywords: words.length ? words.join(", ") : null,
-    organizer: club
-      ? { "@type": "Organization", "@id": clubUrl ? `${clubUrl}#organization` : null, name: club.name, url: clubUrl, logo: isHttp(clubLogo) ? clubLogo : null }
-      : null,
+    organizer: others.length ? [host, ...others] : host,
     performer: speakers
       .filter((s) => s && s.name)
       .map((s, i) => ({
@@ -237,7 +243,8 @@ const SOCIAL_KEYS = ["instagram", "linkedin", "youtube", "x", "website"];
  * The Organization for a club's page, with its upcoming events.
  *   data      parseClubPage's result
  *   url       the club page (absolute); logo, image: absolute or null
- *   events    [{card, url, image}] for the upcoming events
+ *   events    [{card, url, image, organizer?}] for the upcoming events (`organizer`: an
+ *             event it co-hosts, its hosts; otherwise the club)
  * What it knows about: its topics' names (when the API sends them), then its interests.
  */
 export function clubJsonLd({ club, url, logo = null, image = null, description = null, events = [] }) {
@@ -264,7 +271,8 @@ export function clubJsonLd({ club, url, logo = null, image = null, description =
     areaServed: city ? { "@type": "City", name: city.name, containedInPlace: { "@type": "State", name: city.state } } : null,
     knowsAbout: knows.length ? knows : null,
     sameAs: [...new Set(sameAs)],
-    event: events.map((e) => eventCardJsonLd(e.card, { url: e.url, image: e.image, organizer })),
+    // An event it co-hosts names its own organizers (every host, the host club first).
+    event: events.map((e) => eventCardJsonLd(e.card, { url: e.url, image: e.image, organizer: e.organizer || organizer })),
   });
 }
 

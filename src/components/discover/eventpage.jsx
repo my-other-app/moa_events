@@ -2,11 +2,13 @@ import { Link } from "@/lib/router";
 import { dateTile, eventUrl, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { EventTickets } from "../register/eventtickets";
 import { formatCount, formatPrice, plural, showsHighDemand } from "@/utils/format";
+import { hostNames, hostsOf } from "@/utils/hosts";
 import { confirmsEachPlace } from "@/utils/requests";
 import { topicPagePath } from "@/seo/urls";
 import { Agenda } from "./agenda";
 import { Avatar, Section } from "./bits";
 import { EventCard } from "./eventcard";
+import { HostFaces, HostLinks } from "./hosts";
 import {
   About,
   Backers,
@@ -44,7 +46,28 @@ const calendarEvent = (e) => ({
   about: summary(e.about, 600),
 });
 
-function ClubRow({ club }) {
+/**
+ * "Hosted by A and B" (or "A, B and C"): every host's logo, overlapping,
+ * the host's first, then the names, each a link to its club's page.
+ */
+function HostsRow({ hosts }) {
+  return (
+    <div className="ep-club ep-hosts">
+      <HostFaces hosts={hosts} size={40} className="ep-hosts-faces" />
+      <p className="ep-club-text">
+        <span className="ep-club-by">Hosted by</span>{" "}
+        <span className="ep-club-name ep-hosts-names">
+          <HostLinks hosts={hosts} />
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/** Who runs it: the club, as one link to its page; with co-hosts, every host (HostsRow). */
+function ClubRow({ club, cohosts }) {
+  const hosts = hostsOf(club, cohosts);
+  if (hosts.length > 1) return <HostsRow hosts={hosts} />;
   const inner = (
     <>
       <Avatar name={club.name} src={club.logo} size={44} />
@@ -136,6 +159,8 @@ export function EventView({ page }) {
   // The event's own sponsors and partners; an older API sends neither.
   const sponsors = page.sponsors || [];
   const partners = page.partners || [];
+  // The clubs co-hosting it with its club; an older API sends none.
+  const cohosts = page.cohosts || [];
   const url = eventUrl(event);
   const prize = event.has_prize && event.prize_amount > 0 ? event.prize_amount : null;
   const hasVenue = event.is_online || Boolean(event.location_name) || (event.lat !== null && event.lng !== null);
@@ -195,10 +220,10 @@ export function EventView({ page }) {
             {event.name}
           </h1>
           <CancelledNotice event={event} />
-          {club ? <ClubRow club={club} /> : null}
+          {club ? <ClubRow club={club} cohosts={cohosts} /> : null}
           <Facts event={event} club={club} venueLink={hasVenue && !event.is_online} />
           <div className="ep-actions">
-            <ShareButton title={event.name} text={club ? `${event.name} — ${club.name}` : event.name} url={url} />
+            <ShareButton title={event.name} text={club ? `${event.name} — ${hostNames(hostsOf(club, cohosts))}` : event.name} url={url} />
             {cancelled ? null : <CalendarButton event={calendarEvent(event)} url={url} />}
           </div>
         </header>
