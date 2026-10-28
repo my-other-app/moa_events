@@ -37,6 +37,8 @@ export const media = {
   /** A speaker by id, or by place in the list ("i0") when the speaker has no id. */
   eventSpeaker: (ref, key) => `/media/events/${enc(ref)}/speakers/${enc(key)}/photo`,
   eventTeam: (ref, index) => `/media/events/${enc(ref)}/team/${index}/photo`,
+  /** One of the event's sponsors or partners (`kind` "sponsor" or "partner"), by id, or by place ("i0") without one. */
+  eventBacker: (ref, kind, key) => `/media/events/${enc(ref)}/${kind === "sponsor" ? "sponsors" : "partners"}/${enc(key)}/logo`,
   clubLogo: (slug, size = "thumbnail") => sized(`/media/clubs/${enc(slug)}/logo`, size),
   clubCover: (slug, size = "original") => sized(`/media/clubs/${enc(slug)}/cover`, size),
   clubTeam: (slug, index) => `/media/clubs/${enc(slug)}/team/${index}/photo`,

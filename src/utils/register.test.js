@@ -293,20 +293,21 @@ describe("the refusals the server names by code (backend#68), and the shapes bef
     expect(describeRegisterError({ status: 409, data: { message: "Already here." } }).kind).toBe("duplicate");
   });
 
-  it("an event whose club confirms each place: a request declined before, and one sent without saying the form understands that", () => {
+  it("an event whose club reviews every registration: one declined before, and one sent without saying the form understands that", () => {
     expect(describeRegisterError({ status: 409, data: envelope("Declined before.", "REQUEST_DECLINED") })).toEqual({
       kind: "declined",
-      message: "The club couldn't offer you a place at this event, so another request can't be sent from this email.",
+      message: "The club couldn't confirm your registration for this event, so you can't register again with this email.",
     });
     // Never a duplicate, though both are 409s.
-    expect(describeRegisterError({ status: 409, data: envelope("This event needs the club to confirm each place.", "APPROVAL_REQUIRED") })).toEqual({
+    expect(describeRegisterError({ status: 409, data: envelope("This event reviews every registration.", "APPROVAL_REQUIRED") })).toEqual({
       kind: "approval",
-      message: "The club confirms each place at this event now. Reload this page and send your details again: they go to the club as a request.",
+      message: "Reload this page and register again.",
     });
-    // Add-ons sent with a request (the club turned it on after the form loaded its shelf).
-    expect(describeRegisterError({ status: 422, data: envelope("A request holds no add-ons.", "ADD_ONS_NOT_ALLOWED") })).toEqual({
+    // Add-ons sent after the club turned reviewing on (the form loaded its shelf before): the form drops them.
+    expect(describeRegisterError({ status: 422, data: envelope("Add-ons can't be picked when registrations are reviewed.", "ADD_ONS_NOT_ALLOWED") })).toEqual({
       kind: "approval",
-      message: "The club confirms each place at this event now, and a request can't include add-ons. Reload this page and send your details again.",
+      addOns: true,
+      message: "Add-ons can't be picked when registrations are reviewed, so they've been removed. Check your details and register again.",
     });
   });
 });

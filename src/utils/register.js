@@ -257,9 +257,9 @@ export function stepsFor({ questions = [], items = [], chooseTicket = false } = 
  * and `discount_code` only when one was typed: an event with one ticket and
  * no code sends exactly what it always did.
  *
- * `accepts_approval: true` always goes: this form understands an event whose
- * club confirms each place (registration approval), and is then answered
- * with a request (`approval`) instead of a ticket. Without it such an event
+ * `accepts_approval: true` always goes: this form understands an event that
+ * reviews registrations (registration approval), and is then answered with
+ * a registration under review (`approval`) instead of a ticket. Without it such an event
  * refuses with 409 APPROVAL_REQUIRED; any other event, and a server without
  * requests, ignores it.
  */
@@ -375,12 +375,13 @@ function closedCopy(errors, status) {
  * shapes (a 409 with no code, `message` as an object of fields, FastAPI's
  * 422 list) are still read.
  *
- *   declined   REQUEST_DECLINED (409): the club confirms each place and has
- *              declined a request from this person for this event already
- *   approval   APPROVAL_REQUIRED (409): the club confirms each place and the
- *              request didn't say this form understands that (it always
- *              does), or ADD_ONS_NOT_ALLOWED (422: add-ons sent with a
- *              request, after the club turned it on): reload and send it again
+ *   declined   REQUEST_DECLINED (409): the club reviews registrations and has
+ *              declined this person's for this event already
+ *   approval   APPROVAL_REQUIRED (409): the club reviews registrations and the
+ *              call didn't say this form understands that (it always does):
+ *              reload and register again; or ADD_ONS_NOT_ALLOWED (422, with
+ *              `addOns`: add-ons sent after the club turned reviewing on): the
+ *              form drops them, and registering again goes through
  *   duplicate  ALREADY_REGISTERED (409 from the public form, 400 signed in),
  *              or a code-less 409 / "already registered": the app, My tickets
  *   awaiting   REGISTRATION_AWAITING_PAYMENT (409): this address has a
@@ -406,8 +407,8 @@ function closedCopy(errors, status) {
  *   message    anything else the server explained, in its own words
  *   server     a 5xx with nothing to say
  *
- * `approval`: the form sends a request (the club confirms each place). Such
- * an event has no waiting list, so none is offered, whatever the refusal says.
+ * `approval`: the event reviews registrations. Such an event has no waiting
+ * list, so none is offered, whatever the refusal says.
  */
 export function describeRegisterError(error, questionKeys = [], { approval = false } = {}) {
   const status = error?.status ?? error?.response?.status ?? 0;
@@ -429,16 +430,17 @@ export function describeRegisterError(error, questionKeys = [], { approval = fal
   }
   const code = typeof data?.error_code === "string" ? data.error_code : null;
   if (code === "REQUEST_DECLINED") {
-    return { kind: "declined", message: "The club couldn't offer you a place at this event, so another request can't be sent from this email." };
+    return { kind: "declined", message: "The club couldn't confirm your registration for this event, so you can't register again with this email." };
   }
   if (code === "APPROVAL_REQUIRED") {
-    return { kind: "approval", message: "The club confirms each place at this event now. Reload this page and send your details again: they go to the club as a request." };
+    return { kind: "approval", message: "Reload this page and register again." };
   }
   if (code === "ADD_ONS_NOT_ALLOWED") {
-    // Only when the club turned it on after the form loaded with its shelf: a request carries no add-ons.
+    // Only when the club turned reviewing on after the form loaded with its shelf: a registration under review carries no add-ons.
     return {
       kind: "approval",
-      message: "The club confirms each place at this event now, and a request can't include add-ons. Reload this page and send your details again.",
+      addOns: true,
+      message: "Add-ons can't be picked when registrations are reviewed, so they've been removed. Check your details and register again.",
     };
   }
   if (code === "REGISTRATION_AWAITING_PAYMENT") {
@@ -552,7 +554,7 @@ const doneKey = (eventId) => `moa.register.done.${eventId}`;
  * The ticket the form just made, so reloading the page shows it again
  * rather than an empty form. Kept for this tab while the page is open: the
  * page forgets it when it is left (registering a friend next starts afresh).
- * For an event whose club confirms each place it is the request sent
+ * For an event that reviews registrations it is the registration under review
  * instead (`kind: "request"`, with `request.token` for its status page).
  */
 export function keepDone(eventId, ticket) {

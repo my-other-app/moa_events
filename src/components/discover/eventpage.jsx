@@ -9,6 +9,7 @@ import { Avatar, Section } from "./bits";
 import { EventCard } from "./eventcard";
 import {
   About,
+  Backers,
   CalendarButton,
   CancelledNotice,
   Contact,
@@ -69,7 +70,7 @@ function Facts({ event, club, venueLink }) {
   const tile = dateTile(event.starts_at);
   // A cancelled event has no seats to speak of.
   const left = event.status === "cancelled" ? null : seatsLeft(event);
-  // Nobody going yet at an event whose club confirms each place: say that, never how many asked.
+  // Nobody going yet at an event that reviews registrations: "{Club} reviews every registration", never how many registered.
   const confirms = event.requires_approval === true && event.status !== "ended" ? confirmsEachPlace(club) : null;
   const people =
     event.status === "cancelled"
@@ -132,6 +133,9 @@ function Facts({ event, club, venueLink }) {
  */
 export function EventView({ page }) {
   const { event, club, speakers, agenda, team, team_source: teamSource, more_from_club: more, similar } = page;
+  // The event's own sponsors and partners; an older API sends neither.
+  const sponsors = page.sponsors || [];
+  const partners = page.partners || [];
   const url = eventUrl(event);
   const prize = event.has_prize && event.prize_amount > 0 ? event.prize_amount : null;
   const hasVenue = event.is_online || Boolean(event.location_name) || (event.lat !== null && event.lng !== null);
@@ -145,6 +149,8 @@ export function EventView({ page }) {
     prize && ["prizes", "Prizes"],
     speakers.length > 0 && ["speakers", speakers.length === 1 ? "Speaker" : "Speakers"],
     agenda.items.length > 0 && ["agenda", "Agenda"],
+    sponsors.length > 0 && ["sponsors", sponsors.length === 1 ? "Sponsor" : "Sponsors"],
+    partners.length > 0 && ["partners", partners.length === 1 ? "Partner" : "Partners"],
     hasVenue && ["venue", event.is_online ? "Online" : "Venue"],
     event.guidelines && ["guidelines", "Guidelines"],
     showTeam && ["team", "Team"],
@@ -229,6 +235,8 @@ export function EventView({ page }) {
           {prize ? <Prizes amount={prize} /> : null}
           {speakers.length ? <Speakers speakers={speakers} /> : null}
           {agenda.items.length ? <Agenda agenda={agenda} /> : null}
+          {sponsors.length ? <Backers kind="sponsor" items={sponsors} /> : null}
+          {partners.length ? <Backers kind="partner" items={partners} /> : null}
           {hasVenue ? <Venue event={event} /> : null}
 
           {event.guidelines ? (

@@ -5,7 +5,7 @@ import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
 import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
-import { PosterImg } from "./picture";
+import { LogoImg, PosterImg } from "./picture";
 import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
 import Icon from "./icons";
@@ -101,7 +101,7 @@ export function Poster({ event }) {
  */
 export function RegisterCard({ event, club = null }) {
   const state = registerState(event);
-  // The club confirms each place (registration approval): said beside the button while a place can be asked for.
+  // The club reviews every registration (registration approval): said beside the button while registration is open.
   const approval = event.requires_approval === true && (state.kind === "open" || (state.kind === "live" && Boolean(state.also)));
   const left = seatsLeft(event);
   const when = whenLine(event.starts_at);
@@ -127,7 +127,6 @@ export function RegisterCard({ event, club = null }) {
           <RegisterGo
             eventId={String(event.id)}
             state={{ kind: state.kind, label: state.label, href: state.href || null, also: state.also ? { label: state.also.label, href: state.also.href } : null }}
-            club={club?.name ? { name: club.name } : null}
             approval={event.requires_approval === true}
           />
         </div>
@@ -219,6 +218,48 @@ export function Speakers({ speakers }) {
                 </div>
                 {s.bio ? <p className="ep-speaker-bio">{s.bio}</p> : null}
               </div>
+            </li>
+          );
+        })}
+      </ul>
+    </EpSection>
+  );
+}
+
+/**
+ * The event's own sponsors, or its partners: square tiles, each with the
+ * logo on white (LogoImg: a square one fills the tile, any other shape is
+ * whole with room, never cropped; the initials while it loads or without
+ * one), the name, and the label under it. A tile with a link opens it in a new tab;
+ * a sponsor's is marked `sponsored`, as search engines ask of paid links.
+ */
+export function Backers({ kind, items }) {
+  const sponsors = kind === "sponsor";
+  const title = sponsors ? (items.length === 1 ? "Sponsor" : "Sponsors") : items.length === 1 ? "Partner" : "Partners";
+  return (
+    <EpSection id={sponsors ? "sponsors" : "partners"} title={title}>
+      <ul className="ep-backers">
+        {items.map((b, i) => {
+          const href = b.link ? safeHref(b.link) : null;
+          const body = (
+            <>
+              <span className="ep-backer-logo">
+                <span aria-hidden="true">{initials(b.name)}</span>
+                <LogoImg src={b.logo} alt="" />
+              </span>
+              <span className="ep-backer-name">{b.name}</span>
+              {b.label ? <span className="ep-backer-label">{b.label}</span> : null}
+            </>
+          );
+          return (
+            <li key={b.id ?? `${b.name}-${i}`}>
+              {href && href.startsWith("https:") ? (
+                <a className="ep-backer ep-backer--link" href={href} target="_blank" rel={sponsors ? "sponsored noopener noreferrer" : "noopener noreferrer"} aria-label={`${b.name}${b.label ? `, ${b.label}` : ""} (opens in a new tab)`}>
+                  {body}
+                </a>
+              ) : (
+                <div className="ep-backer">{body}</div>
+              )}
             </li>
           );
         })}

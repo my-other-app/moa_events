@@ -63,6 +63,8 @@ export function stableEventPage(page) {
       : null,
     speakers: page.speakers.map((s, i) => ({ ...s, photo: s.photo ? media.eventSpeaker(ref, s.id ?? `i${i}`) : null })),
     team: page.team.map((p, i) => ({ ...p, photo: p.photo ? media.eventTeam(ref, i) : null })),
+    sponsors: (page.sponsors || []).map((b, i) => ({ ...b, logo: b.logo ? media.eventBacker(ref, "sponsor", b.id ?? `i${i}`) : null })),
+    partners: (page.partners || []).map((b, i) => ({ ...b, logo: b.logo ? media.eventBacker(ref, "partner", b.id ?? `i${i}`) : null })),
     more_from_club: page.more_from_club.map(stableCard),
     similar: page.similar.map(stableCard),
   };

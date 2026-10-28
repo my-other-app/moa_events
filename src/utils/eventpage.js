@@ -108,8 +108,8 @@ const LOW_SEATS = 10;
  * What the register button says and does, from the event's status and
  * whether registration is open. Exactly one of these:
  *
- *   open    "Register"                       → the form ("Request a place"
- *                                            when the club confirms each place)
+ *   open    "Register"                       → the form (the same word when the
+ *                                            club reviews every registration)
  *   soon    "Registration opens 18 Oct"      (disabled)
  *   closed  "Registration closed"            (disabled)
  *   full    "Event full"                     (disabled)
@@ -121,8 +121,8 @@ const LOW_SEATS = 10;
  */
 export function registerState(event, now = Date.now()) {
   const register = eventPath(event, "register");
-  // The club confirms each place (registration approval): the form sends a request.
-  const go = event.requires_approval === true ? "Request a place" : "Register";
+  // An event that reviews registrations (registration approval) says "Register" too: people register, the club reviews.
+  const go = "Register";
   const left = seatsLeft(event);
   if (event.status === "cancelled") {
     return { kind: "cancelled", label: "Event cancelled", note: cancelledLine(event.cancellation) };

@@ -1,5 +1,7 @@
 import { dayRange, isDay, isMonth } from "@/utils/days";
 import { parseCancellation } from "@/utils/cancelled";
+import { imageUrl } from "@/utils/format";
+import { sizeFor } from "@/utils/pictures";
 
 /**
  * The public discovery API's shapes: the filters as the pages' addresses
@@ -298,7 +300,7 @@ const DEMO = { is_demo: flag };
 const CLUB_EXTRAS = { ...DEMO, whatsapp_updates: flag };
 /**
  * How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js);
- * and, on a card and on the event's page alike: `requires_approval` (the club confirms each place)
+ * and, on a card and on the event's page alike: `requires_approval` (the club reviews every registration)
  * and `high_demand` (the club has its "High demand" label on). Each kept only when true, so an
  * API without them reads as before.
  */
@@ -761,6 +763,28 @@ export function parseAgenda(a) {
   return { timezone: str(o.timezone) || "Asia/Kolkata", items };
 }
 
+/**
+ * One of the event's own sponsors or partners (the API's docs/EVENT_PARTNERS.md):
+ * a name, a label ("Title sponsor"), an https link and one logo address. A
+ * link that is not https is dropped rather than shown.
+ */
+/** The widest a sponsor's or partner's tile is drawn (styles/event-page.css): its logo's size, utils/pictures.js. */
+const BACKER_LOGO_W = 190;
+
+const parseBacker = (kind) => (b) => {
+  const o = obj(b);
+  if (!o || !str(o.name)) return null;
+  const link = str(o.link)?.trim() || null;
+  return {
+    id: idOf(o.id),
+    kind,
+    name: o.name.trim(),
+    label: str(o.label)?.trim() || null,
+    link: link && /^https:\/\/[^\s]+$/i.test(link) ? link : null,
+    logo: typeof o.logo === "string" ? str(o.logo) : imageUrl(o.logo, sizeFor("logo", BACKER_LOGO_W)),
+  };
+};
+
 const TEAM_SOURCES = new Set(["event", "club"]);
 
 /** Everything the event page shows; null when the event itself is missing. */
@@ -777,6 +801,9 @@ export function parseEventPage(d) {
     agenda: parseAgenda(o.agenda),
     team,
     team_source: team.length && TEAM_SOURCES.has(o.team_source) ? o.team_source : "none",
+    // Absent from an older API: none, and neither section shows.
+    sponsors: list(o.sponsors, parseBacker("sponsor")),
+    partners: list(o.partners, parseBacker("partner")),
     more_from_club: others(o.more_from_club),
     similar: others(o.similar),
   };

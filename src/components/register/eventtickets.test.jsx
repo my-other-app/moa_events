@@ -206,7 +206,8 @@ describe("an event whose club confirms each place", () => {
         </AuthProvider>
       </MemoryRouter>,
     );
-  const REQUEST = { ...OPEN, label: "Request a place" };
+  // A review event's button says Register, as any other.
+  const REQUEST = { ...OPEN, label: "Register" };
   // What an older server still sends: the list on, and a sold-out type offering it.
   const stillOn = (over = {}) =>
     ticketing({
@@ -266,7 +267,7 @@ describe("joining refused because the club confirms each place", () => {
     fireEvent.change(within(form).getByLabelText(/^Email/), { target: { value: "asha@example.org" } });
     fireEvent.click(within(form).getByRole("button", { name: "Join the waiting list" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "This event has no waiting list: the club confirms each place. Request a place instead, and they'll let you know.",
+      "This event has no waiting list: the club reviews every registration. Register instead, and they'll get back to you.",
     );
     expect(within(form).queryByRole("button", { name: "Join the waiting list" })).toBeNull();
     expect(within(form).getByRole("button", { name: "Not now" })).toBeInTheDocument();

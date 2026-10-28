@@ -511,7 +511,7 @@ export function WaitlistJoin({ eventId, types, typeId: firstType = null, account
         </p>
       ) : null}
       <div className="wl-join-actions">
-        {/* The server says the club confirms each place here: there is nothing to join, so no button to try again. */}
+        {/* The server says the club reviews every registration here: there is nothing to join, so no button to try again. */}
         {problem?.kind === "approval" ? null : (
           <button type="button" className="dc-btn dc-btn--sm" onClick={submit} disabled={busy}>
             {busy ? (
@@ -596,7 +596,7 @@ const openTypeOf = (open) => (open && typeof open === "object" ? (open.typeId ??
  * "Join the waiting list for …", or the event page's button. `onChanged()`
  * after joining or leaving, so the page reads the tickets again.
  *
- * An event whose club confirms each place (`approval`, or its tickets say
+ * An event that reviews registrations (`approval`, or its tickets say
  * so) offers no waiting list at all: only places someone already holds in
  * line are shown.
  */

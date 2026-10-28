@@ -10,15 +10,20 @@ import {
   parseApproval,
   parseRequest,
   parseRequestList,
+  payButton,
+  payLine,
   requestPath,
   requiresApproval,
+  statusWord,
   tokenFromStatusUrl,
+  underReviewNote,
 } from "./requests";
 
 /*
- * Registration approval (the club confirms each place), as the site reads
- * the API: a request's shape (GET /registration-requests/{token}, and each
- * item of /mine), the register call's `approval`, and the refusals.
+ * Registration approval (the club reviews every registration), as the site
+ * reads the API: a request's shape (GET /registration-requests/{token}, and
+ * each item of /mine), the register call's `approval`, the refusals, and
+ * the words people read.
  */
 const TOKEN = "Rq7abcdefghijklmnopqrstuvwxyz012";
 
@@ -65,9 +70,19 @@ describe("a request, as the API sends it", () => {
       submittedAt: "2026-10-26T10:15:00+05:30",
       decidedAt: null,
       declineNote: null,
+      closedReason: null,
       ticketId: null,
       pay: null,
     });
+  });
+
+  it("reads why a closed one closed, and only for a closed one", () => {
+    for (const reason of ["event_ended", "event_deleted", "event_cancelled", "registered_directly"]) {
+      expect(parseRequest(REQUEST({ status: "closed", closed_reason: reason })).closedReason).toBe(reason);
+    }
+    expect(parseRequest(REQUEST({ status: "closed", closed_reason: "something_new" })).closedReason).toBeNull();
+    expect(parseRequest(REQUEST({ status: "closed" })).closedReason).toBeNull();
+    expect(parseRequest(REQUEST({ status: "pending", closed_reason: "event_ended" })).closedReason).toBeNull();
   });
 
   it("reads a confirmed paid request's pay link, and a ticket once registered", () => {
@@ -159,9 +174,19 @@ describe("the register call's answer", () => {
     expect(parseApproval({ approval: null })).toBeNull();
     expect(parseApproval(null)).toBeNull();
   });
+
+  it("reads a pay link only when one comes with it", () => {
+    const pay = { amount: "199", pay_by: "2026-10-27T10:15:00+05:30", claim_token: "Cl4im-token-abcdefghijklmnop" };
+    expect(parseApproval({ approval: { id: "r1", status: "approved", token: TOKEN, pay } }).pay).toEqual({
+      amount: 199,
+      payBy: "2026-10-27T10:15:00+05:30",
+      claimToken: "Cl4im-token-abcdefghijklmnop",
+    });
+    expect(parseApproval({ approval: { id: "r1", status: "approved", token: TOKEN, pay: { amount: 199 } } })).not.toHaveProperty("pay");
+  });
 });
 
-describe("whether the club confirms each place", () => {
+describe("whether the club reviews every registration", () => {
   it("takes the form's own read first, then its ticketing, then the event page", () => {
     expect(requiresApproval({ requires_approval: true })).toBe(true);
     expect(requiresApproval({ requires_approval: false }, { requires_approval: true })).toBe(false);
@@ -175,8 +200,39 @@ describe("whether the club confirms each place", () => {
     expect(clubName({ name: "Circuit Society" })).toBe("Circuit Society");
     expect(clubName(null)).toBe("The club");
     expect(clubName({ name: " " }, { start: false })).toBe("the club");
-    expect(approvalNote({ name: "Circuit Society" })).toBe("Circuit Society confirms each place. You’ll get your ticket by email when they do.");
-    expect(approvalNote(null)).toBe("The club confirms each place. You’ll get your ticket by email when they do.");
+    expect(approvalNote({ name: "Circuit Society" })).toBe("Circuit Society reviews every registration and emails tickets to the people it confirms.");
+    expect(approvalNote(null)).toBe("The club reviews every registration and emails tickets to the people it confirms.");
+    expect(underReviewNote({ name: "Circuit Society" })).toBe("Circuit Society reviews every registration. If yours is confirmed, your ticket will come by email.");
+    expect(underReviewNote(null)).toBe("The club reviews every registration. If yours is confirmed, your ticket will come by email.");
+  });
+});
+
+describe("the words people read", () => {
+  const pay = { amount: 199, payBy: "2026-10-27T10:15:00+05:30", claimToken: "Cl4im-token-abcdefghijklmnop" };
+  it("gives each status its chip", () => {
+    const r = (over) => parseRequest(REQUEST(over));
+    expect(statusWord(r({ status: "pending" }))).toBe("Under review");
+    expect(statusWord(r({ status: "approved", ticket_id: "MOA1" }))).toBe("Confirmed");
+    expect(statusWord(r({ status: "approved" }))).toBe("Confirmed");
+    expect(statusWord(r({ status: "approved", pay: { amount: 199, pay_by: "2026-10-27T10:15:00+05:30", claim_token: pay.claimToken } }))).toBe(
+      "Confirmed · pay by Tue, 27 Oct · 10:15 AM IST to get your ticket",
+    );
+    expect(statusWord(r({ status: "approved", pay: { amount: 199, pay_by: null, claim_token: pay.claimToken } }))).toBe("Confirmed · pay to get your ticket");
+    expect(statusWord(r({ status: "declined" }))).toBe("Not confirmed");
+    expect(statusWord(r({ status: "withdrawn" }))).toBe("Cancelled");
+    expect(statusWord(r({ status: "lapsed" }))).toBe("Expired");
+    expect(statusWord(r({ status: "closed", closed_reason: "registered_directly" }))).toBe("Closed");
+    expect(statusWord(r({ status: "archived" }))).toBeNull();
+    expect(statusWord(null)).toBeNull();
+  });
+
+  it("says what a confirmed paid ticket costs and by when", () => {
+    expect(payLine(pay)).toBe("Pay ₹199 by Tue, 27 Oct · 10:15 AM IST to get your ticket.");
+    expect(payLine({ ...pay, payBy: null })).toBe("Pay ₹199 to get your ticket.");
+    expect(payLine(null)).toBe("Pay to get your ticket.");
+    expect(payButton(pay)).toBe("Pay ₹199");
+    expect(payButton({ ...pay, amount: 0 })).toBe("Pay now");
+    expect(payButton(undefined)).toBe("Pay now");
   });
 });
 
@@ -195,13 +251,13 @@ describe("what a refusal means", () => {
 });
 
 describe("the public line in place of \"Be the first to register\"", () => {
-  it("names the club that confirms each place, and never a number", () => {
-    expect(confirmsEachPlace({ name: "Circuit Society" })).toBe("Circuit Society confirms each place");
-    expect(confirmsEachPlace(null)).toBe("The club confirms each place");
+  it("names the club that reviews every registration, and never a number", () => {
+    expect(confirmsEachPlace({ name: "Circuit Society" })).toBe("Circuit Society reviews every registration");
+    expect(confirmsEachPlace(null)).toBe("The club reviews every registration");
   });
 
   it("is the old line for an event without the setting (or an API that doesn't say)", () => {
-    expect(nobodyGoingLine({ requires_approval: true }, { name: "Circuit Society" })).toBe("Circuit Society confirms each place");
+    expect(nobodyGoingLine({ requires_approval: true }, { name: "Circuit Society" })).toBe("Circuit Society reviews every registration");
     expect(nobodyGoingLine({ requires_approval: false }, { name: "Circuit Society" })).toBe("Be the first to register");
     expect(nobodyGoingLine({}, null)).toBe("Be the first to register");
     expect(nobodyGoingLine(null, null)).toBe("Be the first to register");

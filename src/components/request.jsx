@@ -6,7 +6,7 @@ import { requestsApi } from "@/api/requests";
 import { eventPath } from "@/utils/eventpage";
 import { formatWhen } from "@/utils/format";
 import { rupees } from "@/utils/register";
-import { clubName, describeRequestError } from "@/utils/requests";
+import { clubName, describeRequestError, statusWord, underReviewNote } from "@/utils/requests";
 import { ErrorState } from "./discover/bits";
 import { SitePage } from "./discover/chrome";
 import { EpIcon } from "./discover/eventbits";
@@ -15,31 +15,39 @@ import { PayNote, Spinner } from "./register/finishpayment";
 import { Summary } from "./register/summary";
 
 /**
- * /requests/{token}: where a request for a place stands, for an event whose
- * club confirms each place (registration approval). The link comes in the
- * "you're on the waiting list" email and on the form's last screen. The
- * server half (src/app/requests/[token]/page.jsx) checks the address;
- * everything here happens in the browser, the token being the request's
- * only credential:
+ * /requests/{token}: where a registration stands, for an event that reviews
+ * registrations (registration approval; the API calls it a request). The
+ * link comes in the "Thanks for registering" email and on the form's last
+ * screen. The server half (src/app/requests/[token]/page.jsx) checks the
+ * address; everything here happens in the browser, the token being the
+ * registration's only credential:
  *
  *   GET  /registration-requests/{token}            where it stands
- *   POST /registration-requests/{token}/withdraw   take it back (pending, or
+ *   POST /registration-requests/{token}/withdraw   cancel it (under review, or
  *                                                  confirmed and not yet paid);
  *                                                  409 REQUEST_NOT_WITHDRAWABLE
  *                                                  carries it as it stands
  *
- * What each status shows:
- *   pending     waiting for the club; Withdraw, after asking
+ * What each status shows, under its status chip ("Under review",
+ * "Confirmed", "Not confirmed", "Cancelled", "Expired", "Closed"):
+ *   pending     under review; "Cancel my registration", after asking
  *   approved    with `ticket_id`: you're in, and the ticket;
- *               with `pay`: pay by the time the place is held until, on the
+ *               with `pay`: pay by the time the ticket is held until, on the
  *               waiting list's claim page (/claim/{pay.claim_token});
  *               neither: confirmed, the rest comes by email
  *   declined    gently, with the club's note when it left one
- *   withdrawn, lapsed, closed: what happened, and the way back
- * and an address that is no request: "This link isn't valid".
+ *   withdrawn, lapsed: what happened, and the way back
+ *   closed      by its `closed_reason`: the event ended (or was deleted)
+ *               first, the event was cancelled, or a ticket came another way
+ * and an address that is no registration: "This link isn't valid".
+ *
+ * `askToCancel` (the email's "Cancel my registration" link,
+ * `{status_url}?withdraw=1`): once the registration has loaded, and only if
+ * it can still be cancelled, the cancel question opens straight away. It is
+ * asked once: the address loses `?withdraw=1`, so a reload doesn't ask again.
  *
  * The first paint (on the server, and the browser's first) is the loading
- * card: the request is the browser's to read.
+ * card: the registration is the browser's to read.
  */
 
 /** The request's event, as the summary draws an event. */
@@ -59,9 +67,12 @@ const asEvent = (e) => ({
 
 const eventLink = (e) => (e?.slug || (e?.id !== null && e?.id !== undefined) ? eventPath(e) : null);
 
+/** Whether the person can still cancel it here: under review, or confirmed with a ticket still to pay for. */
+const cancellable = (r) => r?.status === "pending" || (r?.status === "approved" && !r.ticketId && Boolean(r.pay));
+
 function Skeleton() {
   return (
-    <div className="rg-skel" role="status" aria-label="Loading your request">
+    <div className="rg-skel" role="status" aria-label="Loading your registration">
       <span className="dc-skel rg-skel-title" />
       <span className="dc-skel rg-skel-lede" />
       {[0, 1].map((i) => (
@@ -74,7 +85,7 @@ function Skeleton() {
   );
 }
 
-/** A link that is no request (the API's 404): said kindly, with somewhere to go. */
+/** A link that is no registration (the API's 404): said kindly, with somewhere to go. */
 function NotFound() {
   return (
     <div className="rg-closed cl-ended" role="status">
@@ -83,7 +94,7 @@ function NotFound() {
       </span>
       <h1 className="rg-h1">This link isn&rsquo;t valid</h1>
       <p className="rg-closed-text">
-        We couldn&rsquo;t find a request for a place at this address. Check that the whole link was copied from your email: each link shows one request.
+        We couldn&rsquo;t find a registration at this address. Check that the whole link was copied from your email: each link shows one registration.
       </p>
       <div className="rg-closed-actions">
         <Link className="dc-btn" href="/events">
@@ -97,11 +108,27 @@ function NotFound() {
   );
 }
 
-/** "Withdraw", then "Withdraw your request?" with the way to keep it. */
-function Withdraw({ token, label, question, onDone, onChanged }) {
-  const [asking, setAsking] = useState(false);
+/**
+ * "Cancel my registration", then the question, with the way to keep it.
+ * `open`: asked straight away (the email's link), the question brought into view.
+ */
+function Withdraw({ token, label, question, open = false, onDone, onChanged }) {
+  const [asking, setAsking] = useState(open);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState(null);
+  const ask = useRef(null);
+
+  // Opened by the email's link: the question is where the eye goes (below the event on a phone).
+  useEffect(() => {
+    if (!open) return;
+    const el = ask.current;
+    try {
+      el?.scrollIntoView?.({ block: "center" });
+    } catch {
+      /* not in a browser */
+    }
+    el?.focus({ preventScroll: true });
+  }, [open]);
 
   const go = async () => {
     if (busy) return;
@@ -112,7 +139,7 @@ function Withdraw({ token, label, question, onDone, onChanged }) {
     } catch (error) {
       const p = describeRequestError(error);
       if (p.kind === "gone" || p.kind === "changed") onChanged(p.kind, p.request || null);
-      else setProblem({ tone: p.kind === "limit" ? "calm" : "error", title: "We couldn't withdraw your request", text: p.message });
+      else setProblem({ tone: p.kind === "limit" ? "calm" : "error", title: "We couldn't cancel your registration", text: p.message });
       setBusy(false);
       setAsking(false);
     }
@@ -121,21 +148,23 @@ function Withdraw({ token, label, question, onDone, onChanged }) {
   return (
     <div className="rq-withdraw">
       {asking ? (
-        <div className="wl-leave" role="group" aria-label="Withdraw your request">
-          <p>{question}</p>
+        <div className="wl-leave" role="group" aria-label="Cancel your registration">
+          <p ref={ask} tabIndex={-1}>
+            {question}
+          </p>
           <div className="wl-leave-actions">
             <button type="button" className="dc-btn dc-btn--sm dc-btn--ghost" onClick={go} disabled={busy}>
               {busy ? (
                 <>
                   <Spinner />
-                  Withdrawing…
+                  Cancelling…
                 </>
               ) : (
-                "Yes, withdraw it"
+                "Yes, cancel it"
               )}
             </button>
             <button type="button" className="rg-textbtn" onClick={() => setAsking(false)} disabled={busy}>
-              Keep my request
+              Keep my registration
             </button>
           </div>
         </div>
@@ -149,7 +178,7 @@ function Withdraw({ token, label, question, onDone, onChanged }) {
   );
 }
 
-/** What the person sent: their name, the ticket, when. */
+/** What the person registered with: their name, the ticket, when. */
 function Facts({ request }) {
   const sent = formatWhen(request.submittedAt);
   if (!request.fullName && !request.ticketType && !sent) return null;
@@ -169,7 +198,7 @@ function Facts({ request }) {
       ) : null}
       {sent ? (
         <div>
-          <dt>Sent</dt>
+          <dt>Registered</dt>
           <dd>{sent} IST</dd>
         </div>
       ) : null}
@@ -177,14 +206,15 @@ function Facts({ request }) {
   );
 }
 
-/** The request as it stands: its title, what it means, and what can be done now. */
-function Status({ request, token, onWithdrawn, onChanged, notice }) {
+/** The registration as it stands: its chip, its title, what it means, and what can be done now. */
+function Status({ request, token, askToCancel = false, onWithdrawn, onChanged, notice }) {
   const heading = useRef(null);
   const e = request.event;
   const club = clubName(e.club);
   const clubMid = clubName(e.club, { start: false });
   const href = eventLink(e);
   const first = String(request.fullName || "").trim().split(/\s+/)[0];
+  const chip = statusWord(request);
   const back = href ? (
     <Link className="dc-btn dc-btn--ghost" href={href}>
       Back to the event
@@ -195,8 +225,13 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
       Find other events
     </Link>
   );
+  const myTickets = (
+    <Link className="dc-btn" href="/me/tickets">
+      My tickets
+    </Link>
+  );
 
-  // A status changed here (withdrawn, or found changed): its title takes the focus.
+  // A status changed here (cancelled, or found changed): its title takes the focus.
   useEffect(() => {
     if (notice) heading.current?.focus({ preventScroll: true });
   }, [notice, request.status]);
@@ -211,19 +246,19 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
   switch (request.status) {
     case "pending":
       icon = "mail";
-      title = `Waiting for ${clubMid} to confirm`;
+      title = "Your registration is under review";
       body = (
         <p className="rg-closed-text">
-          {first ? `${first}, your` : "Your"} request for a place at <strong>{e.name}</strong> is in. {club} confirms each place, and your ticket will come by
-          email as soon as they confirm yours. There&rsquo;s nothing else to do.
+          {first ? `${first}, you’re` : "You’re"} registered for <strong>{e.name}</strong>. {underReviewNote(e.club)} There&rsquo;s nothing else to do.
         </p>
       );
       actions = back;
       after = (
         <Withdraw
           token={token}
-          label="Withdraw my request"
-          question={`Withdraw your request? ${club} won't see it any more. You can send a new one while registration is open.`}
+          label="Cancel my registration"
+          question={`Cancel your registration? ${club} won't review it any more. You can register again while registration is open.`}
+          open={askToCancel}
           onDone={onWithdrawn}
           onChanged={onChanged}
         />
@@ -231,12 +266,12 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
       break;
     case "approved":
       tone = "good";
+      icon = "check";
       if (request.ticketId) {
-        icon = "check";
         title = "You're in";
         body = (
           <p className="rg-closed-text">
-            {club} confirmed your place at <strong>{e.name}</strong>. Your ticket is in your email too.
+            {club} confirmed your registration for <strong>{e.name}</strong>. Your ticket is in your email too.
           </p>
         );
         actions = (
@@ -250,8 +285,7 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
       } else if (request.pay) {
         const by = formatWhen(request.pay.payBy);
         const amount = request.pay.amount > 0 ? rupees(request.pay.amount) : null;
-        icon = "check";
-        title = `${club} confirmed your place`;
+        title = "Your registration is confirmed";
         body = (
           <p className="rg-closed-text">
             {amount ? `Pay ${amount}` : "Pay"}
@@ -261,51 +295,41 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
                 by <strong>{by} IST</strong>
               </>
             ) : null}{" "}
-            to get your ticket for <strong>{e.name}</strong>.{by ? " Your place is held until then." : ""}
+            to get your ticket for <strong>{e.name}</strong>.{by ? " Your ticket is held for you until then." : ""}
           </p>
         );
         actions = (
-          <>
-            <Link className="dc-btn" href={`/claim/${encodeURIComponent(request.pay.claimToken)}`}>
-              {amount ? `Pay ${amount}` : "Pay now"}
-            </Link>
-            {back}
-          </>
+          <Link className="dc-btn" href={`/claim/${encodeURIComponent(request.pay.claimToken)}`}>
+            {amount ? `Pay ${amount}` : "Pay now"}
+          </Link>
         );
         after = (
           <Withdraw
             token={token}
-            label="I can't come: release my place"
-            question={`Release your place? ${club} can offer it to someone else, and you can't take it back.`}
+            label="I can't come: cancel my registration"
+            question="Cancel your registration? Your ticket will go to someone else, and you can't undo this."
+            open={askToCancel}
             onDone={onWithdrawn}
             onChanged={onChanged}
           />
         );
       } else {
-        icon = "check";
-        title = `${club} confirmed your place`;
-        body = (
-          <p className="rg-closed-text">
-            Your place at <strong>{e.name}</strong> is confirmed. Look in your email for your ticket, or for the link to pay for it.
-          </p>
-        );
+        title = "Your registration is confirmed";
+        body = <p className="rg-closed-text">Look in your email for your ticket, or for the link to pay for it.</p>;
         actions = (
           <>
-            <Link className="dc-btn" href="/me/tickets">
-              My tickets
-            </Link>
+            {myTickets}
             {back}
           </>
         );
       }
       break;
     case "declined":
-      title = "No place this time";
+      title = "Your registration wasn't confirmed";
       body = (
         <>
           <p className="rg-closed-text">
-            Sorry, {clubMid} couldn&rsquo;t offer you a place at <strong>{e.name}</strong> this time. Thank you for asking: there are plenty of other events to
-            go to.
+            Thank you for your interest in <strong>{e.name}</strong>. {club} couldn&rsquo;t confirm your registration this time.
           </p>
           {request.declineNote ? (
             <p className="rg-closed-text rg-cancel-reason rq-note">
@@ -324,17 +348,17 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
       );
       break;
     case "withdrawn":
-      title = "You withdrew your request";
+      title = "You cancelled your registration";
       body = (
         <p className="rg-closed-text">
-          {club} won&rsquo;t see it any more. If you change your mind, you can send a new request while registration is open.
+          {club} won&rsquo;t review it any more. If you change your mind, you can register again while registration is open.
         </p>
       );
       actions = (
         <>
-          {e.slug || href ? (
+          {href ? (
             <Link className="dc-btn" href={eventPath(e, "register")}>
-              Request a place again
+              Register again
             </Link>
           ) : null}
           {back}
@@ -342,11 +366,11 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
       );
       break;
     case "lapsed":
-      title = "Your place was released";
+      title = "Your registration has expired";
       body = (
         <p className="rg-closed-text">
-          {club} confirmed your place at <strong>{e.name}</strong>, but the payment didn&rsquo;t arrive in time, so it was released. If registration is still
-          open, you can request a place again.
+          {club} confirmed your registration for <strong>{e.name}</strong>, but it wasn&rsquo;t paid in time. If registration is still open, you can register
+          again.
         </p>
       );
       actions = (
@@ -357,23 +381,45 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
       );
       break;
     case "closed":
-      title = "This request is closed";
-      body = (
-        <p className="rg-closed-text">
-          <strong>{e.name}</strong> isn&rsquo;t taking requests any more: it has ended, or the organisers called it off. If it was cancelled, we&rsquo;ve emailed you
-          about it.
-        </p>
-      );
+      if (request.closedReason === "registered_directly") {
+        tone = "good";
+        icon = "check";
+        title = "You're registered";
+        body = (
+          <p className="rg-closed-text">
+            You have a ticket for <strong>{e.name}</strong> already.
+          </p>
+        );
+        actions = (
+          <>
+            {myTickets}
+            {back}
+          </>
+        );
+        break;
+      }
+      title = "This registration is closed";
+      body =
+        request.closedReason === "event_cancelled" ? (
+          <p className="rg-closed-text">
+            <strong>{e.name}</strong> was cancelled. We&rsquo;ve emailed you about it.
+          </p>
+        ) : (
+          <p className="rg-closed-text">
+            <strong>{e.name}</strong> ended before {clubMid} could confirm your registration.
+          </p>
+        );
       actions = (
         <>
-          {back}
+          {/* A deleted event has no page to go back to. */}
+          {request.closedReason === "event_deleted" ? null : back}
           {findMore}
         </>
       );
       break;
     default:
-      title = "Your request";
-      body = <p className="rg-closed-text">Check your email for the latest from {clubMid} about your place.</p>;
+      title = "Your registration";
+      body = <p className="rg-closed-text">Check your email for the latest from {clubMid} about your registration.</p>;
       actions = back;
   }
 
@@ -387,6 +433,7 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
           {notice}
         </p>
       ) : null}
+      {chip ? <p className={`rq-chip${request.status === "approved" ? " is-good" : ""}`}>{chip}</p> : null}
       <h1 className="rg-h1" ref={heading} tabIndex={-1}>
         {title}
       </h1>
@@ -398,10 +445,16 @@ function Status({ request, token, onWithdrawn, onChanged, notice }) {
   );
 }
 
-export default function RequestStatus({ token }) {
+/**
+ * `askToCancel`: the address had `?withdraw=1` (the email's "Cancel my
+ * registration" link). Asked once, for the registration as it first loads.
+ */
+export default function RequestStatus({ token, askToCancel = false }) {
   const [load, setLoad] = useState({ status: "loading", request: null, problem: null });
   const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState(null);
+  // Whether the email's cancel link still asks: only until the first registration that loads is shown.
+  const [asks, setAsks] = useState(askToCancel);
 
   useEffect(() => {
     let alive = true;
@@ -421,18 +474,35 @@ export default function RequestStatus({ token }) {
     };
   }, [token, attempt]);
 
+  // The question was asked (or there was nothing to cancel): the address forgets `?withdraw=1`, and so does a reload.
+  const shown = load.status === "ready" || load.status === "gone";
+  useEffect(() => {
+    if (!askToCancel || !shown) return;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("withdraw")) {
+        url.searchParams.delete("withdraw");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+    } catch {
+      /* not in a browser */
+    }
+  }, [askToCancel, shown]);
+
   const withdrawn = (next) => {
-    setNotice("Your request was withdrawn.");
+    setAsks(false);
+    setNotice("Your registration was cancelled.");
     setLoad((s) => ({ ...s, request: next || { ...s.request, status: "withdrawn" } }));
   };
-  // Withdrawing found it changed (decided meanwhile: 409 REQUEST_NOT_WITHDRAWABLE, with the request as it
-  // stands) or gone: show it as it is now (read again when the refusal didn't carry it) and say so.
+  // Cancelling found it changed (decided meanwhile: 409 REQUEST_NOT_WITHDRAWABLE, with the registration as
+  // it stands) or gone: show it as it is now (read again when the refusal didn't carry it) and say so.
   const changed = (kind, now = null) => {
+    setAsks(false);
     if (kind === "gone") {
       setLoad({ status: "gone", request: null, problem: null });
       return;
     }
-    setNotice("Your request changed meanwhile, so it wasn't withdrawn. Here's where it stands now.");
+    setNotice("Your registration changed meanwhile, so it wasn't cancelled. Here's where it stands now.");
     if (now) setLoad({ status: "ready", request: now, problem: null });
     else setAttempt((a) => a + 1);
   };
@@ -443,9 +513,11 @@ export default function RequestStatus({ token }) {
   else if (load.status === "error" && !load.request)
     body = (
       <ErrorState
-        title="Your request didn't load"
+        title="Your registration didn't load"
         message={
-          load.problem?.kind === "limit" ? load.problem.message : "We couldn't reach MyOtherApp to read this request. Check your connection and try again."
+          load.problem?.kind === "limit"
+            ? load.problem.message
+            : "We couldn't reach MyOtherApp to read this registration. Check your connection and try again."
         }
         onRetry={() => setAttempt((a) => a + 1)}
       />
@@ -459,7 +531,14 @@ export default function RequestStatus({ token }) {
           place={Boolean(load.request.event.location_name || load.request.event.is_online)}
         />
         <div className="rg-main">
-          <Status request={load.request} token={token} onWithdrawn={withdrawn} onChanged={changed} notice={notice} />
+          <Status
+            request={load.request}
+            token={token}
+            askToCancel={asks && cancellable(load.request)}
+            onWithdrawn={withdrawn}
+            onChanged={changed}
+            notice={notice}
+          />
         </div>
       </div>
     );

@@ -7,6 +7,8 @@
  *   /media/events/{ref}/cover                        the drawn cover, as a PNG
  *   /media/events/{ref}/speakers/{id | iN}/photo     a speaker's photo
  *   /media/events/{ref}/team/{n}/photo               someone on the event's team
+ *   /media/events/{ref}/sponsors/{id | iN}/logo      one of the event's sponsors
+ *   /media/events/{ref}/partners/{id | iN}/logo      one of the event's partners
  *   /media/clubs/{slug}/logo[?size=] | cover[?size=]
  *   /media/clubs/{slug}/team/{n}/photo
  *   /media/clubs/{slug}/partners/{n}/logo
@@ -17,6 +19,8 @@ import { imageUrl } from "@/utils/format";
 const SIZES = new Set(["thumbnail", "medium", "large", "original"]);
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const INDEX = /^\d{1,3}$/;
+/** A row's id, or its place in the list ("i2") when it has none. */
+const KEY = /^(i\d{1,3}|[A-Za-z0-9_-]{1,64})$/;
 
 export const sizeOf = (v, fallback = "original") => (SIZES.has(v) ? v : fallback);
 
@@ -38,6 +42,9 @@ export function mediaTarget(segments) {
     }
     if (n === 5 && a === "team" && c === "photo" && INDEX.test(b || "")) {
       return { source: "event", ref, what: "team", pick: (p, size) => imageUrl(p?.team?.[Number(b)]?.photo, sizeOf(size, "medium")) };
+    }
+    if (n === 5 && (a === "sponsors" || a === "partners") && c === "logo" && KEY.test(b || "")) {
+      return { source: "event", ref, what: a === "sponsors" ? "sponsor" : "partner", pick: (p) => backerLogo(p?.[a], b) };
     }
     return null;
   }
@@ -88,6 +95,13 @@ export function posterOf(page, size = "original") {
   if (s === "original") return imageUrl(e.poster, "original") || imageUrl(e.poster_thumb, "original");
   if (s === "large") return imageUrl(e.poster_large, "large") || imageUrl(e.poster, "large") || imageUrl(e.poster_thumb, "large");
   return imageUrl(e.poster_thumb, s) || imageUrl(e.poster, s);
+}
+
+/** A sponsor's or partner's logo: one address (the API sends the medium size), whatever size is asked. */
+function backerLogo(list, key) {
+  const rows = Array.isArray(list) ? list : [];
+  const b = /^i\d+$/.test(key) ? rows[Number(key.slice(1))] : rows.find((x) => x && x.id !== null && String(x.id) === key);
+  return imageUrl(b?.logo, "medium");
 }
 
 function speakerPhoto(page, key, size) {

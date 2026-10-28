@@ -36,7 +36,7 @@ import {
 import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { CANCELLED_TITLE, REFUND_DETAIL, REFUND_NOTE, cancelledLine } from "@/utils/cancelled";
 import { ticketingApi } from "@/api/ticketing";
-import { clubName as clubLabel, parseApproval, requiresApproval } from "@/utils/requests";
+import { approvalNote, clubName as clubLabel, parseApproval, payButton, payLine, requiresApproval, underReviewNote } from "@/utils/requests";
 import {
   anyPaid,
   defaultType,
@@ -80,12 +80,13 @@ import { DiscountCodeField, linkedTypeFrom, TicketPicker, useDiscountCode, useEv
  *   Review    what was entered and the total (with a discount code, checked
  *             as it is typed, on a paid ticket), then Confirm (nothing to
  *             pay) or Pay
- * then "You're in" with the ticket. An event whose club confirms each place
+ * then "You're in" with the ticket. An event that reviews registrations
  * (registration approval: `requires_approval`) has no add-ons step and
- * nothing to pay yet: Review sends a request ("Request a place"), and the
- * answer's `approval` shows "You're on the waiting list" with a link to the
- * request's page instead of a ticket. The form always says it understands
- * that (`accepts_approval`), so the server decides. `?ticket_type=` (a hidden type a club
+ * nothing to pay yet: Review registers ("Register", as anywhere), the API
+ * keeps a registration under review (a request), and the answer's
+ * `approval` shows "You're registered!" with a link to the registration's
+ * page instead of a ticket. The form always says it understands that
+ * (`accepts_approval`), so the server decides. `?ticket_type=` (a hidden type a club
  * shared) chooses that ticket. The step is in the address (?step=),
  * changed with the browser's own history (Next follows it, and the server
  * isn't asked again), so the phone's back button steps back; what was typed
@@ -273,15 +274,16 @@ function Problem({ problem, event, club = null, signedIn, onRetry, onChangeEmail
     title = "Your registration is waiting for payment";
     actions = <AwaitingActions eventId={String(event.id)} onPaid={onPaid} />;
   } else if (problem.kind === "declined") {
-    // The club confirms each place, and said no to this person already: plainly, with the way back.
+    // The club reviews registrations, and declined this person's already: plainly, with the way back.
     tone = "calm";
-    title = "You can't request a place again";
-    text = `${clubLabel(club)} couldn't offer you a place at this event, so another request can't be sent from this email.`;
+    title = "You can't register again";
+    text = `${clubLabel(club)} couldn't confirm your registration for this event, so you can't register again with this email.`;
     actions = backToEvent;
   } else if (problem.kind === "approval") {
     tone = "calm";
-    title = "This event's places are confirmed by the club";
-    actions = (
+    title = "This event reviews registrations now";
+    // Add-ons refused: the form took them off itself, so registering again is the way on. Otherwise a reload.
+    actions = problem.addOns ? null : (
       <button type="button" className="dc-btn dc-btn--ghost dc-btn--sm" onClick={() => window.location.reload()}>
         Reload the page
       </button>
@@ -378,7 +380,7 @@ function Panel({ event, club, icon = "ticket", title, children, actions }) {
 /**
  * Registration isn't open. A full event whose tickets can be waited for
  * (`ticketing`, from GET /events/info/{id}) offers its waiting list here;
- * one whose club confirms each place has none to offer.
+ * one that reviews registrations has none to offer.
  */
 function Closed({ event, club, gate, ticketing = null, onTicketsChanged = null }) {
   const approval = event.requires_approval === true || ticketing?.requiresApproval === true;
@@ -538,22 +540,26 @@ function Registered({ event, club, ticketId }) {
 }
 
 /**
- * Signed in, for an event whose club confirms each place: the person asked
- * for a place already (`ticketing.viewer_request`), and it is still open.
- * Its page, rather than the form again (which would answer with the same request).
+ * Signed in, for an event that reviews registrations: the person registered
+ * already (`ticketing.viewer_request`), and it is still open (under review,
+ * or confirmed and not paid yet). Its page, rather than the form again
+ * (which would answer with the same registration).
  */
 function AskedPanel({ event, club, asked }) {
   const confirmed = asked.status === "approved";
+  // Confirmed and paid: the claim page pays it when the API says where; else the registration's page does.
+  const payHref = asked.pay?.claimToken ? `/claim/${encodeURIComponent(asked.pay.claimToken)}` : asked.path;
+  const href = confirmed ? payHref : asked.path;
   return (
     <Panel
       event={event}
       club={club}
-      title={confirmed ? `${clubLabel(club)} confirmed your place` : "You've asked for a place"}
+      title={confirmed ? "Your registration is confirmed" : "Your registration is under review"}
       actions={
         <>
-          {asked.path ? (
-            <Link className="dc-btn" href={asked.path}>
-              {confirmed ? "Pay for your ticket" : "See your request"}
+          {href ? (
+            <Link className="dc-btn" href={href}>
+              {confirmed ? payButton(asked.pay) : "See your registration"}
             </Link>
           ) : null}
           <Link className="dc-btn dc-btn--ghost" href={eventPath(event)}>
@@ -562,11 +568,7 @@ function AskedPanel({ event, club, asked }) {
         </>
       }
     >
-      <p className="rg-closed-text">
-        {confirmed
-          ? "Pay to get your ticket: the link is in your email too."
-          : `${clubLabel(club)} confirms each place, and your ticket will come by email as soon as they confirm yours.`}
-      </p>
+      <p className="rg-closed-text">{confirmed ? payLine(asked.pay) : underReviewNote(club)}</p>
     </Panel>
   );
 }
@@ -670,8 +672,10 @@ function Flow({ event, club, info, onDone }) {
   // The ticket: a link's hidden type, the one chosen before (the draft), or the only one.
   const linked = useMemo(() => linkedTypeFrom(params.toString()), [params]);
   const tix = useFlowTicketing(eventId, info, linked);
-  // The club confirms each place (registration approval): the form sends a request, and nothing is paid yet.
-  const approval = requiresApproval(info.data, event);
+  // The club reviews every registration (registration approval): it goes in under review, and nothing is paid yet.
+  // `reviewedNow`: the server refused add-ons because the club turned reviewing on after the form loaded.
+  const [reviewedNow, setReviewedNow] = useState(false);
+  const approval = reviewedNow || requiresApproval(info.data, event);
   // Such an event has no waiting list, whatever its tickets still say.
   const ticketing = useMemo(() => (approval ? withoutWaitlist(tix.ticketing) : tix.ticketing), [approval, tix.ticketing]);
   // The ticket the person picked here; until they do, the one chosen for them (worked out as the page draws).
@@ -714,7 +718,7 @@ function Flow({ event, club, info, onDone }) {
   const ready = info.status === "ready" && items !== null && tix.ready;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
   const infoFee = Number(info.data?.reg_fee) > 0 ? Number(info.data.reg_fee) : null;
-  // A request carries no add-ons (the API keeps none with it), so the shelf isn't offered.
+  // A registration under review carries no add-ons (the API keeps none with it), so the shelf isn't offered.
   const shelf = useMemo(() => (approval ? [] : items || []), [items, approval]);
   const chooseTicket = needsPicker(ticketing);
   const steps = useMemo(() => stepsFor({ questions, items: shelf, chooseTicket }), [questions, shelf, chooseTicket]);
@@ -744,7 +748,7 @@ function Flow({ event, club, info, onDone }) {
   const addOns = picksTotal(shelf, picks);
   const total = fee === null ? null : Math.max(0, fee - discount) + addOns;
   const pays = total === null || total > 0;
-  // Paid now, at the end of the form: never for a request (a confirmed paid place gets a link to pay).
+  // Paid now, at the end of the form: never under review (a confirmed paid ticket gets a link to pay).
   const paysNow = pays && !approval;
   const ticketLabel = chooseTicket || namesType ? chosen?.name || null : null;
   const lines = useMemo(
@@ -757,7 +761,7 @@ function Flow({ event, club, info, onDone }) {
   // (`whatsapp_updates`): the form's GET /events/info says it freshest; until it does, the event
   // page's club. Without the flag at all, the box never shows and nothing is sent.
   const formClub = info.data?.club;
-  // The club that confirms each place, named as the form or the event page names it.
+  // The club that reviews the registrations, named as the form or the event page names it.
   const confirmerClub = formClub?.name ? formClub : club;
   const offersUpdates = typeof formClub?.whatsapp_updates === "boolean" ? formClub.whatsapp_updates : offersClubUpdates(club);
   const clubName = formClub?.name || club?.name || "";
@@ -928,7 +932,7 @@ function Flow({ event, club, info, onDone }) {
     scrollTop();
   };
 
-  /** The club confirms each place: a request went in, not a registration. */
+  /** The club reviews registrations: this one went in under review (a request), with no ticket yet. */
   const requested = (asked) => {
     busy.current = false;
     setPhase("idle");
@@ -949,8 +953,10 @@ function Flow({ event, club, info, onDone }) {
   };
 
   const showError = (error) => {
-    // A request (the club confirms each place) is never offered a waiting list, whatever the refusal says.
+    // A registration under review is never offered a waiting list, whatever the refusal says.
     const p = describeRegisterError(error, questions.map((q) => q.key), { approval });
+    // Add-ons refused because the club reviews registrations now: the form becomes that event's form, add-ons gone.
+    if (p.kind === "approval" && p.addOns) setReviewedNow(true);
     // The tickets changed under the form (sold out, off sale, full): read them again.
     if (p.ticketTypes || p.kind === "full") tix.reload();
     if (p.kind === "fields" && p.fields.discount_code) code.refuse(p.fields.discount_code);
@@ -1026,7 +1032,7 @@ function Flow({ event, club, info, onDone }) {
     let responseData = null;
     try {
       responseData = await eventsApi.registerForEvent(eventId, payload);
-      // The club confirms each place: a request, with no ticket and nothing to pay yet.
+      // The club reviews registrations: under review, with no ticket and nothing to pay yet.
       const asked = parseApproval(responseData);
       if (asked) {
         requested(asked);
@@ -1115,26 +1121,26 @@ function Flow({ event, club, info, onDone }) {
   }
 
   const isReview = step.id === "review";
-  const title = isReview ? (approval ? "Review and send" : pays ? "Review and pay" : "Review and confirm") : step.title;
-  const confirmer = clubLabel(confirmerClub);
+  const title = isReview ? (approval ? "Review and register" : pays ? "Review and pay" : "Review and confirm") : step.title;
+  const reviews = approvalNote(confirmerClub);
   const ledes = {
     ticket: `${club?.name || "The organisers"} sell${club?.name ? "s" : ""} more than one kind of ticket for this event. Pick yours.`,
     details: approval
-      ? `It takes a minute. ${confirmer} confirms each place, and your ticket comes by email when they do.`
+      ? `It takes a minute. ${reviews}`
       : accountEmail
         ? "It takes a minute. Your ticket comes by email and lands in your MyOtherApp app."
         : "It takes a minute. Your ticket comes by email.",
     questions: `${club?.name || "The organisers"} would like to know a little more. Questions marked * need an answer.`,
     addons: "Paid together with your registration and collected at the event. Skip it if you don't want anything.",
     review: approval
-      ? `Check everything is right, then send your request. ${confirmer} confirms each place${pays ? ", and you pay only once they do" : ""}.`
+      ? `Check everything is right, then register. ${reviews}${pays ? " You pay only if yours is confirmed." : ""}`
       : "Check everything is right before you go ahead.",
   };
   const suggestion = touched.email ? suggestEmail(values.email) : null;
   const busyNow = phase !== "idle";
   const go = isReview
     ? approval
-      ? "Request a place"
+      ? "Register"
       : pays
         ? total === null
           ? "Continue to payment"
@@ -1143,7 +1149,7 @@ function Flow({ event, club, info, onDone }) {
     : editing
       ? "Save and review"
       : "Continue";
-  const busyLabel = phase === "paying" ? "Opening payment…" : approval ? "Sending your request…" : "Registering…";
+  const busyLabel = phase === "paying" ? "Opening payment…" : "Registering…";
   const problemHere = problem && (problem.step || "review") === step.id;
 
   return (
@@ -1377,12 +1383,18 @@ function Flow({ event, club, info, onDone }) {
                 </div>
                 {showCode ? <DiscountCodeField code={code} error={serverErrors.discount_code || null} onChanged={() => changed("discount_code")} /> : null}
                 <Lines lines={lines} total={total} />
+                {approval && items?.length ? (
+                  <p className="rg-mailnote">
+                    <Icon name="bag" size={16} />
+                    <span>Add-ons can&rsquo;t be picked when registrations are reviewed.</span>
+                  </p>
+                ) : null}
                 <p className="rg-mailnote">
                   <Icon name="mail" size={16} />
                   {approval ? (
                     <span>
-                      We&rsquo;ll email <strong>{values.email}</strong> as soon as {clubLabel(confirmerClub, { start: false })} confirms your place
-                      {pays ? ", with a link to pay." : ", with your ticket."}
+                      If {clubLabel(confirmerClub, { start: false })} confirms your registration, we&rsquo;ll email <strong>{values.email}</strong>
+                      {pays ? " a link to pay." : " your ticket."}
                     </span>
                   ) : (
                     <span>
@@ -1452,7 +1464,7 @@ function Flow({ event, club, info, onDone }) {
                 </button>
               ) : null}
               <p className={`rg-bar-total${isReview ? " is-review" : ""}`}>
-                {/* A request pays nothing now: what the ticket costs, once the club confirms. */}
+                {/* Under review, nothing is paid now: what the ticket costs, once the club confirms. */}
                 <span>{approval ? "Price" : "Total"}</span>
                 <strong>{total === null ? "Paid" : total > 0 ? rupees(total) : "Free"}</strong>
               </p>
@@ -1514,7 +1526,7 @@ export default function Register({ event, club = null }) {
   // The form needs its questions; signed in, the person's own registration matters even when the form is closed.
   const info = useEventInfo(eventId, auth.ready && !done && (open || (signedIn && !ended)), who);
   const mine = signedIn && info.who === who ? myRegistration(info.data) : null;
-  // Signed in, a request for a place still open (the club confirms each one).
+  // Signed in, a registration still under review (or confirmed, not paid yet) on an event that reviews them.
   const asked = signedIn && info.who === who ? viewerRequestOf(info.data?.ticketing) : null;
   // A full event's tickets (the public list, which counts no visit) say whether its waiting list can be joined.
   const { ticketing: closedTickets, reload: reloadClosed } = useEventTicketing(eventId, { enabled: !done && gate.kind === "full" });
