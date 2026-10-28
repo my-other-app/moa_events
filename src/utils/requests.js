@@ -100,6 +100,16 @@ export const clubName = (club, { start = true } = {}) => str(club?.name) || (sta
 export const approvalNote = (club) => `${clubName(club)} confirms each place. You’ll get your ticket by email when they do.`;
 
 /**
+ * Where an open event with nobody going yet says "Be the first to register":
+ * on an event whose club confirms each place, "Circuit Society confirms each
+ * place" instead (people may have asked already; the page shows no request numbers).
+ */
+export const confirmsEachPlace = (club) => `${clubName(club)} confirms each place`;
+
+/** Nobody going yet: what the event says in place of a count. */
+export const nobodyGoingLine = (event, club) => (event?.requires_approval === true ? confirmsEachPlace(club) : "Be the first to register");
+
+/**
  * The event's "Confirm each registration" setting: the form's GET
  * /events/info (freshest) says it at the top or in its `ticketing`;
  * otherwise the event page's. False when nobody says it (an older server).

@@ -3,7 +3,9 @@ import { apiFailure } from "./ticketing";
 import {
   approvalNote,
   clubName,
+  confirmsEachPlace,
   describeRequestError,
+  nobodyGoingLine,
   openRequests,
   parseApproval,
   parseRequest,
@@ -189,5 +191,19 @@ describe("what a refusal means", () => {
     const now = describeRequestError(fail(409, { error_code: "REQUEST_NOT_WITHDRAWABLE", errors: { request: REQUEST({ status: "approved", ticket_id: "MOA1" }) } }));
     expect(now).toMatchObject({ kind: "changed", request: { status: "approved", ticketId: "MOA1" } });
     expect(describeRequestError(fail(500)).kind).toBe("message");
+  });
+});
+
+describe("the public line in place of \"Be the first to register\"", () => {
+  it("names the club that confirms each place, and never a number", () => {
+    expect(confirmsEachPlace({ name: "Circuit Society" })).toBe("Circuit Society confirms each place");
+    expect(confirmsEachPlace(null)).toBe("The club confirms each place");
+  });
+
+  it("is the old line for an event without the setting (or an API that doesn't say)", () => {
+    expect(nobodyGoingLine({ requires_approval: true }, { name: "Circuit Society" })).toBe("Circuit Society confirms each place");
+    expect(nobodyGoingLine({ requires_approval: false }, { name: "Circuit Society" })).toBe("Be the first to register");
+    expect(nobodyGoingLine({}, null)).toBe("Be the first to register");
+    expect(nobodyGoingLine(null, null)).toBe("Be the first to register");
   });
 });

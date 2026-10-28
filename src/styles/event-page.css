@@ -225,6 +225,17 @@ a.ep-chip:hover {
   border-color: transparent;
   background: var(--dc-accent);
 }
+/* The club's "High demand" label: solid colours of its own (dark orange on pale orange, about 7:1). */
+.ep-chip--demand {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: var(--dc-demand-ink);
+}
+.ep-chip--demand svg {
+  flex: none;
+  color: var(--dc-demand);
+  fill: currentColor;
+}
 .ep-title {
   font-family: var(--dc-display);
   font-weight: 400;

@@ -1,7 +1,8 @@
 import { Link } from "@/lib/router";
 import { dateTile, eventUrl, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { EventTickets } from "../register/eventtickets";
-import { formatCount, formatPrice, plural } from "@/utils/format";
+import { formatCount, formatPrice, plural, showsHighDemand } from "@/utils/format";
+import { confirmsEachPlace } from "@/utils/requests";
 import { topicPagePath } from "@/seo/urls";
 import { Agenda } from "./agenda";
 import { Avatar, Section } from "./bits";
@@ -63,15 +64,17 @@ function ClubRow({ club }) {
   );
 }
 
-function Facts({ event, venueLink }) {
+function Facts({ event, club, venueLink }) {
   const lines = scheduleLines(event);
   const tile = dateTile(event.starts_at);
   // A cancelled event has no seats to speak of.
   const left = event.status === "cancelled" ? null : seatsLeft(event);
+  // Nobody going yet at an event whose club confirms each place: say that, never how many asked.
+  const confirms = event.requires_approval === true && event.status !== "ended" ? confirmsEachPlace(club) : null;
   const people =
     event.status === "cancelled"
       ? ""
-      : [event.going > 0 ? `${formatCount(event.going)} going` : null, left !== null && left > 0 ? `${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : null]
+      : [event.going > 0 ? `${formatCount(event.going)} going` : confirms, left !== null && left > 0 ? `${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : null]
           .filter(Boolean)
           .join(" · ");
   return (
@@ -152,14 +155,22 @@ export function EventView({ page }) {
 
   const cancelled = event.status === "cancelled";
   const regState = registerState(event);
+  // The club's "High demand" label (no numbers), while the event is still to come or on.
+  const demand = showsHighDemand(event);
 
   return (
     <article className="ep" aria-labelledby="ep-title">
       <div className="dc-wrap">{cancelled ? null : <LiveStrips event={{ id: event.id, slug: event.slug, status: event.status }} />}</div>
       <div className="dc-wrap ep-layout">
         <header className="ep-intro">
-          {event.category || prize || topics.length ? (
+          {event.category || prize || topics.length || demand ? (
             <p className="ep-chips">
+              {demand ? (
+                <span className="ep-chip ep-chip--demand">
+                  <Icon name="zap" size={14} />
+                  High demand
+                </span>
+              ) : null}
               {event.category ? <span className="ep-chip ep-chip--cat">{event.category.name}</span> : null}
               {topics.map((t) => (
                 <Link key={t.slug} className="ep-chip ep-chip--topic" to={topicPagePath(t)} style={topicTone(t)}>
@@ -179,7 +190,7 @@ export function EventView({ page }) {
           </h1>
           <CancelledNotice event={event} />
           {club ? <ClubRow club={club} /> : null}
-          <Facts event={event} venueLink={hasVenue && !event.is_online} />
+          <Facts event={event} club={club} venueLink={hasVenue && !event.is_online} />
           <div className="ep-actions">
             <ShareButton title={event.name} text={club ? `${event.name} — ${club.name}` : event.name} url={url} />
             {cancelled ? null : <CalendarButton event={calendarEvent(event)} url={url} />}
@@ -199,6 +210,7 @@ export function EventView({ page }) {
             eventId={String(event.id)}
             kind={regState.kind}
             registerHref={regState.kind === "open" ? regState.href || null : regState.kind === "live" ? regState.also?.href || null : null}
+            approval={event.requires_approval === true}
           />
 
           {hasAbout ? (

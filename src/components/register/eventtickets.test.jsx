@@ -21,7 +21,7 @@ const { AuthProvider } = await import("@/auth/AuthProvider");
 const { parseTicketing } = await import("@/utils/ticketing");
 const { RegisterGo } = await import("./registercta.jsx");
 const { EventTickets } = await import("./eventtickets.jsx");
-const { forgetTicketing } = await import("./tickets.jsx");
+const { forgetTicketing, WaitlistJoin } = await import("./tickets.jsx");
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
 const TT = (over = {}) => ({ id: 12, name: "Early bird", description: null, price: 199, is_free: false, available: 23, status: "on_sale", waitlist: false, ...over });
@@ -186,5 +186,89 @@ describe("a cancelled event", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(eventsApi.fetchEvent).not.toHaveBeenCalled();
     expect(ticketingApi.types).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * An event whose club confirms each place has no waiting list: people
+ * request a place and wait in the club's queue. The server now says the list
+ * is off; an older one may still say it is on, and the page offers none.
+ */
+describe("an event whose club confirms each place", () => {
+  const showApproval = (state, { approval = true } = {}) =>
+    render(
+      <MemoryRouter initialEntries={["/events/hack-night-04"]}>
+        <AuthProvider>
+          <div className="ep-cta-go">
+            <RegisterGo eventId="123" state={state} club={{ name: "Circuit Society" }} approval={approval} />
+          </div>
+          <EventTickets eventId="123" kind={state.kind} registerHref={state.kind === "open" ? state.href : null} approval={approval} />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+  const REQUEST = { ...OPEN, label: "Request a place" };
+  // What an older server still sends: the list on, and a sold-out type offering it.
+  const stillOn = (over = {}) =>
+    ticketing({
+      sold_out: true,
+      types: [TT({ status: "sold_out", available: 0, waitlist: true }), TT({ id: 13, name: "VIP", status: "sold_out", available: 0, waitlist: true })],
+      ...over,
+    });
+
+  it("full: the card's button stays the server's, with no Join the waiting list anywhere", async () => {
+    ticketingApi.types.mockResolvedValue(stillOn({ requires_approval: true }));
+    showApproval(FULL);
+    await waitFor(() => expect(ticketingApi.types).toHaveBeenCalled());
+    const section = await screen.findByRole("region", { name: "Tickets" });
+    expect(screen.getByRole("button", { name: "Event full" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Join the waiting list" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Join the waiting list/ })).toBeNull();
+    expect(within(section).queryByText(/waiting list/)).toBeNull();
+    expect(within(section).getAllByText("Sold out")).toHaveLength(2);
+  });
+
+  it("sold out while open: Sold out, not the waiting list", async () => {
+    ticketingApi.types.mockResolvedValue(stillOn({ requires_approval: true, types: [TT({ status: "sold_out", available: 0, waitlist: true })], requires_choice: false }));
+    showApproval(REQUEST);
+    expect(await screen.findByRole("button", { name: "Sold out" })).toBeDisabled();
+    expect(screen.queryByText(/waiting list/i)).toBeNull();
+  });
+
+  it("known only from the event (the tickets don't say): still no waiting list", async () => {
+    ticketingApi.types.mockResolvedValue(stillOn());
+    showApproval(FULL);
+    await waitFor(() => expect(ticketingApi.types).toHaveBeenCalled());
+    await screen.findByRole("region", { name: "Tickets" });
+    expect(screen.queryByRole("link", { name: "Join the waiting list" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Join the waiting list/ })).toBeNull();
+    expect(screen.queryByText(/waiting list open/)).toBeNull();
+  });
+
+  it("the same tickets on an event without the setting still offer the list", async () => {
+    ticketingApi.types.mockResolvedValue(stillOn());
+    showApproval(FULL, { approval: false });
+    expect(await screen.findByRole("link", { name: "Join the waiting list" })).toBeInTheDocument();
+  });
+});
+
+describe("joining refused because the club confirms each place", () => {
+  it("says so plainly, with no button to try again", async () => {
+    ticketingApi.joinWaitlist.mockRejectedValue({
+      response: { status: 409, data: { message: "Waitlist is off", error_code: "WAITLIST_OFF_ON_APPROVAL_EVENTS" } },
+    });
+    render(
+      <MemoryRouter>
+        <WaitlistJoin eventId="123" types={[{ id: 12, name: "Early bird", price: 199, isFree: false }]} onJoined={vi.fn()} onCancel={vi.fn()} />
+      </MemoryRouter>,
+    );
+    const form = screen.getByRole("group", { name: "Join the waiting list" });
+    fireEvent.change(within(form).getByLabelText(/^Name/), { target: { value: "Asha Rao" } });
+    fireEvent.change(within(form).getByLabelText(/^Email/), { target: { value: "asha@example.org" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Join the waiting list" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This event has no waiting list: the club confirms each place. Request a place instead, and they'll let you know.",
+    );
+    expect(within(form).queryByRole("button", { name: "Join the waiting list" })).toBeNull();
+    expect(within(form).getByRole("button", { name: "Not now" })).toBeInTheDocument();
   });
 });

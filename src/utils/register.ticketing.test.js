@@ -110,3 +110,20 @@ describe("what the server's refusals mean", () => {
     });
   });
 });
+
+describe("a request (the club confirms each place)", () => {
+  const err = (status, data) => describeRegisterError({ response: { status, data } }, [], { approval: true });
+
+  it("is never offered a waiting list, whatever the refusal says", () => {
+    const full = err(400, envelope("Event is full", "EVENT_FULL", { max_participants: 60, waitlist: true }));
+    expect(full).toEqual({ kind: "full", title: "This event is full", message: "All 60 seats are taken. Keep an eye on the event page in case one opens up." });
+    const sold = err(409, envelope("Sold out", "TICKET_TYPE_SOLD_OUT", { waitlist: true }));
+    expect(sold.waitlist).toBe(false);
+    expect(sold.fields.ticket_type).toBe("This ticket just sold out. Choose another.");
+  });
+
+  it("a registration still is, as before", () => {
+    const full = describeRegisterError({ response: { status: 400, data: envelope("Event is full", "EVENT_FULL", { waitlist: true }) } });
+    expect(full.waitlist).toBe(true);
+  });
+});

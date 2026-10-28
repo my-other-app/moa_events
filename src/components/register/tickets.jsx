@@ -511,16 +511,19 @@ export function WaitlistJoin({ eventId, types, typeId: firstType = null, account
         </p>
       ) : null}
       <div className="wl-join-actions">
-        <button type="button" className="dc-btn dc-btn--sm" onClick={submit} disabled={busy}>
-          {busy ? (
-            <>
-              <Spinner />
-              Joining…
-            </>
-          ) : (
-            "Join the waiting list"
-          )}
-        </button>
+        {/* The server says the club confirms each place here: there is nothing to join, so no button to try again. */}
+        {problem?.kind === "approval" ? null : (
+          <button type="button" className="dc-btn dc-btn--sm" onClick={submit} disabled={busy}>
+            {busy ? (
+              <>
+                <Spinner />
+                Joining…
+              </>
+            ) : (
+              "Join the waiting list"
+            )}
+          </button>
+        )}
         {onCancel ? (
           <button type="button" className="rg-textbtn" onClick={onCancel} disabled={busy}>
             Not now
@@ -592,8 +595,12 @@ const openTypeOf = (open) => (open && typeof open === "object" ? (open.typeId ??
  * `open` (a type id, `{typeId}`, or true) opens the join form: the picker's
  * "Join the waiting list for …", or the event page's button. `onChanged()`
  * after joining or leaving, so the page reads the tickets again.
+ *
+ * An event whose club confirms each place (`approval`, or its tickets say
+ * so) offers no waiting list at all: only places someone already holds in
+ * line are shown.
  */
-export function WaitlistPanel({ eventId, ticketing, open: openWith = null, fallbackTypes = null, onChanged = null, headingLevel = 2 }) {
+export function WaitlistPanel({ eventId, ticketing, open: openWith = null, fallbackTypes = null, onChanged = null, headingLevel = 2, approval = false }) {
   const auth = useAuth();
   const signedIn = auth.ready && auth.status === "signed-in";
   const account = signedIn ? auth.user : null;
@@ -619,8 +626,9 @@ export function WaitlistPanel({ eventId, ticketing, open: openWith = null, fallb
   const shown = guest ? [...entries.filter((e) => e.id !== guest.id), guest] : entries;
   const live = liveEntries(shown);
   const waiting = new Set(live.map((e) => e.ticketTypeId));
-  const listed = waitlistTypes(ticketing);
-  const types = (listed.length ? listed : fallbackTypes || []).filter((t) => !waiting.has(t.id));
+  const noLine = approval || ticketing?.requiresApproval === true;
+  const listed = noLine ? [] : waitlistTypes(ticketing);
+  const types = noLine ? [] : (listed.length ? listed : fallbackTypes || []).filter((t) => !waiting.has(t.id));
   if (!live.length && !types.length) return null;
 
   const joined = async (entry, contact) => {

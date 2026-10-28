@@ -165,3 +165,24 @@ describe("the formats", () => {
     expect(timeAgo("2026-10-01T09:00:00Z", now)).toBe("1 Oct");
   });
 });
+
+describe("the High demand pill", () => {
+  it("sits on the poster when the club has its label on, beside the other pills", () => {
+    const { c, article } = show({ high_demand: true, status: "closing_soon" });
+    const pill = c.getByText("High demand");
+    expect(pill).toHaveClass("dc-pill", "dc-pill--demand");
+    expect(article.querySelector(".dc-evcard-pills")).toHaveTextContent("Closing soonHigh demandFree");
+  });
+
+  it("isn't there without the label, from an API that doesn't send it, or once it has ended", () => {
+    expect(show({ high_demand: false }).c.queryByText("High demand")).toBeNull();
+    expect(show().c.queryByText("High demand")).toBeNull();
+    expect(show({ high_demand: true, status: "ended" }).c.queryByText("High demand")).toBeNull();
+  });
+
+  it("the compact row says it beside the status", () => {
+    const { c } = show({ high_demand: true, status: "closing_soon" }, { variant: "row" });
+    expect(c.getByText("High demand")).toHaveClass("dc-evcard-status", "dc-evcard-status--demand");
+    expect(c.getByText("Closing soon")).toBeInTheDocument();
+  });
+});
