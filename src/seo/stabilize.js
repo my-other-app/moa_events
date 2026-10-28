@@ -6,12 +6,12 @@
  * are given, so they need no change. A missing image stays missing (null),
  * so the drawn covers and initials still show.
  *
- * Sizes keep working: a poster becomes {thumbnail, medium, original}, each
- * a /media link with ?size=, and imageUrl(poster, size) picks as before.
+ * Sizes keep working: a poster becomes {thumbnail, medium, large, original},
+ * each a /media link with ?size=, and imageUrl(poster, size) picks as before.
  */
 import { eventRefOf, media } from "./urls";
 
-const sizes = (make) => ({ thumbnail: make("thumbnail"), medium: make("medium"), original: make("original") });
+const sizes = (make) => ({ thumbnail: make("thumbnail"), medium: make("medium"), large: make("large"), original: make("original") });
 
 /** A club as an event card (or a post) carries it. */
 export function stableClubRef(club) {
@@ -51,6 +51,8 @@ export function stableEventPage(page) {
       ...page.event,
       poster: page.event.poster ? sizes((s) => media.eventPoster(ref, s)) : null,
       poster_thumb: page.event.poster_thumb ? media.eventPoster(ref, "medium") : null,
+      // Only /media reads it (posterOf), from the page before this.
+      poster_large: null,
     },
     club: page.club
       ? {

@@ -684,6 +684,8 @@ export function parseEventDetail(e) {
     about: textOf(o.about),
     poster: o.poster || null,
     poster_thumb: o.poster_thumb || null,
+    // About twice a card's width (newer APIs only): what /media/events/{ref}/poster?size=large answers with.
+    poster_large: o.poster_large || null,
     starts_at: isoOrNull(o.starts_at),
     ends_at: isoOrNull(o.ends_at),
     duration_hours: positive(o.duration_hours),

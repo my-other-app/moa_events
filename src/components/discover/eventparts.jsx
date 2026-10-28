@@ -5,6 +5,7 @@ import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
 import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
+import { PosterImg } from "./picture";
 import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
 import Icon from "./icons";
@@ -71,8 +72,11 @@ export function Cover({ event }) {
 
 /**
  * The poster at 4:5 with the status pill on it, or the generated cover.
- * Not lazy: it's the first thing seen. A poster that fails to load gives way
- * to the cover (the one client part, in img.jsx).
+ * Never cropped: a poster of another shape shows whole, on a soft blurred
+ * copy of itself (PosterImg). The original: the frame is up to about 560px
+ * wide on a phone, more than half the large size. Not lazy: it's the first
+ * thing seen. A poster that fails to load gives way to the cover (the one
+ * client part, in picture.jsx).
  */
 export function Poster({ event }) {
   const src = imageUrl(event.poster, "original");
@@ -80,7 +84,7 @@ export function Poster({ event }) {
   return (
     <div className="ep-poster">
       {src ? (
-        <Img src={src} alt={`Poster for ${event.name}`} loading="eager" fetchPriority="high" width="800" height="1000" fallback={<Cover event={event} />} />
+        <PosterImg src={src} alt={`Poster for ${event.name}`} loading="eager" fetchPriority="high" width="800" height="1000" fallback={<Cover event={event} />} />
       ) : (
         <Cover event={event} />
       )}

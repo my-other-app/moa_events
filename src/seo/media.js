@@ -3,7 +3,7 @@
  * link it leads to stays good. Pure: the route handler
  * (src/app/media/[...path]/route.js) fetches, these decide.
  *
- *   /media/events/{ref}/poster[?size=]              the poster (else the drawn cover)
+ *   /media/events/{ref}/poster[?size=]              the poster (else the drawn cover); size: thumbnail | medium | large | original
  *   /media/events/{ref}/cover                        the drawn cover, as a PNG
  *   /media/events/{ref}/speakers/{id | iN}/photo     a speaker's photo
  *   /media/events/{ref}/team/{n}/photo               someone on the event's team
@@ -14,7 +14,7 @@
  */
 import { imageUrl } from "@/utils/format";
 
-const SIZES = new Set(["thumbnail", "medium", "original"]);
+const SIZES = new Set(["thumbnail", "medium", "large", "original"]);
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const INDEX = /^\d{1,3}$/;
 
@@ -75,12 +75,18 @@ export function mediaOrigin(...values) {
   return null;
 }
 
-/** The poster at a size: the original from `poster`, the smaller ones from `poster_thumb` when there is one. */
+/**
+ * The poster at a size: the original from `poster`, the smaller ones from
+ * `poster_thumb` when there is one. The large (what a card asks for, about
+ * twice its width: utils/pictures.js) from `poster_large` when the API sends
+ * it, else the original: sharp, never the soft medium.
+ */
 export function posterOf(page, size = "original") {
   const e = page?.event;
   if (!e) return null;
   const s = sizeOf(size);
   if (s === "original") return imageUrl(e.poster, "original") || imageUrl(e.poster_thumb, "original");
+  if (s === "large") return imageUrl(e.poster_large, "large") || imageUrl(e.poster, "large") || imageUrl(e.poster_thumb, "large");
   return imageUrl(e.poster_thumb, s) || imageUrl(e.poster, s);
 }
 

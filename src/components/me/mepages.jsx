@@ -9,11 +9,12 @@ import { useAuth } from "@/auth/context";
 import { guestToken } from "@/auth/session";
 import { eventPath, whenLine } from "@/utils/eventpage";
 import { formatWhen, imageUrl } from "@/utils/format";
+import { sizeFor } from "@/utils/pictures";
 import { rupees } from "@/utils/register";
 import { openRequests, requestPath } from "@/utils/requests";
 import { VerifyBanner } from "../auth/verifyemail";
 import { SitePage } from "../discover/chrome";
-import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
+import { EmptyState, ErrorState, PosterImg, StoreButtons } from "../discover/bits";
 import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
 import { EventCover } from "../discover/cover";
 import Icon from "../discover/icons";
@@ -166,10 +167,11 @@ function Reading({ label }) {
 
 /* ---------- /me/tickets ---------- */
 
+/** The poster, small and whole (76px at most: styles/account.css). */
 function Thumb({ event }) {
   return (
     <span className="me-thumb">
-      <Img src={imageUrl(event.poster, "medium")} alt="" fallback={<EventCover event={event} />} />
+      <PosterImg src={imageUrl(event.poster, sizeFor("poster", 76))} alt="" fallback={<EventCover event={event} />} small />
     </span>
   );
 }

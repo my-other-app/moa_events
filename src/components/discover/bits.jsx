@@ -1,6 +1,7 @@
 import { Link } from "@/lib/router";
 import { imageUrl, initial } from "@/utils/format";
-import { Img } from "./img";
+import { sizeFor } from "@/utils/pictures";
+import { LogoImg } from "./picture";
 import Icon from "./icons";
 
 /*
@@ -10,14 +11,18 @@ import Icon from "./icons";
  * all from here as before.
  */
 export { Img } from "./img";
+export { LogoImg, PosterImg } from "./picture";
 export { AppPrompt, Dialog } from "./dialog";
 export { AppleGlyph, PlayGlyph, StoreButtons } from "./stores";
 
-/** A club's round logo, or its initial when it has none. */
+/**
+ * A club's round logo, or its initial when it has none. A logo that is not
+ * square sits whole inside the circle, on white, never cut (LogoImg).
+ */
 export function Avatar({ name, src, size = 32, alt = "" }) {
   return (
     <span className="dc-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.5) }}>
-      <Img src={imageUrl(src, size > 64 ? "medium" : "thumbnail")} alt={alt} fallback={<span aria-hidden="true">{initial(name)}</span>} />
+      <LogoImg src={imageUrl(src, sizeFor("logo", size))} alt={alt} fallback={<span aria-hidden="true">{initial(name)}</span>} />
     </span>
   );
 }

@@ -102,11 +102,6 @@
   border-radius: 10px;
   background: var(--dc-sunken);
 }
-.rg-thumb > img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 .rg-sum-id {
   min-width: 0;
 }

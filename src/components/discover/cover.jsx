@@ -52,7 +52,7 @@ export function EventCover({ event, label }) {
 }
 
 /** A wide cover for a club with none of its own, in the same family as the event covers. */
-export function ClubCover({ club, w = 160, h = 70 }) {
+export function ClubCover({ club, w = 180, h = 60 }) {
   const look = coverLook({ id: club?.slug || club?.id || club?.name });
   return (
     <div className={`dc-cover dc-cover--wide dc-cover--${look.palette.name}`} style={{ background: look.palette.bg }} aria-hidden="true">

@@ -29,6 +29,11 @@ describe("a media address", () => {
     expect(posterOf(page, "original")).toBe("https://s3/p.png?Expires=1");
     expect(posterOf(page, "medium")).toBe("https://s3/p.medium.png?Expires=1");
     expect(posterOf(page, "nonsense")).toBe("https://s3/p.png?Expires=1");
+    // A card's large: the original while the API sends no large, never the soft medium; the large once it does.
+    expect(posterOf(page, "large")).toBe("https://s3/p.png?Expires=1");
+    const withLarge = parseEventPage(fullEvent({ event: { ...fullEvent().event, poster: "https://s3/p.png", poster_thumb: "https://s3/p.medium.png", poster_large: "https://s3/p.large.png" } }));
+    expect(posterOf(withLarge, "large")).toBe("https://s3/p.large.png");
+    expect(posterOf(withLarge, "medium")).toBe("https://s3/p.medium.png");
     const speaker = mediaTarget(["events", "hack-night-04", "speakers", "1", "photo"]);
     const withPhoto = parseEventPage(fullEvent({ speakers: [{ id: 1, name: "Ananya", photo: "https://s3/a.jpg" }, { id: null, name: "Rahul", photo: "https://s3/r.jpg" }] }));
     expect(speaker.pick(withPhoto)).toBe("https://s3/a.jpg");
@@ -36,6 +41,10 @@ describe("a media address", () => {
     const club = parseClubPage({ club: { id: 3, slug: "c", name: "C", logo: { thumbnail: "https://s3/l-t.png", medium: "https://s3/l-m.png" } }, partners: [{ name: "Acme", logo: "https://s3/acme.png" }] });
     expect(mediaTarget(["clubs", "c", "logo"]).pick(club)).toBe("https://s3/l-t.png");
     expect(mediaTarget(["clubs", "c", "logo"]).pick(club, "medium")).toBe("https://s3/l-m.png");
+    // A banner has no thumbnail: its large, else the next best.
+    const covered = parseClubPage({ club: { id: 3, slug: "c", name: "C", cover: { medium: "https://s3/c-m.png", large: "https://s3/c-l.png", original: "https://s3/c.png" } } });
+    expect(mediaTarget(["clubs", "c", "cover"]).pick(covered, "large")).toBe("https://s3/c-l.png");
+    expect(mediaTarget(["clubs", "c", "cover"]).pick(covered, "medium")).toBe("https://s3/c-m.png");
     expect(mediaTarget(["clubs", "c", "partners", "0", "logo"]).pick(club)).toBe("https://s3/acme.png");
     expect(mediaTarget(["clubs", "c", "partners", "5", "logo"]).pick(club)).toBeNull();
   });
@@ -79,6 +88,7 @@ describe("a page's images, before it is cached", () => {
     expect(page.event.poster).toEqual({
       thumbnail: "/media/events/hack-night-04/poster?size=thumbnail",
       medium: "/media/events/hack-night-04/poster?size=medium",
+      large: "/media/events/hack-night-04/poster?size=large",
       original: "/media/events/hack-night-04/poster",
     });
     expect(page.club.logo.thumbnail).toBe("/media/clubs/circuit-society/logo?size=thumbnail");

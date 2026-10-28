@@ -633,11 +633,6 @@
   border-radius: 10px;
   background: var(--dc-sunken);
 }
-.me-thumb > img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 .me-ticket-info {
   min-width: 0;
 }
