@@ -223,6 +223,47 @@ export function Speakers({ speakers }) {
   );
 }
 
+/**
+ * The event's own sponsors, or its partners: square tiles, each with the
+ * logo whole (never cropped; the initials while it loads or without one),
+ * the name, and the label under it. A tile with a link opens it in a new tab;
+ * a sponsor's is marked `sponsored`, as search engines ask of paid links.
+ */
+export function Backers({ kind, items }) {
+  const sponsors = kind === "sponsor";
+  const title = sponsors ? (items.length === 1 ? "Sponsor" : "Sponsors") : items.length === 1 ? "Partner" : "Partners";
+  return (
+    <EpSection id={sponsors ? "sponsors" : "partners"} title={title}>
+      <ul className="ep-backers">
+        {items.map((b, i) => {
+          const href = b.link ? safeHref(b.link) : null;
+          const body = (
+            <>
+              <span className="ep-backer-logo">
+                <span aria-hidden="true">{initials(b.name)}</span>
+                <Img src={b.logo} alt="" />
+              </span>
+              <span className="ep-backer-name">{b.name}</span>
+              {b.label ? <span className="ep-backer-label">{b.label}</span> : null}
+            </>
+          );
+          return (
+            <li key={b.id ?? `${b.name}-${i}`}>
+              {href && href.startsWith("https:") ? (
+                <a className="ep-backer ep-backer--link" href={href} target="_blank" rel={sponsors ? "sponsored noopener noreferrer" : "noopener noreferrer"} aria-label={`${b.name}${b.label ? `, ${b.label}` : ""} (opens in a new tab)`}>
+                  {body}
+                </a>
+              ) : (
+                <div className="ep-backer">{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </EpSection>
+  );
+}
+
 const PERSON_LINKS = [
   ["instagram", "Instagram", "instagram"],
   ["linkedin", "LinkedIn", "linkedin"],
