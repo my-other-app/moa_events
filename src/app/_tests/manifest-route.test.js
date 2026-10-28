@@ -11,7 +11,7 @@ describe("/manifest.webmanifest", () => {
   it("names the site, in Indian English, and points to the Android app", async () => {
     const manifest = (await import("../manifest.js")).default();
     expect(manifest).toMatchObject({ short_name: "MyOtherApp", start_url: "/", display: "standalone", lang: "en-IN", prefer_related_applications: true });
-    expect(manifest.related_applications).toEqual([{ platform: "play", url: expect.stringContaining("id=app.myotherapp.com"), id: "app.myotherapp.com" }]);
+    expect(manifest.related_applications).toEqual([{ platform: "play", url: expect.stringContaining("id=app.myotherapp.in"), id: "app.myotherapp.in" }]);
     expect(manifest.icons.map((i) => i.purpose)).toEqual(["any", "any", "maskable"]);
   });
 

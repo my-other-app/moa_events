@@ -52,10 +52,10 @@
  */
 
 /** The iOS app: Team ID and bundle id. */
-export const IOS_APP_ID = "PX6QV826X4.app.myotherapp.com";
+export const IOS_APP_ID = "PX6QV826X4.app.myotherapp.in";
 
 /** The Android app's package. */
-export const ANDROID_PACKAGE = "app.myotherapp.com";
+export const ANDROID_PACKAGE = "app.myotherapp.in";
 
 /** The paths the apps open. */
 export const APP_PATHS = [

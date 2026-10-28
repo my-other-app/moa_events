@@ -43,7 +43,7 @@ describe(AASA, () => {
 
   it("names the iOS app by Team ID and bundle id", async () => {
     const { body } = await answer("../.well-known/apple-app-site-association/route.js");
-    expect(IOS_APP_ID).toBe("PX6QV826X4.app.myotherapp.com");
+    expect(IOS_APP_ID).toBe("PX6QV826X4.app.myotherapp.in");
     expect(body.applinks.details).toHaveLength(1);
     expect(body.applinks.details[0].appIDs).toEqual([IOS_APP_ID]);
     // The modern form only (iOS 13+, the app's minimum): no `paths`, no `apps`.
@@ -131,7 +131,7 @@ describe(ASSETLINKS, () => {
         relation: ["delegate_permission/common.handle_all_urls"],
         target: {
           namespace: "android_app",
-          package_name: "app.myotherapp.com",
+          package_name: "app.myotherapp.in",
           sha256_cert_fingerprints: [KEY, OTHER],
         },
       },
