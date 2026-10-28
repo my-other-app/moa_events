@@ -228,3 +228,21 @@ describe("a club's page", () => {
     expect(countVisit).not.toHaveBeenCalled();
   });
 });
+
+describe("the club's upcoming events", () => {
+  it("carry the High demand pill where the club has its label on, and only there", () => {
+    const data = {
+      ...page,
+      club: { ...page.club, upcoming_events: 2 },
+      upcoming: [
+        { ...page.upcoming[0], requires_approval: true, high_demand: true },
+        { id: 69, name: "Solder Social", starts_at: "2026-10-24T12:30:00Z", status: "upcoming", has_fee: false, going: 3 },
+      ],
+    };
+    show("/clubs/circuit-society", data);
+    const hot = screen.getByRole("link", { name: "Hack Night 04" }).closest("article");
+    expect(within(hot).getByText("High demand")).toHaveClass("dc-pill--demand");
+    const calm = screen.getByRole("link", { name: "Solder Social" }).closest("article");
+    expect(within(calm).queryByText("High demand")).toBeNull();
+  });
+});

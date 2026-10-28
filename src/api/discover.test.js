@@ -236,6 +236,24 @@ describe("an event whose club confirms each place", () => {
     expect(parseEventPage(sparseEvent({ event: { ...base.event, requires_approval: false } })).event).not.toHaveProperty("requires_approval");
     expect(parseEventPage(sparseEvent()).event).not.toHaveProperty("requires_approval");
   });
+
+  it("keeps high_demand (the club's label) on the event's page only when true", () => {
+    const base = sparseEvent();
+    expect(parseEventPage(sparseEvent({ event: { ...base.event, high_demand: true } })).event.high_demand).toBe(true);
+    expect(parseEventPage(sparseEvent({ event: { ...base.event, high_demand: false } })).event).not.toHaveProperty("high_demand");
+    expect(parseEventPage(sparseEvent()).event).not.toHaveProperty("high_demand");
+  });
+
+  it("reads both on the discover cards and on a club page's cards; an API without them reads as before", () => {
+    const card = { id: 9, name: "Hack Night", requires_approval: true, high_demand: true };
+    expect(parseEvent(card)).toMatchObject({ requires_approval: true, high_demand: true });
+    expect(parseEvent({ id: 9, requires_approval: false, high_demand: "yes" })).not.toHaveProperty("high_demand");
+    expect(parseEvent({ id: 9 })).not.toHaveProperty("requires_approval");
+    expect(parseEventsPage({ items: [card], total: 1 }).items[0]).toMatchObject({ requires_approval: true, high_demand: true });
+    const club = parseClubPage({ club: { slug: "circuit-society", name: "Circuit Society" }, upcoming: [card], past: [] });
+    expect(club.upcoming[0]).toMatchObject({ requires_approval: true, high_demand: true });
+    expect(parseClubEventsPage({ items: [card], total: 1 }).items[0].high_demand).toBe(true);
+  });
 });
 
 describe("reading an event's page", () => {

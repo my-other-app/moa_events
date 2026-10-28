@@ -21,6 +21,9 @@ import { useEventTicketing, useLinkedType, WaitlistPanel } from "./tickets";
  *
  * The register card's button (registercta.jsx) asks to join with
  * askToJoin(): this opens the form and comes into view.
+ *
+ * An event whose club confirms each place (`approval`, or its tickets say
+ * so) has no waiting list: none is offered or mentioned here.
  */
 
 export const JOIN_EVENT = "moa:join-waitlist";
@@ -34,7 +37,7 @@ export function askToJoin(eventId, typeId = null) {
   }
 }
 
-export function EventTickets({ eventId, kind, registerHref = null }) {
+export function EventTickets({ eventId, kind, registerHref = null, approval = false }) {
   const linked = useLinkedType();
   const enabled = kind !== "ended" && kind !== "cancelled";
   const { ticketing, reload } = useEventTicketing(eventId, { enabled, ticketType: linked });
@@ -57,7 +60,8 @@ export function EventTickets({ eventId, kind, registerHref = null }) {
 
   if (!ticketing) return null;
   const several = ticketing.types.length > 1;
-  const joinable = waitlistTypes(ticketing);
+  const noLine = approval || ticketing.requiresApproval;
+  const joinable = noLine ? [] : waitlistTypes(ticketing);
   const inLine = liveEntries(ticketing.viewerWaitlist);
   if (!several && !joinable.length && !inLine.length) return null;
   const choose = (t) => (registerHref && onSale(t) && (kind === "open" || kind === "live") ? `${registerHref}?ticket_type=${t.id}` : null);
@@ -72,7 +76,7 @@ export function EventTickets({ eventId, kind, registerHref = null }) {
       {several ? (
         <ul className="ep-tt-list">
           {ticketing.types.map((t) => {
-            const note = typeNote(t);
+            const note = typeNote(noLine ? { ...t, waitlist: false } : t);
             const href = choose(t);
             return (
               <li key={t.id} className={`ep-tt${onSale(t) ? "" : " is-off"}`}>
@@ -97,7 +101,7 @@ export function EventTickets({ eventId, kind, registerHref = null }) {
           })}
         </ul>
       ) : null}
-      <WaitlistPanel eventId={String(eventId)} ticketing={ticketing} open={open} onChanged={reload} headingLevel={3} />
+      <WaitlistPanel eventId={String(eventId)} ticketing={ticketing} open={open} onChanged={reload} headingLevel={3} approval={noLine} />
     </section>
   );
 }

@@ -296,8 +296,13 @@ const DEMO = { is_demo: flag };
  * Kept only when true, so a club from an API without it reads as before.
  */
 const CLUB_EXTRAS = { ...DEMO, whatsapp_updates: flag };
-/** How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js). */
-const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag };
+/**
+ * How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js);
+ * and, on a card and on the event's page alike: `requires_approval` (the club confirms each place)
+ * and `high_demand` (the club has its "High demand" label on). Each kept only when true, so an
+ * API without them reads as before.
+ */
+const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag, requires_approval: flag, high_demand: flag };
 
 const SOURCES = new Set(["browser", "ip", "none"]);
 const STATUSES = new Set(["upcoming", "closing_soon", "full", "live", "ended"]);
@@ -717,8 +722,6 @@ export function parseEventDetail(e) {
       postal_code: (v) => (typeof v === "string" || typeof v === "number" ? str(String(v)) : null),
       // Only on a cancelled event: why, and when (src/utils/cancelled.js).
       cancellation: (v, all) => (all.status === "cancelled" ? parseCancellation(v) || { reason: null, cancelled_at: null } : null),
-      // The club confirms each place (registration approval): "Request a place", not "Register".
-      requires_approval: flag,
     }),
   };
 }

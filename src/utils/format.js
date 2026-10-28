@@ -108,6 +108,13 @@ export function statusPill(event) {
 }
 
 /**
+ * Whether an event shows the club's "High demand" chip (`high_demand`, the
+ * club's own label; no numbers behind it): while it is still to come or on,
+ * never once it has ended or was called off. False when the API doesn't say.
+ */
+export const showsHighDemand = (event) => Boolean(event) && event.high_demand === true && event.status !== "ended" && event.status !== "cancelled";
+
+/**
  * An image from the API is either a plain URL or the S3 dict of sizes
  * (thumbnail / medium / original). Returns the best URL for the size asked,
  * or null.

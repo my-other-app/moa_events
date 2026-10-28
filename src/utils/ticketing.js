@@ -91,6 +91,10 @@ export function parseWaitlistEntry(e) {
  * viewer's open request, pending or confirmed and not yet paid, as
  * {id, status, token, path}; else null.
  *
+ * An event whose club confirms each place has no waiting list (people
+ * simply request a place, and wait in the club's queue): its list reads as
+ * off, and no type offers one, whatever an older server still says.
+ *
  * null when the API has no ticket types (an older server), or sent nothing usable.
  */
 export function parseTicketing(raw) {
@@ -100,7 +104,7 @@ export function parseTicketing(raw) {
   if (!types.length) return null;
   const wl = obj(o.waitlist) || {};
   const hours = count(wl.offer_hours);
-  return {
+  const parsed = {
     types,
     requiresChoice: o.requires_choice === true,
     available: count(o.available),
@@ -111,6 +115,7 @@ export function parseTicketing(raw) {
     requiresApproval: o.requires_approval === true,
     viewerRequest: viewerRequest(o.viewer_request),
   };
+  return parsed.requiresApproval ? withoutWaitlist(parsed) : parsed;
 }
 
 /** The viewer's open request (pending, or confirmed and unpaid); anything else is none. */
@@ -191,8 +196,23 @@ export function typeNote(type) {
 /** Whether a ticket can be chosen on the form now. */
 export const onSale = (type) => Boolean(type) && type.status === "on_sale" && (type.available === null || type.available > 0);
 
-/** The types whose waiting list can be joined now (sold out, the list on). */
-export const waitlistTypes = (ticketing) => (ticketing && ticketing.waitlist.enabled ? ticketing.types.filter((t) => t.waitlist) : []);
+/** The types whose waiting list can be joined now (sold out, the list on); none when the club confirms each place. */
+export const waitlistTypes = (ticketing) =>
+  ticketing && ticketing.waitlist.enabled && !ticketing.requiresApproval ? ticketing.types.filter((t) => t.waitlist) : [];
+
+/**
+ * The tickets of an event whose club confirms each place: no waiting list,
+ * the list off and no type offering one. Null stays null.
+ */
+export const withoutWaitlist = (ticketing) =>
+  ticketing
+    ? {
+        ...ticketing,
+        types: ticketing.types.map((t) => (t.waitlist ? { ...t, waitlist: false } : t)),
+        waitlist: { ...ticketing.waitlist, enabled: false },
+        requiresApproval: true,
+      }
+    : null;
 
 /* ---------- a place in line, in words ---------- */
 
@@ -310,10 +330,16 @@ export function describeCodeCheck(error) {
   return f.message && f.status < 500 ? sentence(f.message) : "We couldn't check the code just now. Try again in a moment.";
 }
 
+/** An event whose club confirms each place has no waiting list (409 WAITLIST_OFF_ON_APPROVAL_EVENTS). */
+export const WAITLIST_OFF_ON_APPROVAL = "This event has no waiting list: the club confirms each place. Request a place instead, and they'll let you know.";
+
 /**
  * Joining the waiting list (POST /events/{id}/waitlist):
  *   {field, message}   a field to fix: "email", "phone", "name" or "ticket_type"
- *   {kind, message}    "registered" | "not_needed" | "closed" | "limit" | "network" | "message"
+ *   {kind, message}    "registered" | "not_needed" | "closed" | "approval" | "limit" | "network" | "message"
+ *
+ * "approval": the club confirms each place at this event, so there's no
+ * waiting list to join (WAITLIST_OFF_ON_APPROVAL_EVENTS).
  */
 export function describeWaitlistError(error) {
   const f = apiFailure(error);
@@ -328,6 +354,8 @@ export function describeWaitlistError(error) {
       return { kind: "not_needed", message: "Good news: tickets are available again. Register now instead." };
     case "WAITLIST_CLOSED":
       return { kind: "closed", message: "This event's waiting list isn't open." };
+    case "WAITLIST_OFF_ON_APPROVAL_EVENTS":
+      return { kind: "approval", message: WAITLIST_OFF_ON_APPROVAL };
     case "ALREADY_REGISTERED":
       return { kind: "registered", message: "You're already registered for this event: your ticket is in your email." };
     default:

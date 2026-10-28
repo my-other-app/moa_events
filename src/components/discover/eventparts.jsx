@@ -3,7 +3,7 @@ import { formatCount, formatPrice, imageUrl, statusPill } from "@/utils/format";
 import { safeHref } from "@/utils/linkify";
 import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
-import { approvalNote } from "@/utils/requests";
+import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
 import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
@@ -124,6 +124,7 @@ export function RegisterCard({ event, club = null }) {
             eventId={String(event.id)}
             state={{ kind: state.kind, label: state.label, href: state.href || null, also: state.also ? { label: state.also.label, href: state.also.href } : null }}
             club={club?.name ? { name: club.name } : null}
+            approval={event.requires_approval === true}
           />
         </div>
       </div>
@@ -139,7 +140,7 @@ export function RegisterCard({ event, club = null }) {
             <span style={{ width: `${Math.round((taken / event.capacity) * 100)}%` }} />
           </span>
           <span className="ep-meter-text">
-            {event.going > 0 ? `${formatCount(event.going)} going` : "Be the first to register"}
+            {event.going > 0 ? `${formatCount(event.going)} going` : nobodyGoingLine(event, club)}
             {left !== null && left > 0 ? ` · ${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : ""}
           </span>
         </div>

@@ -20,6 +20,8 @@ import {
   typeNote,
   typePrice,
   waitlistTypes,
+  WAITLIST_OFF_ON_APPROVAL,
+  withoutWaitlist,
 } from "./ticketing";
 
 /* The API's `ticketing` (docs/TICKETING.md §2), as GET /events/{id}/ticket-types answers. */
@@ -292,5 +294,48 @@ describe("an offer and a ticket's type", () => {
     expect(ticketTypeName({ ticket_label: "VIP" })).toBe("VIP");
     expect(ticketTypeName({ ticket_type: null })).toBeNull();
     expect(ticketTypeName(null)).toBeNull();
+  });
+});
+
+describe("an event whose club confirms each place: no waiting list", () => {
+  const sold = ticketing({
+    sold_out: true,
+    types: [type({ status: "sold_out", available: 0, waitlist: true }), type({ id: 13, status: "sold_out", available: 0, waitlist: true })],
+    waitlist: { enabled: true, offer_hours: 24 },
+  });
+
+  it("reads the list as off and no type as offering one, even when an older server still says it is on", () => {
+    const t = parseTicketing({ ...sold, requires_approval: true });
+    expect(t.requiresApproval).toBe(true);
+    expect(t.waitlist.enabled).toBe(false);
+    expect(t.types.every((x) => x.waitlist === false)).toBe(true);
+    expect(waitlistTypes(t)).toEqual([]);
+    expect(typeNote(t.types[0]).text).toBe("Sold out");
+  });
+
+  it("as the server sends it now: the list off, and still none", () => {
+    const t = parseTicketing({ ...sold, requires_approval: true, waitlist: { enabled: false }, types: [type({ status: "sold_out", available: 0, waitlist: false })] });
+    expect(waitlistTypes(t)).toEqual([]);
+  });
+
+  it("leaves other events' lists as they were", () => {
+    expect(waitlistTypes(parseTicketing(sold)).map((x) => x.id)).toEqual([12, 13]);
+    // Built by hand (not parsed), the rule still holds.
+    expect(waitlistTypes({ ...parseTicketing(sold), requiresApproval: true })).toEqual([]);
+  });
+
+  it("withoutWaitlist turns the list off for a form that knows the event confirms each place", () => {
+    const t = withoutWaitlist(parseTicketing(sold));
+    expect(t.waitlist).toEqual({ enabled: false, offerHours: 24 });
+    expect(t.types.map((x) => x.waitlist)).toEqual([false, false]);
+    expect(t.requiresApproval).toBe(true);
+    expect(waitlistTypes(t)).toEqual([]);
+    expect(withoutWaitlist(null)).toBeNull();
+  });
+
+  it("says plainly why joining was refused (409 WAITLIST_OFF_ON_APPROVAL_EVENTS)", () => {
+    const p = describeWaitlistError(failure(409, { message: "Waitlist is off on approval events", error_code: "WAITLIST_OFF_ON_APPROVAL_EVENTS" }));
+    expect(p).toEqual({ kind: "approval", message: WAITLIST_OFF_ON_APPROVAL });
+    expect(p.message).toBe("This event has no waiting list: the club confirms each place. Request a place instead, and they'll let you know.");
   });
 });

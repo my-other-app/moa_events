@@ -21,6 +21,9 @@
   --dc-link-soft: #e5f5fd;
   --dc-live: #dc2626;
   --dc-warn: #d97706;
+  /* "High demand": the icon, and its words (dark enough for small text on white or pale orange). */
+  --dc-demand: #ea580c;
+  --dc-demand-ink: #9a3412;
   --dc-font: var(--font-dm-sans), "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --dc-display: var(--font-bebas-neue), "Bebas Neue", var(--font-dm-sans), "DM Sans", Impact, sans-serif;
   --dc-radius: 8px;

@@ -185,6 +185,20 @@
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.1);
 }
+/*
+ * The club's "High demand" label: its own solid colours (dark orange on
+ * white, about 7:1), so it reads the same on a light or a dark poster and
+ * whatever the reader's colour scheme.
+ */
+.dc-pill--demand {
+  background: #fff;
+  color: var(--dc-demand-ink);
+}
+.dc-pill--demand svg {
+  flex: none;
+  color: var(--dc-demand);
+  fill: currentColor;
+}
 .dc-evcard-body {
   display: flex;
   flex-direction: column;
@@ -325,6 +339,12 @@
 }
 .dc-evcard-status--muted {
   color: var(--dc-muted);
+}
+.dc-evcard-status--demand {
+  color: var(--dc-demand-ink);
+}
+.dc-evcard-status + .dc-evcard-status {
+  margin-left: 8px;
 }
 
 /* Over: greyed out, still readable. */

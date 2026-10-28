@@ -49,6 +49,7 @@ import {
   typePrice,
   viewerRequestOf,
   waitlistTypes,
+  withoutWaitlist,
 } from "@/utils/ticketing";
 import { GoogleMark } from "../auth/account";
 import { ErrorState, StoreButtons } from "../discover/bits";
@@ -376,16 +377,19 @@ function Panel({ event, club, icon = "ticket", title, children, actions }) {
 
 /**
  * Registration isn't open. A full event whose tickets can be waited for
- * (`ticketing`, from GET /events/info/{id}) offers its waiting list here.
+ * (`ticketing`, from GET /events/info/{id}) offers its waiting list here;
+ * one whose club confirms each place has none to offer.
  */
 function Closed({ event, club, gate, ticketing = null, onTicketsChanged = null }) {
-  const waitable = gate.kind === "full" && ticketing && (waitlistTypes(ticketing).length > 0 || liveEntries(ticketing.viewerWaitlist).length > 0);
+  const approval = event.requires_approval === true || ticketing?.requiresApproval === true;
+  const joinable = !approval && waitlistTypes(ticketing).length > 0;
+  const waitable = gate.kind === "full" && ticketing && (joinable || liveEntries(ticketing.viewerWaitlist).length > 0);
   const copy = {
     soon: { title: gate.label, text: `${gate.note}. Add it to your calendar and come back then.` },
     closed: { title: "Registration has closed", text: "The organisers aren't taking new registrations for this event." },
     full: {
       title: "This event is full",
-      text: `${gate.note || "Every seat is taken."} ${waitable ? "You can still join its waiting list, below." : "Keep an eye on the event page in case a seat opens up."}`,
+      text: `${gate.note || "Every seat is taken."} ${joinable ? "You can still join its waiting list, below." : "Keep an eye on the event page in case a seat opens up."}`,
     },
     ended: { title: "This event has ended", text: gate.note ? `${gate.note}.` : "It's over — but there's always another one." },
     live: { title: "It's happening now", text: "Registration has closed, but the live room is open: polls, questions and the quiz." },
@@ -414,7 +418,7 @@ function Closed({ event, club, gate, ticketing = null, onTicketsChanged = null }
       }
     >
       <p className="rg-closed-text">{copy.text}</p>
-      {waitable ? <WaitlistPanel eventId={String(event.id)} ticketing={ticketing} onChanged={onTicketsChanged} headingLevel={2} /> : null}
+      {waitable ? <WaitlistPanel eventId={String(event.id)} ticketing={ticketing} onChanged={onTicketsChanged} headingLevel={2} approval={approval} /> : null}
     </Panel>
   );
 }
@@ -666,7 +670,10 @@ function Flow({ event, club, info, onDone }) {
   // The ticket: a link's hidden type, the one chosen before (the draft), or the only one.
   const linked = useMemo(() => linkedTypeFrom(params.toString()), [params]);
   const tix = useFlowTicketing(eventId, info, linked);
-  const ticketing = tix.ticketing;
+  // The club confirms each place (registration approval): the form sends a request, and nothing is paid yet.
+  const approval = requiresApproval(info.data, event);
+  // Such an event has no waiting list, whatever its tickets still say.
+  const ticketing = useMemo(() => (approval ? withoutWaitlist(tix.ticketing) : tix.ticketing), [approval, tix.ticketing]);
   // The ticket the person picked here; until they do, the one chosen for them (worked out as the page draws).
   const [typeId, setTypeId] = useState(null);
   // A sold-out ticket's waiting list, opened from the picker: {typeId}.
@@ -707,9 +714,7 @@ function Flow({ event, club, info, onDone }) {
   const ready = info.status === "ready" && items !== null && tix.ready;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
   const infoFee = Number(info.data?.reg_fee) > 0 ? Number(info.data.reg_fee) : null;
-  // The club confirms each place (registration approval): the form sends a request, and nothing is paid yet.
   // A request carries no add-ons (the API keeps none with it), so the shelf isn't offered.
-  const approval = requiresApproval(info.data, event);
   const shelf = useMemo(() => (approval ? [] : items || []), [items, approval]);
   const chooseTicket = needsPicker(ticketing);
   const steps = useMemo(() => stepsFor({ questions, items: shelf, chooseTicket }), [questions, shelf, chooseTicket]);
@@ -944,7 +949,8 @@ function Flow({ event, club, info, onDone }) {
   };
 
   const showError = (error) => {
-    const p = describeRegisterError(error, questions.map((q) => q.key));
+    // A request (the club confirms each place) is never offered a waiting list, whatever the refusal says.
+    const p = describeRegisterError(error, questions.map((q) => q.key), { approval });
     // The tickets changed under the form (sold out, off sale, full): read them again.
     if (p.ticketTypes || p.kind === "full") tix.reload();
     if (p.kind === "fields" && p.fields.discount_code) code.refuse(p.fields.discount_code);
@@ -1168,10 +1174,10 @@ function Flow({ event, club, info, onDone }) {
                   changed("ticket_type");
                 }}
                 error={errorFor("ticket_type")}
-                onWaitlist={(id) => setWaitFor({ typeId: id })}
+                onWaitlist={approval ? null : (id) => setWaitFor({ typeId: id })}
               />
               {waitFor || liveEntries(ticketing.viewerWaitlist).length ? (
-                <WaitlistPanel eventId={eventId} ticketing={ticketing} open={waitFor} onChanged={tix.reload} headingLevel={2} />
+                <WaitlistPanel eventId={eventId} ticketing={ticketing} open={waitFor} onChanged={tix.reload} headingLevel={2} approval={approval} />
               ) : null}
             </div>
           ) : null}
@@ -1422,7 +1428,7 @@ function Flow({ event, club, info, onDone }) {
                   : info.retry()
               }
               extra={
-                problem.kind === "full" && problem.waitlist ? (
+                problem.kind === "full" && problem.waitlist && !approval ? (
                   <WaitlistPanel
                     eventId={eventId}
                     ticketing={ticketing}

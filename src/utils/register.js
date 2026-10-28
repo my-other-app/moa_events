@@ -405,8 +405,11 @@ function closedCopy(errors, status) {
  *              nothing was sent as a guest; sign in again, or go on as one
  *   message    anything else the server explained, in its own words
  *   server     a 5xx with nothing to say
+ *
+ * `approval`: the form sends a request (the club confirms each place). Such
+ * an event has no waiting list, so none is offered, whatever the refusal says.
  */
-export function describeRegisterError(error, questionKeys = []) {
+export function describeRegisterError(error, questionKeys = [], { approval = false } = {}) {
   const status = error?.status ?? error?.response?.status ?? 0;
   const data = error?.data ?? error?.response?.data ?? null;
   const said =
@@ -415,7 +418,8 @@ export function describeRegisterError(error, questionKeys = []) {
       : typeof data?.detail === "string" && data.detail.trim()
         ? data.detail.trim()
         : null;
-  const errors = data?.errors && typeof data.errors === "object" && !Array.isArray(data.errors) ? data.errors : null;
+  const raw = data?.errors && typeof data.errors === "object" && !Array.isArray(data.errors) ? data.errors : null;
+  const errors = raw && approval && "waitlist" in raw ? { ...raw, waitlist: false } : raw;
 
   if (error?.authExpired) {
     return { kind: "auth", message: "Your sign-in expired before we could register you. Sign in again to keep this ticket in your account, or register with your email." };

@@ -34,11 +34,13 @@ import { useEventTicketing, useLinkedType } from "./tickets";
  * (registration approval), the viewer's own open request
  * (`ticketing.viewer_request`): "View your request" (waiting for the club),
  * or "Pay for your ticket" (confirmed, not yet paid), both to its page.
+ * Such an event (`approval`, or its tickets say so) never offers "Join the
+ * waiting list": people request a place and wait in the club's queue.
  *
  * GET /events/info/{id} is asked only for someone signed in; a cancelled or
  * ended event asks nothing.
  */
-export function RegisterGo({ eventId, state, club = null }) {
+export function RegisterGo({ eventId, state, club = null, approval = false }) {
   const auth = useAuth();
   const signedIn = auth.ready && auth.status === "signed-in";
   const ended = state.kind === "ended" || state.kind === "cancelled";
@@ -148,7 +150,7 @@ export function RegisterGo({ eventId, state, club = null }) {
         </>
       );
     }
-    if (waitlistTypes(ticketing).length) {
+    if (!approval && waitlistTypes(ticketing).length) {
       return (
         <>
           <a

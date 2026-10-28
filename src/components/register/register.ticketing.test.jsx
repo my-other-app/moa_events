@@ -391,3 +391,26 @@ describe("a cancelled event", () => {
     expect(window.Razorpay).not.toHaveBeenCalled();
   });
 });
+
+/* An event whose club confirms each place has no waiting list: the form and the full page offer none. */
+describe("an event whose club confirms each place: no waiting list", () => {
+  it("the ticket picker shows a sold-out ticket as sold out, with no list to join", async () => {
+    // As an older server might still send it: the list on, the sold-out type offering it.
+    show(variant({ requires_approval: true }), { ticketing: SEVERAL, info: { requires_approval: true } });
+    expect(await heading(/Choose your ticket/)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Student/ })).toBeDisabled();
+    expect(screen.queryByText("Sold out · waiting list open")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Join the waiting list/ })).toBeNull();
+  });
+
+  it("whose page says it's full: no waiting list, only the way back", async () => {
+    ticketingApi.types.mockResolvedValue(parseTicketing({ ...ONE, sold_out: true, types: [TT({ status: "sold_out", available: 0, waitlist: true })] }));
+    show(variant({ status: "full", seats_left: 0, requires_approval: true }));
+    expect(await heading("This event is full")).toBeInTheDocument();
+    await waitFor(() => expect(ticketingApi.types).toHaveBeenCalled());
+    await act(async () => {});
+    expect(screen.getByText(/Keep an eye on the event page in case a seat opens up/)).toBeInTheDocument();
+    expect(screen.queryByText(/join its waiting list/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Join the waiting list" })).toBeNull();
+  });
+});

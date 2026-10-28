@@ -7,21 +7,31 @@
  * HTML is still made on the server; nothing here reads the browser.
  */
 import { Link } from "@/lib/router";
-import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, statusPill } from "@/utils/format";
+import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, showsHighDemand, statusPill } from "@/utils/format";
 import { coverFields, eventHref, seatsInfo } from "@/utils/cover";
 import { Avatar, Img } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import Icon from "./icons";
 
-/** The pill for the poster: what is most pressing, and a quiet "Free" beside it while there are places. */
+/**
+ * The pills for the poster: what is most pressing, the club's "High demand"
+ * label when it has it on, and a quiet "Free" beside them while there are places.
+ */
 function Pills({ event }) {
   const status = statusPill(event);
   const pill = status && status.tone !== "free" ? status : null;
+  const demand = showsHighDemand(event);
   const free = !event.has_fee && event.status !== "ended" && event.status !== "full";
-  if (!pill && !free) return null;
+  if (!pill && !demand && !free) return null;
   return (
     <span className="dc-evcard-pills">
       {pill ? <span className={`dc-pill dc-pill--${pill.tone}`}>{pill.label}</span> : null}
+      {demand ? (
+        <span className="dc-pill dc-pill--demand">
+          <Icon name="zap" size={12} />
+          High demand
+        </span>
+      ) : null}
       {free ? <span className="dc-pill dc-pill--quiet">Free</span> : null}
     </span>
   );
@@ -125,7 +135,10 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
             </span>
           ) : null}
           {row ? (
-            status && status.tone !== "free" ? <span className={`dc-evcard-status dc-evcard-status--${status.tone}`}>{status.label}</span> : null
+            <>
+              {status && status.tone !== "free" ? <span className={`dc-evcard-status dc-evcard-status--${status.tone}`}>{status.label}</span> : null}
+              {showsHighDemand(event) ? <span className="dc-evcard-status dc-evcard-status--demand">High demand</span> : null}
+            </>
           ) : (
             <Seats seats={seats} />
           )}
