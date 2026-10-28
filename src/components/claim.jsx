@@ -37,9 +37,10 @@ import { DiscountCodeField, useDiscountCode } from "./register/tickets";
  * pays with that guest's session. A closed checkout keeps the place until
  * the offer runs out: claiming again hands back the same registration.
  *
- * The same link pays for a place the club confirmed (registration approval,
- * the offer's `reason: "approved"`): the page says the club confirmed it,
- * not that it opened up on the line.
+ * The same link pays for a registration the club confirmed (an event that
+ * reviews registrations, the offer's `reason: "approved"`): the page says
+ * "{Club} confirmed your registration", never that a place opened up on the
+ * line (that wording stays the waiting list's).
  *
  * The first paint (on the server, and the browser's first) is the loading
  * card: who is signed in and what the offer is are the browser's to read.
@@ -76,22 +77,27 @@ const ENDED = {
 };
 
 /**
- * A place the club confirmed (registration approval, `reason: "approved"`):
- * the same endings, said as what they are. It never came from a line.
+ * A registration the club confirmed (registration approval, `reason:
+ * "approved"`): the same endings, said as what they are. It never came from
+ * a line. `club`: {start, mid}, the club's name at the start of a sentence
+ * and in the middle of one.
  */
 const ENDED_APPROVED = {
   expired: (club) => ({
-    title: "This payment link ran out",
-    text: `${club} confirmed your place and held it for a while, but the payment didn't arrive in time, so it was released.`,
+    title: "Your registration has expired",
+    text: `${club.start} confirmed your registration, but it wasn't paid in time, so it has expired.`,
   }),
-  left: () => ({ title: "This place isn't open any more", text: "You withdrew your request, so the place was released." }),
-  removed: (club) => ({ title: "This place isn't open any more", text: `${club} released this place.` }),
-  declined: (club) => ({ title: "You released your place", text: `Thanks for letting ${club} know. They can offer it to someone else now.` }),
+  claimed: () => ({ title: "This ticket has been paid for", text: "If that was you, your ticket is in your email, and in My tickets once you sign in." }),
+  left: () => ({ title: "You cancelled your registration", text: "So this link to pay for it doesn't work any more." }),
+  removed: (club) => ({ title: "This link isn't open any more", text: `${club.start} closed this registration.` }),
+  declined: (club) => ({ title: "You cancelled your registration", text: `Thanks for letting ${club.mid} know.` }),
+  cancelled: () => ({ title: "This event was cancelled", text: "There's nothing to pay. Anyone who paid online is being refunded in full." }),
 };
 
 const endedCopy = (kind, offer) => {
   const approved = offer?.reason === "approved" ? ENDED_APPROVED[kind] : null;
-  return approved ? approved(clubName(offer.event?.club, { start: false })) : ENDED[kind] || ENDED.gone;
+  const club = offer?.event?.club;
+  return approved ? approved({ start: clubName(club), mid: clubName(club, { start: false }) }) : ENDED[kind] || ENDED.gone;
 };
 
 function Ended({ kind, offer = null, message = null }) {
@@ -153,11 +159,12 @@ function OfferForm({ offer, token, onOutcome }) {
     ticketTypeId: type.id,
     email: offer.needsEmail && isEmail(email) ? email.trim() : null,
   });
-  // A place the club confirmed (registration approval): this is its pay link, not a place from the line.
-  // The claim registers what the request said (its name, its code): the price is the one confirmed,
+  // A registration the club confirmed (registration approval): this is its pay link, not a place from the line.
+  // The claim registers what the registration said (its name, its code): the price is the one confirmed,
   // and there is no code to type nor a name to change here.
   const approved = offer.reason === "approved";
   const club = clubName(offer.event.club);
+  const claimFailed = approved ? "We couldn't get your ticket" : "We couldn't claim your place";
   const price = approved && offer.amount !== null ? offer.amount : type.price;
   const discount = !approved && offer.needsPayment && code.applied ? Math.min(price, code.applied.discount) : 0;
   const total = Math.max(0, price - discount);
@@ -211,7 +218,7 @@ function OfferForm({ offer, token, onOutcome }) {
         ...(!approved && offer.needsPayment && code.toSend ? { discount_code: code.toSend } : {}),
       });
       if (!data || !data.ticket_id) {
-        setProblem({ tone: "error", title: "We couldn't claim your place", text: "No ticket came back. Try again — you won't be registered twice." });
+        setProblem({ tone: "error", title: claimFailed, text: "No ticket came back. Try again — you won't be registered twice." });
         return;
       }
       if (!(Number(data.pay_amount) > 0)) {
@@ -236,7 +243,7 @@ function OfferForm({ offer, token, onOutcome }) {
         return;
       }
       const p = describePayment(result.outcome, result.error, { email: data.email, kept: "registration" });
-      setProblem({ ...p, text: `${p.text}${until ? ` Your place is held until ${until} IST.` : ""}` });
+      setProblem({ ...p, text: `${p.text}${until ? ` ${approved ? "Your ticket is held for you" : "Your place is held"} until ${until} IST.` : ""}` });
     } catch (error) {
       const p = describeClaimError(error);
       if (["expired", "claimed", "gone", "cancelled"].includes(p.kind)) {
@@ -249,7 +256,7 @@ function OfferForm({ offer, token, onOutcome }) {
       } else if (p.kind === "registered") {
         setProblem({ tone: "info", title: "You're already registered", text: p.message });
       } else {
-        setProblem({ tone: p.kind === "limit" ? "calm" : "error", title: "We couldn't claim your place", text: p.message });
+        setProblem({ tone: p.kind === "limit" ? "calm" : "error", title: claimFailed, text: p.message });
       }
     } finally {
       setPhase("idle");
@@ -266,15 +273,15 @@ function OfferForm({ offer, token, onOutcome }) {
     } catch (error) {
       const p = describeClaimError(error);
       if (["expired", "claimed", "gone"].includes(p.kind)) onOutcome({ kind: p.kind, message: p.message });
-      else setProblem({ tone: "error", title: "We couldn't pass on the place", text: p.kind === "network" ? p.message : "Try again in a moment." });
+      else setProblem({ tone: "error", title: approved ? "We couldn't cancel your registration" : "We couldn't pass on the place", text: p.kind === "network" ? p.message : "Try again in a moment." });
     } finally {
       setPhase("idle");
       setDeclining(false);
     }
   };
 
-  const go = offer.needsPayment && total > 0 ? (approved ? `Pay ${rupees(total)}` : `Claim and pay ${rupees(total)}`) : approved ? "Confirm my place" : "Claim my place";
-  const busyLabel = phase === "paying" ? "Opening payment…" : phase === "declining" ? (approved ? "Releasing it…" : "Passing it on…") : "Claiming…";
+  const go = offer.needsPayment && total > 0 ? (approved ? `Pay ${rupees(total)}` : `Claim and pay ${rupees(total)}`) : approved ? "Get my ticket" : "Claim my place";
+  const busyLabel = phase === "paying" ? "Opening payment…" : phase === "declining" ? (approved ? "Cancelling…" : "Passing it on…") : "Claiming…";
 
   return (
     <div className="rg-layout">
@@ -285,18 +292,18 @@ function OfferForm({ offer, token, onOutcome }) {
             <EpIcon name="ticket" size={24} />
           </span>
           <h1 className="rg-h1" id="cl-title">
-            {approved ? `${club} confirmed your place` : "A place opened up for you"}
+            {approved ? `${club} confirmed your registration` : "A place opened up for you"}
           </h1>
           {approved ? (
             <p className="rg-lede">
-              {first ? `${first}, your` : "Your"} place at <strong>{offer.event.name}</strong> is confirmed. {offer.needsPayment ? "Pay" : "Confirm"}
+              {offer.needsPayment && total > 0 ? `Pay ${rupees(total)}` : "Confirm"}
               {until ? (
                 <>
                   {" "}
                   by <strong>{until} IST</strong>
                 </>
               ) : null}{" "}
-              to get your <strong>{type.name}</strong> ticket.{until ? " Your place is held until then." : null}
+              to get your ticket for <strong>{offer.event.name}</strong>.{until ? " Your ticket is held for you until then." : null}
             </p>
           ) : (
             <p className="rg-lede">
@@ -376,7 +383,7 @@ function OfferForm({ offer, token, onOutcome }) {
             {offer.needsPayment && total > 0 ? (
               <p className="rg-paynote">
                 <Icon name="creditCard" size={15} />
-                Payment is handled securely by Razorpay. The place is yours once it goes through.
+                Payment is handled securely by Razorpay. {approved ? "The ticket is yours" : "The place is yours"} once it goes through.
               </p>
             ) : null}
           </section>
@@ -395,24 +402,24 @@ function OfferForm({ offer, token, onOutcome }) {
               )}
             </button>
             {declining ? (
-              <div className="wl-leave" role="group" aria-label={approved ? "Release this place" : "Pass on this place"}>
+              <div className="wl-leave" role="group" aria-label={approved ? "Cancel your registration" : "Pass on this place"}>
                 <p>
                   {approved
-                    ? `Release your place? ${club} can offer it to someone else, and you can't take it back.`
+                    ? "Cancel your registration? Your ticket will go to someone else, and you can't undo this."
                     : "Give this place to the next person in line? You can’t take it back."}
                 </p>
                 <div className="wl-leave-actions">
                   <button type="button" className="dc-btn dc-btn--sm dc-btn--ghost" onClick={decline} disabled={busy}>
-                    {phase === "declining" ? busyLabel : approved ? "Yes, release it" : "Yes, pass it on"}
+                    {phase === "declining" ? busyLabel : approved ? "Yes, cancel it" : "Yes, pass it on"}
                   </button>
                   <button type="button" className="rg-textbtn" onClick={() => setDeclining(false)} disabled={busy}>
-                    Keep it
+                    {approved ? "Keep my registration" : "Keep it"}
                   </button>
                 </div>
               </div>
             ) : (
               <button type="button" className="rg-textbtn" onClick={() => setDeclining(true)} disabled={busy}>
-                {approved ? "I can't come: release my place" : "No thanks, give it to the next person"}
+                {approved ? "I can't come: cancel my registration" : "No thanks, give it to the next person"}
               </button>
             )}
           </div>

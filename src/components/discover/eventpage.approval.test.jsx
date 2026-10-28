@@ -11,9 +11,10 @@ const { parseEventPage } = await import("@/api/discover");
 const { EventView } = await import("./eventpage.jsx");
 
 /*
- * An event whose club confirms each place (registration approval): its
- * page asks for a place rather than registering, and says beside the button
- * that the club confirms each one. Without the setting, nothing changes.
+ * An event whose club reviews every registration (registration approval):
+ * its page says "Register", exactly as any other, and says beside the
+ * button that the club reviews every registration and emails tickets to
+ * the people it confirms. Without the setting, nothing changes.
  */
 const show = (event = {}, club = undefined) => {
   const base = fullEvent();
@@ -25,27 +26,31 @@ const show = (event = {}, club = undefined) => {
   );
 };
 const card = () => screen.getByRole("region", { name: "Registration" });
+// Never on an event that reviews registrations.
+const OLD_WORDS = /request a place|confirms each place|your request|waiting list/i;
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("an event whose club confirms each place", () => {
-  it("asks for a place, and says the club confirms each one", () => {
+describe("an event whose club reviews every registration", () => {
+  it("says Register, and says the club reviews every registration", () => {
     show({ requires_approval: true, status: "upcoming", registration_open: true, reg_closes_at: "2099-01-01T00:00:00+05:30" });
-    expect(within(card()).getByRole("link", { name: "Request a place" })).toHaveAttribute("href", "/events/hack-night-04/register");
-    expect(within(card()).queryByRole("link", { name: "Register" })).toBeNull();
-    expect(within(card()).getByText(/confirms each place/)).toHaveTextContent("Circuit Society confirms each place. You’ll get your ticket by email when they do.");
+    expect(within(card()).getByRole("link", { name: "Register" })).toHaveAttribute("href", "/events/hack-night-04/register");
+    expect(within(card()).getByText(/reviews every registration/)).toHaveTextContent(
+      "Circuit Society reviews every registration and emails tickets to the people it confirms.",
+    );
+    expect(card()).not.toHaveTextContent(OLD_WORDS);
   });
 
   it("says the club when the page names none", () => {
     show({ requires_approval: true, status: "upcoming", registration_open: true }, null);
-    expect(within(card()).getByText(/confirms each place/)).toHaveTextContent("The club confirms each place.");
+    expect(within(card()).getByText(/reviews every registration/)).toHaveTextContent("The club reviews every registration and emails tickets to the people it confirms.");
   });
 
-  it("says nothing of it when no place can be asked for (full, closed)", () => {
+  it("says nothing of it when registration isn't open (full, closed)", () => {
     show({ requires_approval: true, status: "full" });
-    expect(within(card()).queryByText(/confirms each place/)).toBeNull();
+    expect(within(card()).queryByText(/reviews every registration/)).toBeNull();
   });
 });
 
@@ -53,29 +58,30 @@ describe("an event without the setting", () => {
   it("registers, as it always did", () => {
     show({ status: "upcoming", registration_open: true });
     expect(within(card()).getByRole("link", { name: "Register" })).toHaveAttribute("href", "/events/hack-night-04/register");
-    expect(screen.queryByText(/confirms each place/)).toBeNull();
+    expect(screen.queryByText(/reviews every registration/)).toBeNull();
   });
 });
 
 /*
  * Nobody going yet: where an open event says "Be the first to register",
- * one whose club confirms each place says the club confirms each place
- * (people may have asked already; the page shows no request numbers).
+ * one whose club reviews every registration says so, in the short form
+ * (people may have registered already; the page shows no numbers under review).
  */
 describe("nobody going yet", () => {
   const facts = () => document.querySelector(".ep-facts");
   const meter = () => document.querySelector(".ep-meter-text");
 
-  it("says the club confirms each place, beside the seats left and in the facts", () => {
+  it("says the club reviews every registration, beside the seats left and in the facts", () => {
     show({ requires_approval: true, status: "upcoming", registration_open: true, going: 0, capacity: 120, seats_left: 120 });
-    expect(meter()).toHaveTextContent("Circuit Society confirms each place · 120 seats left");
+    expect(meter()).toHaveTextContent("Circuit Society reviews every registration · 120 seats left");
     expect(screen.queryByText(/Be the first to register/)).toBeNull();
-    expect(facts()).toHaveTextContent("Circuit Society confirms each place · 120 seats left");
+    expect(facts()).toHaveTextContent("Circuit Society reviews every registration · 120 seats left");
+    expect(facts()).not.toHaveTextContent(OLD_WORDS);
   });
 
   it("says the club when the page names none", () => {
     show({ requires_approval: true, status: "upcoming", registration_open: true, going: 0, capacity: 120, seats_left: 120 }, null);
-    expect(meter()).toHaveTextContent("The club confirms each place");
+    expect(meter()).toHaveTextContent("The club reviews every registration");
   });
 
   it("says how many are going once someone is, as before", () => {
@@ -87,7 +93,7 @@ describe("nobody going yet", () => {
   it("an event without the setting still says Be the first to register", () => {
     show({ status: "upcoming", registration_open: true, going: 0, capacity: 120, seats_left: 120 });
     expect(meter()).toHaveTextContent("Be the first to register · 120 seats left");
-    expect(document.querySelector(".ep-facts")).not.toHaveTextContent(/confirms each place/);
+    expect(document.querySelector(".ep-facts")).not.toHaveTextContent(/reviews every registration/);
   });
 });
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { eventsApi } from "@/api/events";
 import { useAuth } from "@/auth/context";
 import { myRegistration } from "@/utils/register";
-import { clubName } from "@/utils/requests";
+import { payButton, payLine } from "@/utils/requests";
 import { liveEntries, waitlistTypes } from "@/utils/ticketing";
 import { askToJoin } from "./eventtickets";
 import { FinishPaymentButton } from "./finishpayment";
@@ -30,17 +30,17 @@ import { useEventTicketing, useLinkedType } from "./tickets";
  *   in line already                 You're on the waiting list
  *   a link naming a hidden type     Register keeps `?ticket_type=`
  *
- * and, signed in, for an event whose club confirms each place
- * (registration approval), the viewer's own open request
- * (`ticketing.viewer_request`): "View your request" (waiting for the club),
- * or "Pay for your ticket" (confirmed, not yet paid), both to its page.
- * Such an event (`approval`, or its tickets say so) never offers "Join the
- * waiting list": people request a place and wait in the club's queue.
+ * and, signed in, for an event that reviews registrations (registration
+ * approval), the viewer's own open registration (`ticketing.viewer_request`):
+ * "See your registration" (under review), or "Pay ₹…" / "Pay now"
+ * (confirmed, not yet paid), to its page (or the claim page, when the API
+ * says where). Such an event (`approval`, or its tickets say so) never
+ * offers "Join the waiting list": people register, and the club reviews.
  *
  * GET /events/info/{id} is asked only for someone signed in; a cancelled or
  * ended event asks nothing.
  */
-export function RegisterGo({ eventId, state, club = null, approval = false }) {
+export function RegisterGo({ eventId, state, approval = false }) {
   const auth = useAuth();
   const signedIn = auth.ready && auth.status === "signed-in";
   const ended = state.kind === "ended" || state.kind === "cancelled";
@@ -110,25 +110,24 @@ export function RegisterGo({ eventId, state, club = null, approval = false }) {
     );
   }
 
-  // The club confirms each place, and the viewer has asked for one already: where it stands.
+  // The club reviews registrations, and the viewer has registered already: where it stands.
   const asked = ticketing?.viewerRequest || null;
   if (asked) {
     const confirmed = asked.status === "approved";
+    const href = confirmed && asked.pay?.claimToken ? `/claim/${encodeURIComponent(asked.pay.claimToken)}` : asked.path;
     return (
       <>
-        {asked.path ? (
-          <Link className={`dc-btn ep-cta-btn${confirmed ? "" : " dc-btn--ghost"}`} href={asked.path}>
-            {confirmed ? "Pay for your ticket" : "View your request"}
+        {href ? (
+          <Link className={`dc-btn ep-cta-btn${confirmed ? "" : " dc-btn--ghost"}`} href={href}>
+            {confirmed ? payButton(asked.pay) : "See your registration"}
           </Link>
         ) : (
           <button type="button" className="dc-btn ep-cta-btn" disabled>
-            Request sent
+            {confirmed ? "Confirmed" : "Under review"}
           </button>
         )}
         <p className="ep-cta-mine" role="status">
-          {confirmed
-            ? `${clubName(club)} confirmed your place. Pay to get your ticket.`
-            : `Waiting for ${clubName(club, { start: false })} to confirm your place.`}
+          {confirmed ? `Your registration is confirmed. ${payLine(asked.pay)}` : "Your registration is under review."}
         </p>
       </>
     );

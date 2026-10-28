@@ -506,7 +506,7 @@
   margin: 24px auto 0;
 }
 
-/* ---------- registration approval: the club confirms each place ---------- */
+/* ---------- registration approval: the club reviews every registration ---------- */
 
 /* The event page's register card: said beside the button. */
 .ep-cta-approval {
@@ -574,6 +574,23 @@
   background: var(--dc-primary);
   color: var(--dc-accent);
 }
+/* The status chip above the title: "Under review", "Confirmed", "Not confirmed"... */
+.rq-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 0 10px;
+  padding: 3px 10px;
+  border-radius: 14px;
+  background: var(--dc-sunken);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--dc-ink);
+}
+.rq-chip.is-good {
+  background: var(--dc-accent);
+}
 .rq-notice {
   margin-bottom: 14px;
   padding: 10px 12px;
@@ -599,8 +616,12 @@
 .rq-withdraw .wl-leave {
   width: 100%;
 }
+/* Opened by the email's cancel link: the question holds the focus (read out), with no ring around plain text. */
+.rq-withdraw .wl-leave p:focus {
+  outline: none;
+}
 
-/* My tickets: requests waiting for the club. */
+/* My tickets: registrations under review. */
 .me-request .me-ticket-number.me-request-state {
   font-family: var(--dc-display);
   font-weight: 400;

@@ -97,7 +97,7 @@ export function Poster({ event }) {
  */
 export function RegisterCard({ event, club = null }) {
   const state = registerState(event);
-  // The club confirms each place (registration approval): said beside the button while a place can be asked for.
+  // The club reviews every registration (registration approval): said beside the button while registration is open.
   const approval = event.requires_approval === true && (state.kind === "open" || (state.kind === "live" && Boolean(state.also)));
   const left = seatsLeft(event);
   const when = whenLine(event.starts_at);
@@ -123,7 +123,6 @@ export function RegisterCard({ event, club = null }) {
           <RegisterGo
             eventId={String(event.id)}
             state={{ kind: state.kind, label: state.label, href: state.href || null, also: state.also ? { label: state.also.label, href: state.also.href } : null }}
-            club={club?.name ? { name: club.name } : null}
             approval={event.requires_approval === true}
           />
         </div>

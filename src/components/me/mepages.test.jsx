@@ -499,7 +499,7 @@ describe("My tickets: ticket types and cancelled events", () => {
   });
 });
 
-describe("My tickets: requests waiting for the club (registration approval)", () => {
+describe("My tickets: registrations under review (registration approval)", () => {
   const T1 = "Rq7abcdefghijklmnopqrstuvwxyz001";
   const T2 = "Rq7abcdefghijklmnopqrstuvwxyz002";
   const CLAIM = "Cl4im-token-abcdefghijklmnop";
@@ -539,29 +539,34 @@ describe("My tickets: requests waiting for the club (registration approval)", ()
   };
   const asked = () => get.mock.calls.filter(([url]) => url === "/api/v1/registration-requests/mine").length;
 
-  it("signed in: the open requests, each with its page, and paying a confirmed one", async () => {
+  it("signed in: the open registrations under review, each with its page, and paying a confirmed one", async () => {
     enableSignIn();
     signInAs();
     answerWith(() => ({ data: { items: MINE } }));
     show("/me/tickets");
-    const group = await screen.findByRole("region", { name: /Waiting for confirmation/ });
+    const group = await screen.findByRole("region", { name: /Under review/ });
     const rows = within(group).getAllByRole("listitem");
     expect(rows).toHaveLength(2);
-    expect(within(group).getByRole("heading", { level: 2 })).toHaveTextContent("Waiting for confirmation 2");
+    expect(within(group).getByRole("heading", { level: 2 })).toHaveTextContent("Under review 2");
 
     expect(within(rows[0]).getByRole("link", { name: "Maker Night" })).toHaveAttribute("href", "/events/maker-night");
-    expect(within(rows[0]).getByText("Waiting for confirmation")).toBeInTheDocument();
+    expect(rows[0].querySelector(".me-pill")).toHaveTextContent(/^Under review$/);
     expect(within(rows[0]).getByText("Student")).toBeInTheDocument();
-    expect(within(rows[0]).getByText(/confirms each place/)).toHaveTextContent("Circuit Society confirms each place. Your ticket comes by email when they confirm yours.");
-    expect(within(rows[0]).getByRole("link", { name: "Your request for Maker Night" })).toHaveAttribute("href", `/requests/${T1}`);
+    expect(within(rows[0]).getByText(/reviews every registration/)).toHaveTextContent(
+      "Circuit Society reviews every registration. If yours is confirmed, your ticket will come by email.",
+    );
+    expect(within(rows[0]).getByRole("link", { name: "See your registration for Maker Night" })).toHaveAttribute("href", `/requests/${T1}`);
+    expect(within(rows[0]).getByRole("link", { name: "See your registration for Maker Night" })).toHaveTextContent("See your registration");
 
-    expect(within(rows[1]).getByText("Confirmed")).toBeInTheDocument();
-    expect(within(rows[1]).getByText(/confirmed your place/)).toHaveTextContent("Circuit Society confirmed your place. Pay ₹199 by Tue, 27 Oct · 10:15 AM IST to get your ticket.");
+    expect(rows[1].querySelector(".me-pill")).toHaveTextContent("Confirmed · pay by Tue, 27 Oct · 10:15 AM IST to get your ticket");
+    expect(within(rows[1]).getByText(/confirmed your registration/)).toHaveTextContent("Circuit Society confirmed your registration. Your ticket is held for you until then.");
+    expect(within(rows[1]).getByRole("link", { name: "Pay ₹199 for Solder Lab" })).toHaveTextContent("Pay ₹199");
     expect(within(rows[1]).getByRole("link", { name: "Pay ₹199 for Solder Lab" })).toHaveAttribute("href", `/claim/${CLAIM}`);
-    expect(within(rows[1]).getByRole("link", { name: "Your request for Solder Lab" })).toHaveAttribute("href", `/requests/${T2}`);
+    expect(within(rows[1]).getByRole("link", { name: "See your registration for Solder Lab" })).toHaveAttribute("href", `/requests/${T2}`);
 
     expect(within(group).queryByText("Registered Already")).toBeNull();
     expect(within(group).queryByText("Declined One")).toBeNull();
+    expect(group).not.toHaveTextContent(/request|waiting|confirms each place|your place/i);
     // The tickets are there as ever.
     expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
   });
@@ -573,7 +578,7 @@ describe("My tickets: requests waiting for the club (registration approval)", ()
     show("/me/tickets");
     expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
     await waitFor(() => expect(asked()).toBe(1));
-    expect(screen.queryByRole("region", { name: /Waiting for confirmation/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: /Under review/ })).toBeNull();
   });
 
   it("shows nothing when there are none open", async () => {
@@ -583,17 +588,17 @@ describe("My tickets: requests waiting for the club (registration approval)", ()
     show("/me/tickets");
     expect(await screen.findByRole("region", { name: /Upcoming/ })).toBeInTheDocument();
     await waitFor(() => expect(asked()).toBe(1));
-    expect(screen.queryByRole("region", { name: /Waiting for confirmation/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: /Under review/ })).toBeNull();
   });
 
-  it("signed out, with the guest token a registration here left: that guest's requests, under the way in", async () => {
+  it("signed out, with the guest token a registration here left: that guest's registrations, under the way in", async () => {
     enableSignIn();
     localStorage.setItem("access_token", "guest-a");
     answerWith(() => ({ data: { items: [MINE[0]] } }));
     show("/me/tickets");
     expect(await screen.findByRole("heading", { name: "Your tickets, in one place" })).toBeInTheDocument();
-    const group = await screen.findByRole("region", { name: /Waiting for confirmation/ });
-    expect(within(group).getByRole("link", { name: "Your request for Maker Night" })).toHaveAttribute("href", `/requests/${T1}`);
+    const group = await screen.findByRole("region", { name: /Under review/ });
+    expect(within(group).getByRole("link", { name: "See your registration for Maker Night" })).toHaveAttribute("href", `/requests/${T1}`);
     localStorage.removeItem("access_token");
   });
 
@@ -603,6 +608,6 @@ describe("My tickets: requests waiting for the club (registration approval)", ()
     show("/me/tickets");
     expect(await screen.findByRole("heading", { name: "Your tickets, in one place" })).toBeInTheDocument();
     expect(asked()).toBe(0);
-    expect(screen.queryByRole("region", { name: /Waiting for confirmation/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: /Under review/ })).toBeNull();
   });
 });

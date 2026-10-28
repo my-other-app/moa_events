@@ -1,15 +1,21 @@
+import { formatWhen } from "./format";
+import { rupees } from "./register";
 import { parseRequestRef, tokenOf } from "./requestlink";
 import { apiFailure } from "./ticketing";
 
 export { requestPath, tokenFromStatusUrl } from "./requestlink";
 
 /**
- * Registration approval ("Confirm each registration"): a club can confirm
- * each place at an event. Whoever fills in its form isn't registered yet:
- * they get a request, and an email, and the club confirms or declines it.
- * Confirmed and free, they are registered and the ticket email goes out;
- * confirmed and paid, they get a pay link (the waiting list's claim flow,
- * /claim/{token}) and the place is held for a while.
+ * Registration approval, called "Review registrations" wherever people read
+ * it: a club can review every registration for an event. Whoever registers
+ * gets a registration under review (the API's "request") and an email, and
+ * the club confirms or declines it. Confirmed and free, they get their
+ * ticket by email; confirmed and paid, they get a pay link (the waiting
+ * list's claim flow, /claim/{token}) and the ticket is held for a while.
+ *
+ * The words people read follow feature-register/review-wording-contract.md:
+ * never "request a place", "your request", "waiting list" or "place" (a
+ * seat) on such an event. "Request" stays in code, routes and the API.
  *
  * Nothing here touches the page: the request's shape as the API sends it
  * (GET /registration-requests/{token}, and each item of
@@ -33,17 +39,25 @@ const idOf = (v) => (typeof v === "number" || (typeof v === "string" && v.trim()
 export const REQUEST_STATUSES = new Set(["pending", "approved", "declined", "withdrawn", "lapsed", "closed"]);
 
 /**
+ * Why a closed request closed (`closed_reason`): the event ended or was
+ * deleted while it was under review, the event was cancelled, or the person
+ * got a ticket another way.
+ */
+export const CLOSED_REASONS = new Set(["event_ended", "event_deleted", "event_cancelled", "registered_directly"]);
+
+/**
  * A registration request, as the pages read it:
  *
  *   {id, token, status, event: {id, slug, name, starts_at, location_name, is_online, poster, club},
  *    ticketType: {id, name} | null, fullName, submittedAt, decidedAt, declineNote,
- *    ticketId, pay: {amount, payBy, claimToken, claimUrl} | null}
+ *    closedReason, ticketId, pay: {amount, payBy, claimToken, claimUrl} | null}
  *
  * `status` is one of REQUEST_STATUSES, or "other" for one this site doesn't
  * know yet. `ticketId` once registered; `pay` only for a confirmed paid
- * request still inside its hold (the claim link pays it). `token` when the
- * answer carries one (`token`, or `status_url`): the status page's address.
- * Null when it isn't a request.
+ * request still inside its hold (the claim link pays it). `closedReason`
+ * only for a closed one, and only one of CLOSED_REASONS (else null, said as
+ * the event having ended). `token` when the answer carries one (`token`, or
+ * `status_url`): the status page's address. Null when it isn't a request.
  */
 export function parseRequest(d) {
   const o = obj(d);
@@ -74,10 +88,43 @@ export function parseRequest(d) {
     submittedAt: iso(o.submitted_at),
     decidedAt: iso(o.decided_at),
     declineNote: str(o.decline_note),
+    closedReason: o.status === "closed" && CLOSED_REASONS.has(o.closed_reason) ? o.closed_reason : null,
     ticketId: ticket,
     pay: claimToken ? { amount: Math.max(0, num(pay.amount) ?? 0), payBy: iso(pay.pay_by), claimToken, claimUrl: str(pay.claim_url) } : null,
   };
 }
+
+const WORDS = { pending: "Under review", declined: "Not confirmed", withdrawn: "Cancelled", lapsed: "Expired", closed: "Closed" };
+
+/**
+ * The status chip, in the attendee's words: "Under review", "Confirmed",
+ * "Confirmed · pay by Tue, 27 Oct · 10:15 AM IST to get your ticket" (paid,
+ * not paid yet, inside the hold), "Not confirmed", "Cancelled", "Expired",
+ * "Closed". Null for a status this site doesn't know.
+ */
+export function statusWord(request) {
+  const status = request?.status;
+  if (status === "approved") {
+    if (request.ticketId || !request.pay) return "Confirmed";
+    const by = formatWhen(request.pay.payBy);
+    return `Confirmed · pay ${by ? `by ${by} IST ` : ""}to get your ticket`;
+  }
+  return WORDS[status] || null;
+}
+
+/**
+ * A confirmed paid registration's line: "Pay ₹199 by Tue, 27 Oct · 10:15 AM
+ * IST to get your ticket." Whatever `pay` doesn't say is left out ("Pay to
+ * get your ticket." without it).
+ */
+export function payLine(pay) {
+  const amount = pay && pay.amount > 0 ? rupees(pay.amount) : null;
+  const by = pay ? formatWhen(pay.payBy) : "";
+  return `Pay ${amount ? `${amount} ` : ""}${by ? `by ${by} IST ` : ""}to get your ticket.`;
+}
+
+/** "Pay ₹199", or "Pay now" without an amount. */
+export const payButton = (pay) => (pay && pay.amount > 0 ? `Pay ${rupees(pay.amount)}` : "Pay now");
 
 /** GET /registration-requests/mine: `{items: [...]}` (a bare list is read too). */
 export function parseRequestList(d) {
@@ -96,21 +143,30 @@ export const openRequests = (list) => (Array.isArray(list) ? list.filter((r) => 
 /** The club's name for a sentence: "Circuit Society", else "The club" (or "the club" mid-sentence). */
 export const clubName = (club, { start = true } = {}) => str(club?.name) || (start ? "The club" : "the club");
 
-/** Beside the event's register button: "Circuit Society confirms each place. You'll get your ticket by email when they do." */
-export const approvalNote = (club) => `${clubName(club)} confirms each place. You’ll get your ticket by email when they do.`;
+/**
+ * Beside the event's register button, and on the form's steps: "Circuit
+ * Society reviews every registration and emails tickets to the people it
+ * confirms."
+ */
+export const approvalNote = (club) => `${clubName(club)} reviews every registration and emails tickets to the people it confirms.`;
 
 /**
- * Where an open event with nobody going yet says "Be the first to register":
- * on an event whose club confirms each place, "Circuit Society confirms each
- * place" instead (people may have asked already; the page shows no request numbers).
+ * The short form, for one-line stat spots only (the full note sits by the
+ * button): where an open event with nobody going yet says "Be the first to
+ * register", one that reviews registrations says "Circuit Society reviews
+ * every registration" instead (people may have registered already; the page
+ * shows no numbers under review).
  */
-export const confirmsEachPlace = (club) => `${clubName(club)} confirms each place`;
+export const confirmsEachPlace = (club) => `${clubName(club)} reviews every registration`;
+
+/** Registered, and under review: "Circuit Society reviews every registration. If yours is confirmed, your ticket will come by email." */
+export const underReviewNote = (club) => `${clubName(club)} reviews every registration. If yours is confirmed, your ticket will come by email.`;
 
 /** Nobody going yet: what the event says in place of a count. */
 export const nobodyGoingLine = (event, club) => (event?.requires_approval === true ? confirmsEachPlace(club) : "Be the first to register");
 
 /**
- * The event's "Confirm each registration" setting: the form's GET
+ * The event's "Review registrations" setting: the form's GET
  * /events/info (freshest) says it at the top or in its `ticketing`;
  * otherwise the event page's. False when nobody says it (an older server).
  */
@@ -124,10 +180,10 @@ export function requiresApproval(info, event = null) {
 
 /**
  * The register call's `approval` (with `accepts_approval: true`, for an
- * event whose club confirms each place): {id, status, submittedAt, token,
+ * event that reviews registrations): {id, status, submittedAt, token,
  * path}. `token` and `path` are null when the form was sent again, signed
- * out, for an address with an open request: the API emails the link to the
- * address instead. Null when the answer is a registration.
+ * out, for an address with an open registration: the API emails the link
+ * to the address instead. Null when the answer is a registration.
  */
 export const parseApproval = (data) => parseRequestRef(obj(data)?.approval);
 

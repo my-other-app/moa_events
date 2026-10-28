@@ -55,7 +55,7 @@ export function registerEvent(e) {
     url: e.url,
     // Why a cancelled event was called off, for the page that says so.
     ...(e.cancellation ? { cancellation: e.cancellation } : {}),
-    // The club confirms each place: the form sends a request (until its own read of the event says otherwise).
+    // The club reviews every registration: the form's goes in under review (until its own read of the event says otherwise).
     ...(e.requires_approval ? { requires_approval: true } : {}),
   };
 }

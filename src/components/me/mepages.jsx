@@ -8,9 +8,8 @@ import { requestsApi } from "@/api/requests";
 import { useAuth } from "@/auth/context";
 import { guestToken } from "@/auth/session";
 import { eventPath, whenLine } from "@/utils/eventpage";
-import { formatWhen, imageUrl } from "@/utils/format";
-import { rupees } from "@/utils/register";
-import { openRequests, requestPath } from "@/utils/requests";
+import { imageUrl } from "@/utils/format";
+import { clubName, openRequests, payButton, requestPath, statusWord, underReviewNote } from "@/utils/requests";
 import { VerifyBanner } from "../auth/verifyemail";
 import { SitePage } from "../discover/chrome";
 import { EmptyState, ErrorState, Img, StoreButtons } from "../discover/bits";
@@ -26,9 +25,10 @@ import { CancelledNote, ownState, useEventStates } from "../cancelled";
  * the same neutral first paint on the server and in the browser, then, once
  * the browser has read who is signed in: the list, or the way in. In a build
  * without sign-in, each points to the app, where these have always lived.
- * My tickets also lists the requests still waiting on a club that confirms
- * each place (registration approval), for an account or for the guest a
- * registration here left, when the API has them.
+ * My tickets also lists the registrations still under review by a club that
+ * reviews registrations (registration approval), or confirmed and not paid
+ * yet, for an account or for the guest a registration here left, when the
+ * API has them.
  */
 
 const TICKETS_PAGE = 20;
@@ -264,11 +264,11 @@ function TicketRow({ item, past, onPaid, state = null }) {
   );
 }
 
-/* ---------- requests waiting for the club ---------- */
+/* ---------- registrations under review ---------- */
 
 /**
- * One request for a place at an event whose club confirms each place: the
- * event, and where it stands. Waiting: its page (and withdrawing it there).
+ * One registration for an event that reviews registrations: the event, and
+ * where it stands. Under review: its page (and cancelling it there).
  * Confirmed and not yet paid: pay on the claim page, or its page.
  */
 function RequestRow({ request }) {
@@ -276,8 +276,8 @@ function RequestRow({ request }) {
   const when = whenLine(e.starts_at);
   const page = requestPath(request.token);
   const pay = request.status === "approved" ? request.pay : null;
-  const payBy = pay ? formatWhen(pay.payBy) : null;
-  const amount = pay && pay.amount > 0 ? rupees(pay.amount) : null;
+  const payLabel = pay ? payButton(pay) : null;
+  const club = clubName(e.club);
   return (
     <li className="me-ticket me-request">
       <div className="me-ticket-main">
@@ -293,32 +293,32 @@ function RequestRow({ request }) {
           </h3>
           <p className="me-ticket-meta">
             {e.club?.name ? <span>by {e.club.name}</span> : null}
-            <span className={`me-pill${pay ? " me-pill--yes" : ""}`}>{request.status === "approved" ? "Confirmed" : "Waiting for confirmation"}</span>
+            <span className={`me-pill${pay ? " me-pill--yes" : ""}`}>{statusWord(request)}</span>
             {request.ticketType ? <span className="me-ticket-type">{request.ticketType.name}</span> : null}
           </p>
           <p className="me-request-line">
             {request.status === "approved"
               ? pay
-                ? `${e.club?.name || "The club"} confirmed your place. Pay${amount ? ` ${amount}` : ""}${payBy ? ` by ${payBy} IST` : ""} to get your ticket.`
-                : `${e.club?.name || "The club"} confirmed your place: your ticket is on its way by email.`
-              : `${e.club?.name || "The club"} confirms each place. Your ticket comes by email when they confirm yours.`}
+                ? `${club} confirmed your registration.${pay.payBy ? " Your ticket is held for you until then." : ""}`
+                : `${club} confirmed your registration: your ticket is on its way by email.`
+              : underReviewNote(e.club)}
           </p>
         </div>
       </div>
       <div className="me-ticket-stub">
         <div className="me-ticket-code">
-          <p className="me-ticket-kicker">Request</p>
-          <p className="me-ticket-number me-request-state">{request.status === "approved" ? (pay ? "To pay" : "Confirmed") : "Waiting"}</p>
+          <p className="me-ticket-kicker">Registration</p>
+          <p className="me-ticket-number me-request-state">{request.status === "approved" ? (pay ? "To pay" : "Confirmed") : "Under review"}</p>
         </div>
         <div className="me-ticket-actions">
           {pay ? (
-            <Link className="dc-btn dc-btn--sm" href={`/claim/${encodeURIComponent(pay.claimToken)}`} aria-label={`Pay${amount ? ` ${amount}` : ""} for ${e.name}`}>
-              {amount ? `Pay ${amount}` : "Pay now"}
+            <Link className="dc-btn dc-btn--sm" href={`/claim/${encodeURIComponent(pay.claimToken)}`} aria-label={`${payLabel} for ${e.name}`}>
+              {payLabel}
             </Link>
           ) : null}
           {page ? (
-            <Link className={pay ? "me-cert" : "dc-btn dc-btn--sm"} href={page} aria-label={`Your request for ${e.name}`}>
-              {pay ? "Request details" : "View request"}
+            <Link className={pay ? "me-cert" : "dc-btn dc-btn--sm"} href={page} aria-label={`See your registration for ${e.name}`}>
+              See your registration
             </Link>
           ) : null}
         </div>
@@ -328,7 +328,7 @@ function RequestRow({ request }) {
 }
 
 /**
- * "Waiting for confirmation": the reader's requests still open (waiting, or
+ * "Under review": the reader's registrations still open (under review, or
  * confirmed and not yet paid), from GET /registration-requests/mine, sent
  * with the account's token or, signed out, the guest token a registration
  * left. Nothing at all while it loads, when there are none, from a server
@@ -353,7 +353,7 @@ function WaitingRequests({ who }) {
   return (
     <section className="me-section me-requests" aria-labelledby="me-waiting">
       <h2 className="me-section-title" id="me-waiting">
-        Waiting for confirmation <small>{items.length}</small>
+        Under review <small>{items.length}</small>
       </h2>
       <ul className="me-tickets">
         {items.map((r, i) => (

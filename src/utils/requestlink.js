@@ -40,16 +40,23 @@ export const requestPath = (token) => (token && REQUEST_TOKEN.test(String(token)
 /** The token an answer carries: `token`, else the one in `status_url`. */
 export const tokenOf = (o) => (str(o?.token) && REQUEST_TOKEN.test(o.token.trim()) ? o.token.trim() : tokenFromStatusUrl(o?.status_url));
 
-/** {id, status, submittedAt, token, path}, or null when it isn't one. `token` and `path` are null when the link was emailed instead. */
+/**
+ * {id, status, submittedAt, token, path}, or null when it isn't one. `token` and `path` are null when the link was emailed instead.
+ * With `pay: {amount, payBy, claimToken}` too, only when the answer carries a confirmed ticket's pay link (an API may add one).
+ */
 export function parseRequestRef(d) {
   const a = obj(d);
   if (!a) return null;
   const token = tokenOf(a);
+  const pay = obj(a.pay);
+  const claimToken = str(pay?.claim_token);
+  const amount = Number(pay?.amount);
   return {
     id: a.id === null || a.id === undefined ? null : String(a.id),
     status: str(a.status) || "pending",
     submittedAt: iso(a.submitted_at),
     token,
     path: requestPath(token),
+    ...(claimToken ? { pay: { amount: Number.isFinite(amount) ? Math.max(0, amount) : 0, payBy: iso(pay.pay_by), claimToken } } : {}),
   };
 }

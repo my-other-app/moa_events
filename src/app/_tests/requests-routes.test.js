@@ -8,11 +8,11 @@ import { DISALLOW } from "@/seo/robots";
 import { APP_PATHS } from "@/seo/appLinks";
 
 /*
- * /requests/{token}: where a request for a place stands, for an event whose
- * club confirms each place (registration approval). The token is the
- * request's only credential (it can withdraw it), so the page is never
- * indexed, kept, framed or passed on in a Referer; the request itself is
- * read in the browser.
+ * /requests/{token}: where a registration stands, for an event that reviews
+ * registrations (registration approval). The token is the registration's
+ * only credential (it can cancel it), so the page is never indexed, kept,
+ * framed or passed on in a Referer; the registration itself is read in the
+ * browser.
  */
 const params = (o) => Promise.resolve(o);
 const route = () => import("../requests/[token]/page.jsx");
@@ -35,11 +35,28 @@ describe("/requests/{token}", () => {
     expect(value("Vercel-CDN-Cache-Control")).toBe("no-store");
   });
 
-  it("first paints the loading card: the request is the browser's to read", async () => {
+  it("is titled as the person's registration", async () => {
+    const r = await route();
+    expect(String(r.metadata.title?.absolute ?? r.metadata.title)).toMatch(/^Your registration/);
+    expect(r.metadata.description).toBe("Where your registration for an event stands.");
+  });
+
+  it("first paints the loading card: the registration is the browser's to read", async () => {
     const r = await route();
     const out = html(await r.default({ params: params({ token: TOKEN }) }), `/requests/${TOKEN}`);
-    expect(out).toContain('aria-label="Loading your request"');
+    expect(out).toContain('aria-label="Loading your registration"');
     expect(out).not.toContain(TOKEN);
+  });
+
+  it("?withdraw=1 (the email's cancel link) asks the page to open on the cancel question; nothing else does", async () => {
+    const r = await route();
+    const asks = async (searchParams) => (await r.default({ params: params({ token: TOKEN }), searchParams })).props.askToCancel;
+    expect(await asks(params({ withdraw: "1" }))).toBe(true);
+    expect(await asks(params({ withdraw: ["1", "0"] }))).toBe(true);
+    expect(await asks(params({ withdraw: "0" }))).toBe(false);
+    expect(await asks(params({ withdraw: "yes" }))).toBe(false);
+    expect(await asks(params({}))).toBe(false);
+    expect(await asks(undefined)).toBe(false);
   });
 
   it("answers an address that is no request link with a real 404", async () => {

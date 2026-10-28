@@ -242,65 +242,80 @@ describe("an offer no longer standing", () => {
   });
 });
 
-describe("a place the club confirmed (registration approval)", () => {
+describe("a registration the club confirmed (registration approval)", () => {
   const approved = (over = {}, type = {}) => offer({ reason: "approved", event: { id: 7, slug: "hack-night-04", name: "Hack Night 04", event_datetime: "2026-11-08T18:00:00+05:30", location_name: "Lab 3B, COEP", poster: null, club: { name: "Circuit Society" } }, ...over }, type);
+  // Never said about a registration the club confirmed: those are the waiting list's words.
+  const LINE_WORDS = /opened up|next person in line|your place|claim/i;
 
-  it("says the club confirmed it, and pays without the waiting list's words", async () => {
+  it("says the club confirmed the registration, and pays without the waiting list's words", async () => {
     ticketingApi.offer.mockResolvedValue(approved());
     ticketingApi.claim.mockResolvedValue(CLAIMED());
     paymentsApi.createPaymentOrder.mockResolvedValue({ amount: 19900, razorpay_order_id: "order_9" });
     show();
-    expect(await heading("Circuit Society confirmed your place")).toBeInTheDocument();
-    expect(screen.getByText(/is confirmed/, { selector: ".rg-lede" })).toHaveTextContent(
-      "Asha, your place at Hack Night 04 is confirmed. Pay by Mon, 2 Nov · 6:00 PM IST to get your Early bird ticket. Your place is held until then.",
+    expect(await heading("Circuit Society confirmed your registration")).toBeInTheDocument();
+    expect(screen.getByText(/to get your ticket/, { selector: ".rg-lede" })).toHaveTextContent(
+      "Pay ₹199 by Mon, 2 Nov · 6:00 PM IST to get your ticket for Hack Night 04. Your ticket is held for you until then.",
     );
-    expect(screen.queryByText(/opened up/)).toBeNull();
-    expect(screen.queryByText(/next person in line/)).toBeNull();
+    expect(screen.getByRole("form")).not.toHaveTextContent(LINE_WORDS);
     fireEvent.click(screen.getByRole("button", { name: "Pay ₹199" }));
     await waitFor(() => expect(window.Razorpay).toHaveBeenCalledTimes(1));
     expect(paymentsApi.createPaymentOrder).toHaveBeenCalledWith("7", "r5");
-    // The request's own name and code are registered: the page sends neither.
+    // The registration's own name and code are registered: the page sends neither.
     expect(ticketingApi.claim).toHaveBeenCalledWith(TOKEN, {});
   });
 
-  it("charges the price the club confirmed (its code taken off), with no code to type and the request's name as it was", async () => {
+  it("charges the price the club confirmed (its code taken off), with no code to type and the registration's name as it was", async () => {
     ticketingApi.offer.mockResolvedValue(approved({ amount: 159.2 }));
     show();
-    await heading("Circuit Society confirmed your place");
+    await heading("Circuit Society confirmed your registration");
     expect(screen.getByRole("button", { name: "Pay ₹159.20" })).toBeInTheDocument();
+    expect(screen.getByText(/to get your ticket/, { selector: ".rg-lede" })).toHaveTextContent(/^Pay ₹159\.20 by/);
     expect(screen.queryByLabelText(/^Discount code/)).toBeNull();
     expect(screen.queryByLabelText(/^Full name/)).toBeNull();
     expect(screen.getByText("Asha K", { selector: "dd" })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Your order" })).getByText("₹159.20", { selector: ".rg-total strong" })).toBeInTheDocument();
   });
 
-  it("releasing the place asks first, in the club's words", async () => {
+  it("cancelling the registration asks first", async () => {
     ticketingApi.offer.mockResolvedValue(approved());
     ticketingApi.decline.mockResolvedValue({ declined: true });
     show();
-    fireEvent.click(await screen.findByRole("button", { name: "I can't come: release my place" }));
-    expect(screen.getByRole("group", { name: "Release this place" })).toHaveTextContent("Release your place? Circuit Society can offer it to someone else, and you can't take it back.");
-    fireEvent.click(screen.getByRole("button", { name: "Yes, release it" }));
-    expect(await heading("You released your place")).toBeInTheDocument();
-    expect(screen.getByText(/Thanks for letting/)).toHaveTextContent("Thanks for letting Circuit Society know. They can offer it to someone else now.");
+    fireEvent.click(await screen.findByRole("button", { name: "I can't come: cancel my registration" }));
+    const ask = screen.getByRole("group", { name: "Cancel your registration" });
+    expect(ask).toHaveTextContent("Cancel your registration? Your ticket will go to someone else, and you can't undo this.");
+    expect(within(ask).getByRole("button", { name: "Keep my registration" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, cancel it" }));
+    expect(await heading("You cancelled your registration")).toBeInTheDocument();
+    expect(screen.getByText(/Thanks for letting/)).toHaveTextContent("Thanks for letting Circuit Society know.");
   });
 
-  it("a free confirmed place is confirmed in one tap", async () => {
+  it("a free confirmed ticket is had in one tap", async () => {
     ticketingApi.offer.mockResolvedValue(approved({ needs_payment: false }, { price: 0 }));
     show();
-    expect(await screen.findByRole("button", { name: "Confirm my place" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Get my ticket" })).toBeInTheDocument();
   });
 
-  it("a pay link that ran out says the payment didn't arrive, not that the line moved on", async () => {
+  it("a pay link that ran out says the registration expired, not that the line moved on", async () => {
     ticketingApi.offer.mockResolvedValue(approved({ status: "expired" }));
     show();
-    expect(await heading("This payment link ran out")).toBeInTheDocument();
-    expect(screen.getByText(/didn't arrive in time/)).toHaveTextContent("Circuit Society confirmed your place and held it for a while, but the payment didn't arrive in time, so it was released.");
+    expect(await heading("Your registration has expired")).toBeInTheDocument();
+    expect(screen.getByText(/paid in time/)).toHaveTextContent("Circuit Society confirmed your registration, but it wasn't paid in time, so it has expired.");
+  });
+
+  it.each([
+    ["claimed", "This ticket has been paid for"],
+    ["left", "You cancelled your registration"],
+    ["removed", "This link isn't open any more"],
+  ])("%s says what it is, in a registration's words", async (status, title) => {
+    ticketingApi.offer.mockResolvedValue(approved({ status }));
+    show();
+    expect(await heading(title)).toBeInTheDocument();
+    expect(document.querySelector(".cl-ended")).not.toHaveTextContent(/next person in line|your place|waiting list/i);
   });
 
   it("without a club's name, says the club", async () => {
     ticketingApi.offer.mockResolvedValue(offer({ reason: "approved" }));
     show();
-    expect(await heading("The club confirmed your place")).toBeInTheDocument();
+    expect(await heading("The club confirmed your registration")).toBeInTheDocument();
   });
 });

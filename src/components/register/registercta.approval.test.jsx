@@ -3,9 +3,9 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 /*
- * The event page's register button for an event whose club confirms each
- * place (registration approval): signed in, the viewer's own open request
- * (`ticketing.viewer_request`) replaces "Request a place" with where it
+ * The event page's register button for an event whose club reviews every
+ * registration (registration approval): signed in, the viewer's own open
+ * registration (`ticketing.viewer_request`) replaces "Register" with where it
  * stands. The API is mocked; nothing leaves the test.
  */
 vi.mock("@/api/events", () => ({ eventsApi: { fetchEvent: vi.fn() } }));
@@ -19,7 +19,8 @@ const { forgetTicketing } = await import("./tickets.jsx");
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
 const TOKEN = "Rq7abcdefghijklmnopqrstuvwxyz001";
-const OPEN = { kind: "open", label: "Request a place", href: "/events/hack-night-04/register", also: null };
+const CLAIM = "Cl4im-token-abcdefghijklmnop";
+const OPEN = { kind: "open", label: "Register", href: "/events/hack-night-04/register", also: null };
 const TICKETING = (viewer_request) => ({
   types: [{ id: 3, name: "Student", price: 199, is_free: false, status: "on_sale", available: 20 }],
   requires_choice: false,
@@ -39,12 +40,12 @@ function answer(viewerRequest) {
   });
 }
 
-const show = (club = { name: "Circuit Society" }) =>
+const show = () =>
   render(
     <MemoryRouter>
       <AuthProvider>
         <div className="ep-cta-go">
-          <RegisterGo eventId="123" state={OPEN} club={club} />
+          <RegisterGo eventId="123" state={OPEN} approval />
         </div>
       </AuthProvider>
     </MemoryRouter>,
@@ -63,26 +64,27 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-describe("signed in, with a request open", () => {
-  it("waiting: says the club is to confirm, and opens the request", async () => {
+describe("signed in, with a registration open", () => {
+  it("under review: says so, and opens the registration", async () => {
     answer({ id: "r1", status: "pending", token: TOKEN, status_url: `https://myotherapp.in/requests/${TOKEN}` });
     show();
-    expect(await screen.findByRole("link", { name: "View your request" })).toHaveAttribute("href", `/requests/${TOKEN}`);
-    expect(screen.getByText("Waiting for Circuit Society to confirm your place.")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Request a place" })).toBeNull();
+    expect(await screen.findByRole("link", { name: "See your registration" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+    expect(screen.getByText("Your registration is under review.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Register" })).toBeNull();
   });
 
-  it("confirmed and not paid: pay to get the ticket, on the request's page", async () => {
+  it("confirmed and not paid: pay now, on the registration's page", async () => {
     answer({ id: "r1", status: "approved", token: TOKEN, status_url: `https://myotherapp.in/requests/${TOKEN}` });
     show();
-    expect(await screen.findByRole("link", { name: "Pay for your ticket" })).toHaveAttribute("href", `/requests/${TOKEN}`);
-    expect(screen.getByText("Circuit Society confirmed your place. Pay to get your ticket.")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Pay now" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+    expect(screen.getByText("Your registration is confirmed. Pay to get your ticket.")).toBeInTheDocument();
   });
 
-  it("names the club as the club when the page names none", async () => {
-    answer({ id: "r1", status: "pending", token: TOKEN, status_url: null });
-    show(null);
-    expect(await screen.findByText("Waiting for the club to confirm your place.")).toBeInTheDocument();
+  it("confirmed, with the pay link when the API sends one: the amount and the time, on the claim page", async () => {
+    answer({ id: "r1", status: "approved", token: TOKEN, pay: { amount: 199, pay_by: "2026-10-27T10:15:00+05:30", claim_token: CLAIM } });
+    show();
+    expect(await screen.findByRole("link", { name: "Pay ₹199" })).toHaveAttribute("href", `/claim/${CLAIM}`);
+    expect(screen.getByText("Your registration is confirmed. Pay ₹199 by Tue, 27 Oct · 10:15 AM IST to get your ticket.")).toBeInTheDocument();
   });
 
   it.each([
@@ -93,7 +95,7 @@ describe("signed in, with a request open", () => {
     show();
     await waitFor(() => expect(get).toHaveBeenCalledWith("/api/v1/events/123/ticket-types", expect.anything()));
     await act(async () => {});
-    expect(screen.getByRole("link", { name: "Request a place" })).toHaveAttribute("href", "/events/hack-night-04/register");
-    expect(screen.queryByText(/to confirm your place/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Register" })).toHaveAttribute("href", "/events/hack-night-04/register");
+    expect(screen.queryByText(/under review/)).toBeNull();
   });
 });
