@@ -1,12 +1,15 @@
 import { Link } from "@/lib/router";
 import { formatCount, formatWhen, imageUrl } from "@/utils/format";
 import { coverFields, eventHref, heroPicks } from "@/utils/cover";
-import { Avatar, Img } from "./bits";
+import { sizeFor } from "@/utils/pictures";
+import { Avatar, PosterImg } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import { HeroSearch } from "./homeislands";
 import Icon from "./icons";
 
 const CHIPS = 8;
+/** The widest a fan tile's poster is drawn (--fan-w in styles/cards-hero.css). */
+const FAN_POSTER_W = 216;
 
 /** One event in the fan: its poster or cover, the date on it, the name and club underneath. */
 function FanTile({ event }) {
@@ -15,7 +18,7 @@ function FanTile({ event }) {
   return (
     <Link className="dc-fan-tile" to={eventHref(event)} aria-label={`${event.name}${when ? `, ${when}` : ""}`}>
       <span className="dc-fan-media">
-        <Img src={imageUrl(event.poster, "medium")} alt="" loading="eager" fallback={<EventCover event={coverFields(event)} />} extra={<DateBadge iso={event.starts_at} />} />
+        <PosterImg src={imageUrl(event.poster, sizeFor("poster", FAN_POSTER_W))} alt="" loading="eager" fallback={<EventCover event={coverFields(event)} />} extra={<DateBadge iso={event.starts_at} />} />
         {live ? <span className="dc-pill dc-pill--live">Live now</span> : null}
       </span>
       <span className="dc-fan-caption">

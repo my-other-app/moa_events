@@ -102,7 +102,8 @@ describe("an event's page", () => {
     expect(screen.getByAltText("Poster for Hack Night 04")).toHaveAttribute("src", "/media/events/hack-night-04/poster");
     const html = document.body.innerHTML;
     expect(html).toContain("/media/events/hack-night-04/speakers/1/photo");
-    expect(html).toContain("/media/events/solder-sprint/poster?size=medium");
+    // A card asks for the large poster: about twice the width it is drawn at.
+    expect(html).toContain("/media/events/solder-sprint/poster?size=large");
     expect(html).not.toMatch(/s3\.example|cdn\.example/);
   });
 

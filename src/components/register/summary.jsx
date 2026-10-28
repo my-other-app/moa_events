@@ -3,6 +3,8 @@
 import { useId, useState } from "react";
 import { dateTile, scheduleLines, seatsLeft, whenLine } from "@/utils/eventpage";
 import { imageUrl } from "@/utils/format";
+import { sizeFor } from "@/utils/pictures";
+import { PosterImg } from "../discover/picture";
 import { rupees } from "@/utils/register";
 import { EventCover } from "../discover/cover";
 import { EpIcon } from "../discover/eventparts";
@@ -14,13 +16,13 @@ import Icon from "../discover/icons";
  * over the form whose order summary opens on a tap.
  */
 
-/** The poster, small; the drawn cover when there is none (or it fails). */
+/** The poster, small and whole (92px at most: styles/register.css); the drawn cover when there is none (or it fails). */
 export function Thumb({ event, className = "" }) {
-  const src = imageUrl(event.poster, "medium") || imageUrl(event.poster_thumb, "medium");
-  const [failed, setFailed] = useState(null);
+  const size = sizeFor("poster", 92);
+  const src = imageUrl(event.poster, size) || imageUrl(event.poster_thumb, size);
   return (
     <span className={`rg-thumb ${className}`}>
-      {src && failed !== src ? <img src={src} alt="" decoding="async" onError={() => setFailed(src)} /> : <EventCover event={event} />}
+      <PosterImg src={src} alt="" loading="eager" fallback={<EventCover event={event} />} small />
     </span>
   );
 }

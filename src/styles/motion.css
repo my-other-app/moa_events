@@ -238,21 +238,24 @@
     transition-duration: var(--motion-fast);
   }
 
-  /* A card's picture leans in a little under the pointer. */
-  .dc-evcard-media > img,
+  /* A card's picture leans in a little under the pointer. A poster itself
+     never does (it would lose its edges): only the blurred copy behind it. */
+  .dc-evcard-media .dc-poster-bg,
   .dc-evcard .dc-cover-art,
-  .dc-ccard-cover img,
+  .dc-ccard-cover > img,
   .dc-clubcard .dc-cover-art,
   .dc-tcard--clamp .dc-tcard-image img {
     transition: transform var(--motion-slow) var(--motion-ease-out);
   }
   @media (hover: hover) {
-    .dc-evcard:hover .dc-evcard-media > img,
     .dc-evcard:hover .dc-cover-art,
-    .dc-clubcard:hover .dc-ccard-cover img,
+    .dc-clubcard:hover .dc-ccard-cover > img,
     .dc-clubcard:hover .dc-cover-art,
     .dc-tcard--clamp:hover .dc-tcard-image img {
       transform: scale(1.04);
+    }
+    .dc-evcard:hover .dc-evcard-media .dc-poster-bg {
+      transform: scale(1.06);
     }
   }
 
@@ -266,10 +269,10 @@
 
   /* ---------- images: a lazy one fades in as it arrives (components/discover/img.jsx) ---------- */
 
-  img[data-fade="wait"] {
+  :is(img, .dc-poster)[data-fade="wait"] {
     opacity: 0.01;
   }
-  img[data-fade="in"] {
+  :is(img, .dc-poster)[data-fade="in"] {
     animation: motion-fade var(--motion-slow) var(--motion-ease-out);
   }
 

@@ -2,8 +2,9 @@ import { Suspense } from "react";
 import { Link } from "@/lib/router";
 import { formatCount, imageUrl } from "@/utils/format";
 import { faceLook, initials } from "@/utils/cover";
+import { sizeFor } from "@/utils/pictures";
 import { feeds } from "@/seo/urls";
-import { Avatar, EmptyState, Img, Section } from "./bits";
+import { Avatar, EmptyState, Img, LogoImg, Section } from "./bits";
 import { ClubActions, ClubFollow, FollowerCount, FollowHint, MoreEvents, UpcomingEmpty, VisitCounter } from "./clubislands";
 import { ClubCover } from "./cover";
 import { ThreadCard } from "./threadcard";
@@ -81,13 +82,20 @@ function Member({ person }) {
   );
 }
 
-/** A partner on the logo wall: the logo large, the name and what they do for the club below. */
+/** How wide a partner's logo tile and the club's banner are drawn at most (styles/cards-hero.css, discover.css). */
+const PARTNER_LOGO_W = 112;
+const CLUB_COVER_W = 1120;
+
+/**
+ * A partner on the logo wall: the logo in its square on white (whole, with
+ * room, when it is not square), the name and what they do for the club below.
+ */
 function Partner({ partner }) {
   return (
     <li className="dc-ptile">
       <span className="dc-ptile-logo">
-        <Img
-          src={imageUrl(partner.logo, "medium")}
+        <LogoImg
+          src={imageUrl(partner.logo, sizeFor("logo", PARTNER_LOGO_W))}
           alt=""
           fallback={
             <span className="dc-ptile-initials" aria-hidden="true">
@@ -136,7 +144,7 @@ export function ClubView({ data }) {
       </Suspense>
       <div className="dc-wrap">
         <div className="dc-club-cover">
-          <Img src={imageUrl(club.cover, "original")} alt="" loading="eager" fetchPriority="high" fallback={<ClubCover club={{ id: club.id, slug: club.slug, name: club.name }} w={240} h={80} />} />
+          <Img src={imageUrl(club.cover, sizeFor("cover", CLUB_COVER_W))} alt="" loading="eager" fetchPriority="high" fallback={<ClubCover club={{ id: club.id, slug: club.slug, name: club.name }} w={240} h={80} />} />
         </div>
         <div className="dc-club-id">
           <Avatar name={club.name} src={club.logo} size={104} alt={`${club.name} logo`} />

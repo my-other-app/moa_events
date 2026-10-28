@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { fullEvent } from "@/test/eventFixture";
 
@@ -61,6 +61,12 @@ describe("an event's sponsors and partners", () => {
     const logo = kinetic.querySelector(".ep-backer-logo img");
     expect(logo).toHaveAttribute("src", SPONSORS[0].logo);
     expect(logo).toHaveAttribute("alt", "");
+    // On white like every logo: a square one fills the tile, anything else is whole with room (LogoImg).
+    expect(logo).toHaveClass("dc-logo-img");
+    Object.defineProperty(logo, "naturalWidth", { configurable: true, value: 1330 });
+    Object.defineProperty(logo, "naturalHeight", { configurable: true, value: 300 });
+    fireEvent.load(logo);
+    expect(logo).toHaveAttribute("data-fit", "whole");
     // No link, no logo: a plain tile with the initials.
     expect(tiles[1].querySelector("a")).toBeNull();
     expect(tiles[1].querySelector(".ep-backer-logo").textContent).toBe("AF");

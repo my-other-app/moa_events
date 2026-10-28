@@ -1,6 +1,7 @@
 import { dayRange, isDay, isMonth } from "@/utils/days";
 import { parseCancellation } from "@/utils/cancelled";
 import { imageUrl } from "@/utils/format";
+import { sizeFor } from "@/utils/pictures";
 
 /**
  * The public discovery API's shapes: the filters as the pages' addresses
@@ -685,6 +686,8 @@ export function parseEventDetail(e) {
     about: textOf(o.about),
     poster: o.poster || null,
     poster_thumb: o.poster_thumb || null,
+    // About twice a card's width (newer APIs only): what /media/events/{ref}/poster?size=large answers with.
+    poster_large: o.poster_large || null,
     starts_at: isoOrNull(o.starts_at),
     ends_at: isoOrNull(o.ends_at),
     duration_hours: positive(o.duration_hours),
@@ -765,6 +768,9 @@ export function parseAgenda(a) {
  * a name, a label ("Title sponsor"), an https link and one logo address. A
  * link that is not https is dropped rather than shown.
  */
+/** The widest a sponsor's or partner's tile is drawn (styles/event-page.css): its logo's size, utils/pictures.js. */
+const BACKER_LOGO_W = 190;
+
 const parseBacker = (kind) => (b) => {
   const o = obj(b);
   if (!o || !str(o.name)) return null;
@@ -775,7 +781,7 @@ const parseBacker = (kind) => (b) => {
     name: o.name.trim(),
     label: str(o.label)?.trim() || null,
     link: link && /^https:\/\/[^\s]+$/i.test(link) ? link : null,
-    logo: typeof o.logo === "string" ? str(o.logo) : imageUrl(o.logo, "medium"),
+    logo: typeof o.logo === "string" ? str(o.logo) : imageUrl(o.logo, sizeFor("logo", BACKER_LOGO_W)),
   };
 };
 

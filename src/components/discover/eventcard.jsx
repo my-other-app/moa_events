@@ -9,7 +9,8 @@
 import { Link } from "@/lib/router";
 import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, showsHighDemand, statusPill } from "@/utils/format";
 import { coverFields, eventHref, seatsInfo } from "@/utils/cover";
-import { Avatar, Img } from "./bits";
+import { sizeFor } from "@/utils/pictures";
+import { Avatar, PosterImg } from "./bits";
 import { DateBadge, EventCover } from "./cover";
 import Icon from "./icons";
 
@@ -61,6 +62,10 @@ function FillBar({ seats }) {
   );
 }
 
+/** How wide each card's poster is drawn at most (styles/cards-hero.css): a card in a rail or grid, and the sideways row. */
+const CARD_POSTER_W = 360;
+const ROW_POSTER_W = 104;
+
 /**
  * An event as the app's feed shows it: the club on top, the poster (or a
  * cover drawn for it) with the date and what matters right now pinned to
@@ -92,11 +97,12 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
         </p>
       ) : null}
       <div className="dc-evcard-media">
-        <Img
-          src={imageUrl(event.poster, "medium")}
+        <PosterImg
+          src={imageUrl(event.poster, sizeFor("poster", row ? ROW_POSTER_W : CARD_POSTER_W))}
           alt={`Poster for ${event.name}`}
           fallback={<EventCover event={coverFields(event)} />}
           extra={row ? null : <DateBadge iso={event.starts_at} />}
+          small={row}
         />
         {row ? null : <Pills event={event} />}
       </div>

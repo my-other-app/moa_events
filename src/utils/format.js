@@ -114,16 +114,24 @@ export function statusPill(event) {
  */
 export const showsHighDemand = (event) => Boolean(event) && event.high_demand === true && event.status !== "ended" && event.status !== "cancelled";
 
+/** For each size asked, the sizes to try, best first (a bigger one before a smaller). */
+const IMAGE_ORDER = {
+  thumbnail: ["thumbnail", "medium", "large", "original"],
+  medium: ["medium", "large", "original", "thumbnail"],
+  large: ["large", "original", "medium", "thumbnail"],
+  original: ["original", "large", "medium", "thumbnail"],
+};
+
 /**
  * An image from the API is either a plain URL or the S3 dict of sizes
- * (thumbnail / medium / original). Returns the best URL for the size asked,
- * or null.
+ * (thumbnail / medium / large / original). Returns the best URL for the size
+ * asked, or null. Which size a frame asks for: utils/pictures.js (sizeFor).
  */
 export function imageUrl(img, size = "medium") {
   if (!img) return null;
   if (typeof img === "string") return img;
   if (typeof img !== "object") return null;
-  const order = { thumbnail: ["thumbnail", "medium", "original"], medium: ["medium", "original", "thumbnail"], original: ["original", "medium", "thumbnail"] }[size] || ["medium", "original", "thumbnail"];
+  const order = IMAGE_ORDER[size] || IMAGE_ORDER.medium;
   for (const k of [...order, "url", "src"]) {
     if (typeof img[k] === "string" && img[k]) return img[k];
   }

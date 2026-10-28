@@ -5,6 +5,7 @@ import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
 import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
+import { LogoImg, PosterImg } from "./picture";
 import { coverFields } from "@/utils/cover";
 import { EventCover } from "./cover";
 import Icon from "./icons";
@@ -71,8 +72,11 @@ export function Cover({ event }) {
 
 /**
  * The poster at 4:5 with the status pill on it, or the generated cover.
- * Not lazy: it's the first thing seen. A poster that fails to load gives way
- * to the cover (the one client part, in img.jsx).
+ * Never cropped: a poster of another shape shows whole, on a soft blurred
+ * copy of itself (PosterImg). The original: the frame is up to about 560px
+ * wide on a phone, more than half the large size. Not lazy: it's the first
+ * thing seen. A poster that fails to load gives way to the cover (the one
+ * client part, in picture.jsx).
  */
 export function Poster({ event }) {
   const src = imageUrl(event.poster, "original");
@@ -80,7 +84,7 @@ export function Poster({ event }) {
   return (
     <div className="ep-poster">
       {src ? (
-        <Img src={src} alt={`Poster for ${event.name}`} loading="eager" fetchPriority="high" width="800" height="1000" fallback={<Cover event={event} />} />
+        <PosterImg src={src} alt={`Poster for ${event.name}`} loading="eager" fetchPriority="high" width="800" height="1000" fallback={<Cover event={event} />} />
       ) : (
         <Cover event={event} />
       )}
@@ -224,8 +228,9 @@ export function Speakers({ speakers }) {
 
 /**
  * The event's own sponsors, or its partners: square tiles, each with the
- * logo whole (never cropped; the initials while it loads or without one),
- * the name, and the label under it. A tile with a link opens it in a new tab;
+ * logo on white (LogoImg: a square one fills the tile, any other shape is
+ * whole with room, never cropped; the initials while it loads or without
+ * one), the name, and the label under it. A tile with a link opens it in a new tab;
  * a sponsor's is marked `sponsored`, as search engines ask of paid links.
  */
 export function Backers({ kind, items }) {
@@ -240,7 +245,7 @@ export function Backers({ kind, items }) {
             <>
               <span className="ep-backer-logo">
                 <span aria-hidden="true">{initials(b.name)}</span>
-                <Img src={b.logo} alt="" />
+                <LogoImg src={b.logo} alt="" />
               </span>
               <span className="ep-backer-name">{b.name}</span>
               {b.label ? <span className="ep-backer-label">{b.label}</span> : null}
