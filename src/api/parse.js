@@ -1,5 +1,6 @@
 import { dayRange, isDay, isMonth } from "@/utils/days";
 import { parseCancellation } from "@/utils/cancelled";
+import { imageUrl } from "@/utils/format";
 
 /**
  * The public discovery API's shapes: the filters as the pages' addresses
@@ -759,6 +760,25 @@ export function parseAgenda(a) {
   return { timezone: str(o.timezone) || "Asia/Kolkata", items };
 }
 
+/**
+ * One of the event's own sponsors or partners (the API's docs/EVENT_PARTNERS.md):
+ * a name, a label ("Title sponsor"), an https link and one logo address. A
+ * link that is not https is dropped rather than shown.
+ */
+const parseBacker = (kind) => (b) => {
+  const o = obj(b);
+  if (!o || !str(o.name)) return null;
+  const link = str(o.link)?.trim() || null;
+  return {
+    id: idOf(o.id),
+    kind,
+    name: o.name.trim(),
+    label: str(o.label)?.trim() || null,
+    link: link && /^https:\/\/[^\s]+$/i.test(link) ? link : null,
+    logo: typeof o.logo === "string" ? str(o.logo) : imageUrl(o.logo, "medium"),
+  };
+};
+
 const TEAM_SOURCES = new Set(["event", "club"]);
 
 /** Everything the event page shows; null when the event itself is missing. */
@@ -775,6 +795,9 @@ export function parseEventPage(d) {
     agenda: parseAgenda(o.agenda),
     team,
     team_source: team.length && TEAM_SOURCES.has(o.team_source) ? o.team_source : "none",
+    // Absent from an older API: none, and neither section shows.
+    sponsors: list(o.sponsors, parseBacker("sponsor")),
+    partners: list(o.partners, parseBacker("partner")),
     more_from_club: others(o.more_from_club),
     similar: others(o.similar),
   };
