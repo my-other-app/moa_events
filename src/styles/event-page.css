@@ -677,6 +677,10 @@ a.ep-club:hover .ep-club-go {
   font-size: 13px;
   color: var(--dc-muted);
 }
+/* "108 applied" with no bar above it (an event that reviews registrations). */
+.ep-meter--applied .ep-meter-text {
+  margin-top: 0;
+}
 
 /* ---------- the section tabs ---------- */
 

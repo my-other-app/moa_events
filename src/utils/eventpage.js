@@ -1,6 +1,6 @@
 import { SITE_URL } from "@/config";
 import { cancelledLine } from "./cancelled";
-import { TZ, formatDate, formatTime, formatWhen } from "./format";
+import { TZ, formatCount, formatDate, formatTime, formatWhen } from "./format";
 
 /**
  * What the event page works out from the event: its addresses, when it
@@ -95,9 +95,33 @@ export const shortDate = (iso) => {
   return d ? dateOnlyFmt.format(d) : "";
 };
 
-/** Seats still free, when the event has a limit; null when it doesn't (or nobody said). */
+/**
+ * On an event that reviews registrations, how many applied: every
+ * registration ever made for it, whatever became of it, so it never drops
+ * (`applied_count`, from newer APIs). Null on any other event, and from an
+ * older API: the event then reads exactly as before ("34 going", seats left).
+ */
+export const appliedCount = (event) => (event?.requires_approval === true && Number.isInteger(event.applied_count) ? event.applied_count : null);
+
+/**
+ * How many people, for a card, the facts and the seat meter: "108 applied"
+ * on an event that reviews registrations, else "34 going"; null when nobody
+ * has yet.
+ */
+export function peopleLine(event) {
+  const applied = appliedCount(event);
+  const n = applied ?? Math.max(0, Number(event?.going) || 0);
+  if (n <= 0) return null;
+  return `${formatCount(n)} ${applied !== null ? "applied" : "going"}`;
+}
+
+/**
+ * Seats still free, when the event has a limit; null when it doesn't (or
+ * nobody said), and on an event that reviews registrations: the club decides
+ * who gets in, so its page and cards say how many applied, never what is left.
+ */
 export function seatsLeft(event) {
-  if (!event?.capacity) return null;
+  if (!event?.capacity || appliedCount(event) !== null) return null;
   if (event.seats_left !== null && event.seats_left !== undefined) return Math.max(0, event.seats_left);
   return Math.max(0, event.capacity - (event.going || 0));
 }

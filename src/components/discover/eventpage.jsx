@@ -1,5 +1,5 @@
 import { Link } from "@/lib/router";
-import { dateTile, eventUrl, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
+import { dateTile, eventUrl, peopleLine, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { EventTickets } from "../register/eventtickets";
 import { formatCount, formatPrice, plural, showsHighDemand } from "@/utils/format";
 import { confirmsEachPlace } from "@/utils/requests";
@@ -68,14 +68,14 @@ function ClubRow({ club }) {
 function Facts({ event, club, venueLink }) {
   const lines = scheduleLines(event);
   const tile = dateTile(event.starts_at);
-  // A cancelled event has no seats to speak of.
+  // A cancelled event has no seats to speak of; one that reviews registrations shows none either (seatsLeft).
   const left = event.status === "cancelled" ? null : seatsLeft(event);
-  // Nobody going yet at an event that reviews registrations: "{Club} reviews every registration", never how many registered.
+  // Nobody yet at an event that reviews registrations: "{Club} reviews every registration".
   const confirms = event.requires_approval === true && event.status !== "ended" ? confirmsEachPlace(club) : null;
   const people =
     event.status === "cancelled"
       ? ""
-      : [event.going > 0 ? `${formatCount(event.going)} going` : confirms, left !== null && left > 0 ? `${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : null]
+      : [peopleLine(event) || confirms, left !== null && left > 0 ? `${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : null]
           .filter(Boolean)
           .join(" · ");
   return (

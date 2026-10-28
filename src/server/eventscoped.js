@@ -57,6 +57,8 @@ export function registerEvent(e) {
     ...(e.cancellation ? { cancellation: e.cancellation } : {}),
     // The club reviews every registration: the form's goes in under review (until its own read of the event says otherwise).
     ...(e.requires_approval ? { requires_approval: true } : {}),
+    // How many applied there (newer APIs): its summary then says no seats left (seatsLeft).
+    ...(typeof e.applied_count === "number" ? { applied_count: e.applied_count } : {}),
   };
 }
 

@@ -7,6 +7,7 @@
  * HTML is still made on the server; nothing here reads the browser.
  */
 import { Link } from "@/lib/router";
+import { peopleLine } from "@/utils/eventpage";
 import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, showsHighDemand, statusPill } from "@/utils/format";
 import { coverFields, eventHref, seatsInfo } from "@/utils/cover";
 import { sizeFor } from "@/utils/pictures";
@@ -87,6 +88,8 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
   const status = statusPill(event);
   const seats = row ? null : seatsInfo(event);
   const filling = seats && (seats.kind === "bar" || seats.kind === "few");
+  // "34 going", or "108 applied" where the club reviews registrations (and then no seats: seatsInfo).
+  const people = peopleLine(event);
 
   return (
     <article className={`dc-evcard${row ? " dc-evcard--row" : ""}${ended ? " is-ended" : ""}`}>
@@ -134,10 +137,10 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
         <div className={`dc-evcard-foot${filling ? " has-bar" : ""}`}>
           <FillBar seats={seats} />
           <span className="dc-price">{formatPrice(event.has_fee, event.fee)}</span>
-          {event.going > 0 ? (
+          {people ? (
             <span className="dc-going">
               <Icon name="users" size={14} />
-              {formatCount(event.going)} going
+              {people}
             </span>
           ) : null}
           {row ? (

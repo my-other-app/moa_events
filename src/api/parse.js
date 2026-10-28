@@ -299,12 +299,21 @@ const DEMO = { is_demo: flag };
  */
 const CLUB_EXTRAS = { ...DEMO, whatsapp_updates: flag };
 /**
+ * How many applied (`applied_count`), on an event that reviews registrations
+ * only: every registration ever made for it. A whole number, zero or more;
+ * kept only then, so an API without it reads as before (src/utils/eventpage.js).
+ */
+const appliedOf = (v, all) => {
+  const x = all.requires_approval === true ? nOrNull(v) : null;
+  return x !== null && x >= 0 ? Math.floor(x) : null;
+};
+/**
  * How an event is attended and whether it is on as planned, once the API says (src/seo/jsonld.js);
  * and, on a card and on the event's page alike: `requires_approval` (the club reviews every registration)
  * and `high_demand` (the club has its "High demand" label on). Each kept only when true, so an
- * API without them reads as before.
+ * API without them reads as before. And `applied_count` (appliedOf).
  */
-const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag, requires_approval: flag, high_demand: flag };
+const EVENT_STATE = { event_status: word, attendance_mode: word, is_demo: flag, requires_approval: flag, high_demand: flag, applied_count: appliedOf };
 
 const SOURCES = new Set(["browser", "ip", "none"]);
 const STATUSES = new Set(["upcoming", "closing_soon", "full", "live", "ended"]);
