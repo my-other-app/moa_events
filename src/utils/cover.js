@@ -5,6 +5,7 @@
  * tested on their own and shared by the cards, the hero and the club page.
  */
 import { TZ } from "./format";
+import { appliedCount } from "./eventpage";
 
 /** Just what a drawn cover is made from: the id, the category, the date and whether it is online. */
 export const coverFields = (event) => ({
@@ -97,11 +98,13 @@ export function eventHref(event) {
  *  - "bar":   filling up, shown as a slim bar
  *  - "few":   ten or fewer seats (or the last 15%) left
  *  - "full":  nothing left
- * Null when there is no capacity or the event is over.
+ * Null when there is no capacity or the event is over, and on an event that
+ * reviews registrations (the club decides who gets in: the card says how
+ * many applied instead).
  */
 export function seatsInfo(event) {
   const capacity = Number(event?.capacity);
-  if (!event || !Number.isFinite(capacity) || capacity <= 0 || event.status === "ended") return null;
+  if (!event || !Number.isFinite(capacity) || capacity <= 0 || event.status === "ended" || appliedCount(event) !== null) return null;
   const going = Math.max(0, Number(event.going) || 0);
   const left = Math.max(0, Math.round(capacity - going));
   const pct = Math.min(100, Math.round((going / capacity) * 100));

@@ -1,7 +1,7 @@
 import { Link } from "@/lib/router";
 import { formatCount, formatPrice, imageUrl, statusPill } from "@/utils/format";
 import { safeHref } from "@/utils/linkify";
-import { registerState, seatsLeft, whenLine } from "@/utils/eventpage";
+import { appliedCount, peopleLine, registerState, seatsLeft, whenLine } from "@/utils/eventpage";
 import { CANCELLED_TITLE, cancelledLine } from "@/utils/cancelled";
 import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
@@ -104,6 +104,7 @@ export function RegisterCard({ event, club = null }) {
   // The club reviews every registration (registration approval): said beside the button while registration is open.
   const approval = event.requires_approval === true && (state.kind === "open" || (state.kind === "live" && Boolean(state.also)));
   const left = seatsLeft(event);
+  const applied = appliedCount(event) !== null;
   const when = whenLine(event.starts_at);
   const taken = event.capacity && left !== null ? Math.min(event.capacity, Math.max(0, event.capacity - left)) : 0;
   const showMeter = event.capacity && (state.kind === "open" || state.kind === "full");
@@ -138,12 +139,15 @@ export function RegisterCard({ event, club = null }) {
         </p>
       ) : null}
       {showMeter ? (
-        <div className="ep-meter">
-          <span className="ep-meter-bar" role="img" aria-label={`${formatCount(taken)} of ${formatCount(event.capacity)} seats taken`}>
-            <span style={{ width: `${Math.round((taken / event.capacity) * 100)}%` }} />
-          </span>
+        <div className={`ep-meter${applied ? " ep-meter--applied" : ""}`}>
+          {/* Where the club reviews registrations it decides who gets in: how many applied, and no bar of seats. */}
+          {applied ? null : (
+            <span className="ep-meter-bar" role="img" aria-label={`${formatCount(taken)} of ${formatCount(event.capacity)} seats taken`}>
+              <span style={{ width: `${Math.round((taken / event.capacity) * 100)}%` }} />
+            </span>
+          )}
           <span className="ep-meter-text">
-            {event.going > 0 ? `${formatCount(event.going)} going` : nobodyGoingLine(event, club)}
+            {peopleLine(event) || nobodyGoingLine(event, club)}
             {left !== null && left > 0 ? ` · ${formatCount(left)} ${left === 1 ? "seat" : "seats"} left` : ""}
           </span>
         </div>
