@@ -76,6 +76,35 @@ describe("the live room", () => {
     expect(await screen.findByText(/the organiser will put it up/)).toBeInTheDocument();
   });
 
+  it("says what is on at a glance", async () => {
+    liveApi.fetchFeed.mockResolvedValue(feed);
+    at("/events/hack-night-04/live", <Live eventId="68" eventSlug="hack-night-04" />, "/events/:slug/live");
+    const on = within(await screen.findByRole("list", { name: "What is on right now" })).getAllByRole("listitem");
+    expect(on.map((li) => li.textContent)).toEqual(["Event is live", "Quiz running", "Poll open", "Q&A open"]);
+    // Each one jumps to its part of the room.
+    expect(screen.getByRole("link", { name: "Poll open" })).toHaveAttribute("href", "#live-poll");
+  });
+
+  it("shows each choice's count beside its share, and confirms the one you picked", async () => {
+    liveApi.fetchFeed.mockResolvedValue({ ...feed, poll: { ...feed.poll, my_response: "A little" } });
+    at("/events/hack-night-04/live", <Live eventId="68" eventSlug="hack-night-04" />, "/events/:slug/live");
+    expect(await screen.findByText("38 votes")).toBeInTheDocument();
+    expect(screen.getByText("21 votes")).toBeInTheDocument();
+    const mine = screen.getByRole("button", { name: /A little/ });
+    expect(mine).toHaveAttribute("aria-pressed", "true");
+    expect(mine.className).toContain("is-mine");
+    expect(screen.getByText(/You voted for/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Never touched it/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("says so when the room could not be reached, and reads it again on Retry", async () => {
+    liveApi.fetchFeed.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(feed);
+    at("/events/hack-night-04/live", <Live eventId="68" eventSlug="hack-night-04" eventName="Hack Night 04" />, "/events/:slug/live");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The room didn’t load");
+    fireEvent.click(screen.getByRole("button", { name: "RETRY" }));
+    expect(await screen.findByText("How comfortable are you with embedded C?")).toBeInTheDocument();
+  });
+
   it("joins the quiz with the code and the name, and remembers the player", async () => {
     liveApi.fetchFeed.mockResolvedValue(feed);
     liveApi.joinQuiz.mockResolvedValue({ event_id: 68, quiz_id: "qz", title: "Edge AI warm-up quiz", player_id: "pl1", player_key: "secret-key", name: "Sneha" });
@@ -157,6 +186,27 @@ describe("the quiz, played", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("shows where you stand once the answer is out: the first five and your own row", async () => {
+    localStorage.setItem("moa.live.player.68", JSON.stringify({ player_key: "secret-key", name: "Sneha" }));
+    const options = [{ key: "a", label: "512 KB" }, { key: "b", label: "8 MB" }];
+    liveApi.playState.mockResolvedValue({
+      status: "live",
+      title: "Edge AI warm-up quiz",
+      name: "Sneha",
+      score: 640,
+      current_index: 2,
+      total: 8,
+      rank: 12,
+      leaderboard: Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, name: `Player ${i + 1}`, score: 2000 - i * 50 })),
+      question: { id: "q3", prompt: "RAM on an ESP32-S3?", options, seconds: 20, time_left: 0, my_answer: "b", my_points: 0, my_correct: false, correct_key: "a" },
+    });
+    at("/play/68", <Play eventId="68" />, "/play/:id");
+    const rows = within(await screen.findByRole("list", { name: "Leaderboard" })).getAllByRole("listitem");
+    expect(rows.map((r) => r.textContent)).toEqual(["1Player 12000", "2Player 21950", "3Player 31900", "4Player 41850", "5Player 51800", "12Sneha (you)640"]);
+    // Nothing of the podium while a question is on: a plain list under the answers.
+    expect(rows[0].className).toBe("");
   });
 
   it("sends people without a player back to the room", async () => {
@@ -399,5 +449,56 @@ describe("the quiz's end", () => {
     play();
     expect(await screen.findByRole("heading", { level: 2, name: "The host has not started yet" })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Leaderboard" })).toBeNull();
+  });
+
+  it("puts the first three on a podium, second-first-third across the row", async () => {
+    liveApi.playState.mockResolvedValue(ended());
+    play();
+    const rows = within(await screen.findByRole("list", { name: "Leaderboard" })).getAllByRole("listitem");
+    // The DOM stays in rank order — a screen reader reads 1, 2, 3 — and CSS
+    // lays the three out as a podium with the winner in the middle.
+    expect(rows.slice(0, 3).map((r) => r.className)).toEqual(["is-podium is-p1", "is-podium is-p2 is-me", "is-podium is-p3"]);
+  });
+
+  it("shares a rank between tied players, as the player's own rank is counted", async () => {
+    liveApi.playState.mockResolvedValue(
+      ended({
+        rank: 3,
+        score: 990,
+        leaderboard: [
+          { rank: 1, name: "Rohan", score: 2210 },
+          { rank: 2, name: "Aarthi", score: 2210 },
+          { rank: 3, name: "Sneha", score: 990 },
+          { rank: 4, name: "Kiran", score: 990 },
+          { rank: 5, name: "Devika", score: 400 },
+        ],
+      })
+    );
+    play();
+    const rows = within(await screen.findByRole("list", { name: "Leaderboard" })).getAllByRole("listitem");
+    // Two on 2210 are both first and the next is third; two on 990 are both third.
+    expect(rows.map((r) => r.textContent)).toEqual(["1Rohan2210", "1Aarthi2210", "3Sneha990", "3Kiran990", "5Devika400"]);
+    expect(screen.getByText("You came 3rd with 990 points.")).toBeInTheDocument();
+  });
+
+  it("keeps the player's own row on the board when they are far down it", async () => {
+    const top = Array.from({ length: 10 }, (_, i) => ({ rank: i + 1, name: `Player ${i + 1}`, score: 2000 - i * 50 }));
+    liveApi.playState.mockResolvedValue(ended({ rank: 17, score: 640, leaderboard: top }));
+    play();
+    const rows = within(await screen.findByRole("list", { name: "Leaderboard" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(11);
+    const mine = rows[10];
+    expect(mine).toHaveClass("is-me");
+    expect(mine).toHaveClass("is-apart");
+    expect(mine.textContent).toBe("17Sneha (you)640");
+  });
+
+  it("does not repeat the player's row when they are already on the board", async () => {
+    liveApi.playState.mockResolvedValue(ended());
+    play();
+    const rows = within(await screen.findByRole("list", { name: "Leaderboard" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(rows.filter((r) => r.classList.contains("is-me"))).toHaveLength(1);
+    expect(screen.queryByText(/\(you\)/)).toBeNull();
   });
 });
