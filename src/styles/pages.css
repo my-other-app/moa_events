@@ -575,3 +575,29 @@
   color: var(--dc-link);
   font-weight: 600;
 }
+
+/* ---------- support (the legal pages' layout, with a way to write to us up top) ---------- */
+
+.dc-support-lede {
+  margin-top: 14px;
+  max-width: 620px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.dc-support-ctas,
+.dc-support-policies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.dc-support-ctas {
+  margin-top: 20px;
+}
+/* A question (/support#tickets) opens below the sticky header, as a section does. */
+.dc-support .dc-prose h3[id] {
+  scroll-margin-top: 84px;
+}
+.dc-support .dc-prose h3[id]:not(:first-of-type) {
+  margin-top: 28px;
+}

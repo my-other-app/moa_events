@@ -5,8 +5,9 @@ import { html, jsonLdOf } from "@/test/html";
 import { creditPacksResponse, plansResponse } from "@/test/plansFixture";
 import { validateSoftwareApplication } from "@/seo/validate";
 import { LEGAL } from "@/content/legal";
+import { SUPPORT } from "@/content/support";
 
-/* /about, /privacy, /terms, /pricing and /for-clubs on the server: all their words in the HTML. */
+/* /about, /privacy, /terms, /support, /pricing and /for-clubs on the server: all their words in the HTML. */
 let fetch;
 beforeEach(() => {
   fetch = fakeFetch((url) => {
@@ -46,6 +47,24 @@ describe("the static pages", () => {
       const out = html(route.default(), doc.path);
       for (const s of doc.sections) expect(out).toContain(`id="${s.id}"`);
     }
+    expect(fetch.calls).toHaveLength(0);
+  });
+
+  it("/support: static, its own title and canonical, the support address and the account-deletion section in the HTML", async () => {
+    const route = await import("../support/page.jsx");
+    expect(route.revalidate).toBeUndefined();
+    expect(route.metadata.title).toBe("Support");
+    expect(route.metadata.description).toBe(SUPPORT.description);
+    expect(route.metadata.alternates.canonical).toBe("https://myotherapp.in/support");
+    expect(route.metadata.openGraph).toMatchObject({ url: "https://myotherapp.in/support", locale: "en_IN" });
+    expect(route.metadata.robots).toBeUndefined();
+    const out = html(route.default(), "/support");
+    expect(out).toContain('href="mailto:support@myotherapp.in"');
+    // The address given to Google Play opens on its section, with no script needed.
+    expect(out).toContain('id="delete-account"');
+    for (const s of SUPPORT.sections) expect(out).toContain(`id="${s.id}"`);
+    // And the footer on every page links to it.
+    expect(out).toContain('href="/support"');
     expect(fetch.calls).toHaveLength(0);
   });
 
