@@ -1,4 +1,4 @@
-import { Bebas_Neue, DM_Sans, Inter } from "next/font/google";
+import { Bebas_Neue, DM_Sans } from "next/font/google";
 import { SITE_URL } from "@/config";
 import { DEFAULT_DESCRIPTION, HOME_TITLE, OG_IMAGE, SITE_NAME, TITLE_TEMPLATE } from "@/seo/metadata";
 import { TopicsNavProvider } from "@/components/discover/topicsnav";
@@ -42,8 +42,6 @@ import "@/styles/motion.css";
  */
 const dmSans = DM_Sans({ subsets: ["latin"], style: ["normal"], axes: ["opsz"], display: "swap", variable: "--font-dm-sans" });
 const bebasNeue = Bebas_Neue({ subsets: ["latin"], weight: "400", display: "swap", variable: "--font-bebas-neue" });
-// Only the live room and play use Inter: not preloaded on every page.
-const inter = Inter({ subsets: ["latin"], axes: ["opsz"], display: "swap", variable: "--font-inter", preload: false });
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
@@ -85,7 +83,7 @@ export const viewport = {
 export default async function RootLayout({ children }) {
   const topics = await hasTopics();
   return (
-    <html lang="en-IN" className={`${dmSans.variable} ${bebasNeue.variable} ${inter.variable}`}>
+    <html lang="en-IN" className={`${dmSans.variable} ${bebasNeue.variable}`}>
       <body>
         <Providers>
           <TopicsNavProvider on={topics}>{children}</TopicsNavProvider>
