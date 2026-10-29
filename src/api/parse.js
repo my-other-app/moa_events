@@ -1,6 +1,7 @@
 import { dayRange, isDay, isMonth } from "@/utils/days";
 import { parseCancellation } from "@/utils/cancelled";
 import { imageUrl } from "@/utils/format";
+import { sameClub } from "@/utils/hosts";
 import { sizeFor } from "@/utils/pictures";
 
 /**
@@ -336,6 +337,31 @@ export function parseClubRef(c) {
   return { id: idOf(o.id), name: name || "A club", slug: str(o.slug), logo: o.logo || null, ...optional(o, DEMO) };
 }
 
+/**
+ * The clubs co-hosting an event with its club (the API's docs/COHOSTS.md):
+ * `cohosts: [{club_id, name, slug, logo}]`, the accepted ones in the order
+ * they accepted, read in the shape of the club beside them ({id, name,
+ * slug, logo}). A row without a name, the host itself and repeats are left
+ * out. An API without co-hosts sends none: [].
+ */
+export function parseCohosts(v, host = null) {
+  const out = [];
+  for (const c of Array.isArray(v) ? v : []) {
+    const o = obj(c);
+    const name = str(o?.name)?.trim();
+    if (!name) continue;
+    const ref = { id: idOf(o.club_id) ?? idOf(o.id), name, slug: str(o.slug), logo: o.logo || null };
+    if (![host, ...out].some((h) => sameClub(h, ref))) out.push(ref);
+  }
+  return out;
+}
+
+/** {cohosts} when the event has any, else nothing: an answer from an API without them reads exactly as before. */
+const cohostsField = (v, host) => {
+  const cohosts = parseCohosts(v, host);
+  return cohosts.length ? { cohosts } : {};
+};
+
 /* ---------- topics ---------- */
 
 /*
@@ -425,6 +451,7 @@ export function parseEvent(e) {
   const o = obj(e);
   if (!o || idOf(o.id) === null) return null;
   const category = obj(o.category);
+  const club = parseClubRef(o.club);
   return {
     id: o.id,
     slug: str(o.slug),
@@ -440,7 +467,7 @@ export function parseEvent(e) {
     has_fee: Boolean(o.has_fee),
     fee: nOrNull(o.fee),
     category: category && idOf(category.id) !== null ? { id: category.id, name: str(category.name) || "" } : null,
-    club: parseClubRef(o.club),
+    club,
     going: Math.max(0, n(o.going)),
     capacity: nOrNull(o.capacity),
     status: STATUSES.has(o.status) ? o.status : "upcoming",
@@ -453,6 +480,8 @@ export function parseEvent(e) {
     summary: typeof o.summary === "string" && o.summary.trim() ? o.summary.replace(/\r\n?/g, "\n").trim() : null,
     topics: list(o.topics, parseTopicRef),
     ...optional(o, EVENT_STATE),
+    // The clubs co-hosting it with its club (who stays `club`), once it has any.
+    ...cohostsField(o.cohosts, club),
   };
 }
 
@@ -794,9 +823,10 @@ export function parseEventPage(d) {
   if (!event) return null;
   const others = (rows) => list(rows, parseEvent).filter((e) => String(e.id) !== String(event.id));
   const team = list(o.team, parsePerson);
+  const club = parseClub(o.club);
   return {
     event,
-    club: parseClub(o.club),
+    club,
     speakers: list(o.speakers, parseSpeaker),
     agenda: parseAgenda(o.agenda),
     team,
@@ -806,6 +836,8 @@ export function parseEventPage(d) {
     partners: list(o.partners, parseBacker("partner")),
     more_from_club: others(o.more_from_club),
     similar: others(o.similar),
+    // The clubs co-hosting it with its club (the host, who stays `club`), once it has any: beside `club`, or on the event.
+    ...cohostsField(Array.isArray(o.cohosts) ? o.cohosts : obj(o.event)?.cohosts, club),
   };
 }
 

@@ -20,7 +20,10 @@ export function stableClubRef(club) {
   return { ...club, logo: club.logo && club.slug ? sizes((s) => media.clubLogo(club.slug, s)) : null };
 }
 
-/** An event card: its poster and its club's logo. */
+/** The clubs co-hosting an event, when it has any: each logo on its club's stable address. */
+const stableCohosts = (x) => (Array.isArray(x.cohosts) ? { cohosts: x.cohosts.map(stableClubRef) } : {});
+
+/** An event card: its poster, its club's logo and its co-hosts'. */
 export function stableCard(card) {
   if (!card) return card;
   const ref = eventRefOf(card);
@@ -28,6 +31,7 @@ export function stableCard(card) {
     ...card,
     poster: card.poster && ref ? sizes((s) => media.eventPoster(ref, s)) : null,
     club: card.club ? stableClubRef(card.club) : card.club,
+    ...stableCohosts(card),
   };
 }
 
@@ -67,6 +71,7 @@ export function stableEventPage(page) {
     partners: (page.partners || []).map((b, i) => ({ ...b, logo: b.logo ? media.eventBacker(ref, "partner", b.id ?? `i${i}`) : null })),
     more_from_club: page.more_from_club.map(stableCard),
     similar: page.similar.map(stableCard),
+    ...stableCohosts(page),
   };
 }
 

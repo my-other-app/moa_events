@@ -1,9 +1,11 @@
 import { Link } from "@/lib/router";
 import { formatCount, formatWhen, imageUrl } from "@/utils/format";
 import { coverFields, eventHref, heroPicks } from "@/utils/cover";
+import { eventHosts, hostsShort } from "@/utils/hosts";
 import { sizeFor } from "@/utils/pictures";
 import { Avatar, PosterImg } from "./bits";
 import { DateBadge, EventCover } from "./cover";
+import { HostFaces } from "./hosts";
 import { HeroSearch } from "./homeislands";
 import Icon from "./icons";
 
@@ -15,6 +17,8 @@ const FAN_POSTER_W = 216;
 function FanTile({ event }) {
   const when = formatWhen(event.starts_at);
   const live = event.status === "live";
+  // Its club, and the clubs co-hosting it with them ("A and B", "A + 2").
+  const hosts = event.club ? eventHosts(event) : [];
   return (
     <Link className="dc-fan-tile" to={eventHref(event)} aria-label={`${event.name}${when ? `, ${when}` : ""}`}>
       <span className="dc-fan-media">
@@ -23,10 +27,10 @@ function FanTile({ event }) {
       </span>
       <span className="dc-fan-caption">
         <span className="dc-fan-name">{event.name}</span>
-        {event.club ? (
+        {hosts.length ? (
           <span className="dc-fan-club">
-            <Avatar name={event.club.name} src={event.club.logo} size={18} />
-            <span>{event.club.name}</span>
+            {hosts.length > 1 ? <HostFaces hosts={hosts} size={18} more={false} /> : <Avatar name={event.club.name} src={event.club.logo} size={18} />}
+            <span>{hostsShort(hosts)}</span>
           </span>
         ) : null}
       </span>

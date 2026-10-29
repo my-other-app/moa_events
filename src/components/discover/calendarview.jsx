@@ -6,6 +6,7 @@ import { eventHref } from "@/utils/cover";
 import { WEEKDAYS, addMonths, dayName, dayShort, istDay, monthLabel, monthOf, monthWeeks, monthWord } from "@/utils/days";
 import { NAMES_PER_DAY, eventsByDay, useCalendarCounts } from "@/utils/eventcalendar";
 import { formatTime } from "@/utils/format";
+import { eventHosts, hostsShort } from "@/utils/hosts";
 import { NARROW, useMedia } from "@/utils/media";
 import { EmptyState, ErrorState } from "./bits";
 import Icon from "./icons";
@@ -124,7 +125,7 @@ function AgendaDay({ day, entries, count, onDay, today }) {
               <span className="dc-agitem-body">
                 <span className="dc-agitem-name">{event.name}</span>
                 <span className="dc-agitem-meta">
-                  {[event.club?.name, event.is_online ? "Online" : event.location_name].filter(Boolean).join(" · ")}
+                  {[event.club ? hostsShort(eventHosts(event)) : null, event.is_online ? "Online" : event.location_name].filter(Boolean).join(" · ")}
                 </span>
               </span>
               <Icon name="chevronRight" size={16} className="dc-agitem-go" />

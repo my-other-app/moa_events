@@ -9,9 +9,11 @@
 import { Link } from "@/lib/router";
 import { formatCount, formatDistance, formatPrice, formatWhen, imageUrl, showsHighDemand, statusPill } from "@/utils/format";
 import { coverFields, eventHref, seatsInfo } from "@/utils/cover";
+import { eventHosts } from "@/utils/hosts";
 import { sizeFor } from "@/utils/pictures";
 import { Avatar, PosterImg } from "./bits";
 import { DateBadge, EventCover } from "./cover";
+import { HostFaces, HostsShort } from "./hosts";
 import Icon from "./icons";
 
 /**
@@ -72,9 +74,14 @@ const ROW_POSTER_W = 104;
  * it, then the name once, when and where, the price and how many are going.
  * The whole card is one link to the event page.
  *
+ * An event the club co-hosts with others names them all there, the host's
+ * logo first ("A and B", "A + 2").
+ *
  * `variant="row"` is the compact, sideways version for dense lists.
  * `showClub={false}` drops the club row where the page is already the
- * club's own.
+ * club's own. Without that row (both), a co-hosted event says "Hosted by
+ * A and B" under where it is, so a club's page never passes an event it
+ * co-hosts off as its own, and its posters stay in line.
  */
 export function EventCard({ event, headingLevel = 3, variant = "card", showClub = true }) {
   const Heading = `h${headingLevel}`;
@@ -84,16 +91,19 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
   const distance = event.is_online ? null : formatDistance(event.distance_km);
   const place = event.is_online ? "Online" : event.location_name || (distance ? null : "Venue to be announced");
   const club = event.club;
+  const hosts = club ? eventHosts(event) : [];
+  const cohosted = hosts.length > 1;
+  const clubRow = Boolean(club) && showClub && !row;
   const status = statusPill(event);
   const seats = row ? null : seatsInfo(event);
   const filling = seats && (seats.kind === "bar" || seats.kind === "few");
 
   return (
     <article className={`dc-evcard${row ? " dc-evcard--row" : ""}${ended ? " is-ended" : ""}`}>
-      {club && showClub && !row ? (
-        <p className="dc-evcard-club">
-          <Avatar name={club.name} src={club.logo} size={24} />
-          <span>{club.name}</span>
+      {clubRow ? (
+        <p className={`dc-evcard-club${cohosted ? " dc-evcard-club--hosts" : ""}`}>
+          {cohosted ? <HostFaces hosts={hosts} size={24} more={false} /> : <Avatar name={club.name} src={club.logo} size={24} />}
+          <span>{cohosted ? <HostsShort hosts={hosts} /> : club.name}</span>
         </p>
       ) : null}
       <div className="dc-evcard-media">
@@ -128,6 +138,11 @@ export function EventCard({ event, headingLevel = 3, variant = "card", showClub 
               <Icon name={event.is_online ? "monitor" : "pin"} size={14} />
               {place ? <span>{place}</span> : null}
               {distance ? <span className="dc-evcard-dist">{place ? `· ${distance}` : distance}</span> : null}
+            </p>
+          ) : null}
+          {cohosted && !clubRow ? (
+            <p className="dc-evcard-hosts">
+              Hosted by <HostsShort hosts={hosts} />
             </p>
           ) : null}
         </div>

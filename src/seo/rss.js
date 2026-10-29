@@ -11,6 +11,7 @@
 import { SITE_NAME, SITE_URL } from "@/config";
 import { formatPrice } from "@/utils/format";
 import { scheduleLines, summary } from "@/utils/eventpage";
+import { eventHosts, hostNames } from "@/utils/hosts";
 import { istIso, rfc822 } from "./time";
 import { absoluteUrl, eventPagePath, eventRefOf, media } from "./urls";
 
@@ -41,13 +42,16 @@ export function imageType(url) {
   return (m && IMAGE_TYPES[m[1].toLowerCase()]) || "image/jpeg";
 }
 
+/** Who hosts it, in words: its club, and the clubs co-hosting it ("A and B"); null without a club. */
+const hostsLine = (card) => (card.club?.name ? hostNames(eventHosts(card)) : null);
+
 /** The HTML summary of an event: when (IST), where, the price and the club, then its words, trimmed. */
 export function itemHtml(card, { about = null, link }) {
   const lines = scheduleLines(card);
   const when = lines ? `${lines.day}, ${lines.time}` : null;
   const where = card.is_online ? "Online" : card.location_name || "Venue to be announced";
   const price = formatPrice(card.has_fee, card.fee);
-  const club = card.club?.name || null;
+  const club = hostsLine(card);
   const parts = [
     `<p>${[when ? `<strong>${html(when)}</strong>` : null, html(where), html([price, club ? `by ${club}` : null].filter(Boolean).join(" · "))].filter(Boolean).join("<br>")}</p>`,
     about ? `<p>${html(summary(about, 400))}</p>` : null,
@@ -64,7 +68,7 @@ export function itemHtml(card, { about = null, link }) {
 export function eventItem(card, { detail = null } = {}) {
   const ref = eventRefOf(card);
   const link = absoluteUrl(eventPagePath(card));
-  const club = card.club?.name || null;
+  const club = hostsLine(card);
   const category = card.category?.name || detail?.category?.name || null;
   const poster = card.poster || detail?.poster;
   const enclosure = poster
