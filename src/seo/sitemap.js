@@ -32,6 +32,8 @@ export const STATIC_PAGES = [
   ["/about", "monthly", "0.5"],
   // The certificate check; its results (/verify/{number}) are never listed.
   ["/verify", "monthly", "0.5"],
+  // Help: the App Store's Support URL, and Google Play's account-deletion page (/support#delete-account).
+  ["/support", "monthly", "0.4"],
   ["/privacy", "yearly", "0.3"],
   ["/terms", "yearly", "0.3"],
 ];

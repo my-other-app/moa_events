@@ -23,7 +23,8 @@ export function Inline({ text }) {
   });
 }
 
-function Block({ block }) {
+/** One block of a text in @/content/legal's format: a paragraph, a subheading or a list (the Support page's too). */
+export function Block({ block }) {
   const [kind, body] = block;
   if (kind === "h3") return <h3>{body}</h3>;
   if (kind === "ul" || kind === "ol") {

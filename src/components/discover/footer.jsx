@@ -100,9 +100,12 @@ export function SiteFooter() {
               </li>
             </ul>
           </nav>
-          <nav aria-label="Legal">
-            <h2>Legal</h2>
+          <nav aria-label="Help and legal">
+            <h2>Help &amp; legal</h2>
             <ul>
+              <li>
+                <Link to="/support">Support</Link>
+              </li>
               <li>
                 <Link to="/privacy">Privacy</Link>
               </li>

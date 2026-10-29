@@ -73,9 +73,11 @@ describe("the sitemap index", () => {
 });
 
 describe("one sitemap", () => {
-  it("lists the fixed pages", async () => {
+  it("lists the fixed pages, /support (the stores' support and account-deletion page) among them", async () => {
     vi.stubGlobal("fetch", legacyApi());
-    expect(texts(parseXml(await (await page("pages.xml")).text()), "loc")).toContain("https://myotherapp.in/for-clubs");
+    const locs = texts(parseXml(await (await page("pages.xml")).text()), "loc");
+    expect(locs).toContain("https://myotherapp.in/for-clubs");
+    expect(locs).toContain("https://myotherapp.in/support");
   });
 
   it("lists events and clubs from today's API, skipping bad rows; page 2 doesn't exist there", async () => {

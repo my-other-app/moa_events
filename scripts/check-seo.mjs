@@ -290,6 +290,7 @@ async function checkStatic() {
     ["/about", /Where student clubs run their events/],
     ["/privacy", /Privacy/],
     ["/terms", /Terms/],
+    ["/support", /Support/],
     ["/for-clubs", /from one place/],
     ["/pricing", /Plans for/],
   ]) {

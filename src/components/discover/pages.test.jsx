@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { LEGAL, PRIVACY, TERMS, plainText, updatedLabel } from "@/content/legal";
+import { SUPPORT } from "@/content/support";
 import { AboutView } from "./aboutpage";
 import { SitePage } from "./chrome";
 import { LegalPage } from "./legalpage";
+import { SupportView } from "./supportpage";
 
 /*
  * The site's own pages as the server renders them (src/app/about, privacy,
@@ -127,5 +129,72 @@ describe("the legal pages", () => {
     // No fee the checkout doesn't charge.
     expect(text).not.toMatch(/2% processing fee/);
     expect(within(main).getAllByRole("link", { name: /delete your account/i })[0]).toHaveAttribute("href", "/privacy#delete-account");
+  });
+});
+
+describe("/support", () => {
+  it("is how to reach us: the support address as a link, at the top and in its section", () => {
+    at("/support", <SupportView />);
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("heading", { level: 1, name: "Support" })).toBeInTheDocument();
+    expect(within(main).getByRole("link", { name: /Email support/ })).toHaveAttribute("href", "mailto:support@myotherapp.in");
+    const contact = within(main).getByRole("region", { name: "Contact us" });
+    expect(contact).toHaveAttribute("id", "contact");
+    expect(within(contact).getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
+    // No promise the Terms don't make: only reports have a deadline.
+    expect(contact).toHaveTextContent("reply as soon as we can");
+    expect(contact).toHaveTextContent("act within 24 hours");
+  });
+
+  it("answers the common questions, each under its own id, and sends people to the right pages", () => {
+    at("/support", <SupportView />);
+    const questions = within(screen.getByRole("main")).getByRole("region", { name: "Common questions" });
+    for (const q of SUPPORT.sections.find((s) => s.id === "questions").questions) {
+      expect(within(questions).getByRole("heading", { level: 3, name: q.q })).toHaveAttribute("id", q.id);
+    }
+    expect(within(questions).getByRole("link", { name: "My tickets" })).toHaveAttribute("href", "/me/tickets");
+    expect(within(questions).getByRole("link", { name: "MyOtherApp for clubs" })).toHaveAttribute("href", "/for-clubs");
+    expect(within(questions).getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing");
+    // Registrations the club reviews, in the words the event pages use: register, the club reviews.
+    expect(questions).toHaveTextContent("You register as usual, and the club reviews your registration.");
+    expect(questions.textContent).not.toMatch(/request a place|waiting list/i);
+    expect(questions).toHaveTextContent("Razorpay");
+    expect(questions).toHaveTextContent("Report comment");
+    expect(questions).toHaveTextContent("Settings → Blocked Users");
+  });
+
+  it("keeps /support#delete-account, the page Google Play links to, on how to delete an account and what happens to the data", () => {
+    at("/support", <SupportView />);
+    const main = screen.getByRole("main");
+    const section = within(main).getByRole("region", { name: "Delete your account" });
+    expect(section).toHaveAttribute("id", "delete-account");
+    // The button at the top and the list of sections both go there.
+    for (const a of within(main).getAllByRole("link", { name: "Delete your account" })) expect(a).toHaveAttribute("href", "#delete-account");
+    const steps = within(section).getByRole("heading", { level: 3, name: "In the app" }).nextElementSibling;
+    expect(steps.tagName).toBe("OL");
+    expect(steps.children[1]).toHaveTextContent("Scroll to the bottom and tap Delete Account.");
+    expect(within(section).getByRole("link", { name: "support@myotherapp.in" })).toHaveAttribute("href", "mailto:support@myotherapp.in");
+    for (const h of ["By email", "What is deleted", "What is kept", "How long it takes"]) expect(within(section).getByRole("heading", { level: 3, name: h })).toBeInTheDocument();
+    expect(section).toHaveTextContent("Payment records:");
+    expect(within(section).getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy#delete-account");
+    // Every line of the page is in it, bold and links included.
+    const text = main.textContent.replace(/\s+/g, " ");
+    const blocks = SUPPORT.sections.flatMap((s) => [...(s.blocks || []), ...(s.questions || []).flatMap((q) => q.blocks)]);
+    for (const [kind, body] of blocks) for (const line of kind === "ul" || kind === "ol" ? body : [body]) expect(text).toContain(plainText(line));
+  });
+
+  it("lists its sections, links to the policies, and is in the footer of every page", () => {
+    at("/support", <SupportView />);
+    const toc = screen.getByRole("navigation", { name: "On this page" });
+    for (const s of SUPPORT.sections) expect(within(toc).getByRole("link", { name: s.heading })).toHaveAttribute("href", `#${s.id}`);
+    const policies = screen.getByRole("complementary", { name: "Our policies" });
+    expect(within(policies).getByRole("link", { name: /Privacy Policy/ })).toHaveAttribute("href", "/privacy");
+    expect(within(policies).getByRole("link", { name: /Terms and Conditions/ })).toHaveAttribute("href", "/terms");
+    const footer = within(screen.getByRole("contentinfo")).getByRole("navigation", { name: "Help and legal" });
+    expect(within(footer).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Support", "/support"],
+      ["Privacy", "/privacy"],
+      ["Terms", "/terms"],
+    ]);
   });
 });
