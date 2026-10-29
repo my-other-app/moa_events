@@ -178,6 +178,11 @@ const Play = ({ eventId }) => {
       {state.status === "ended" || (state.status === "draft" && !q) ? (
         <section className="live-card">
           <h2>{state.status === "ended" ? "That is the quiz" : "The host has not started yet"}</h2>
+          <p className="live-sub">
+            {state.status === "ended"
+              ? `Thanks for playing, ${state.name}.`
+              : `You are in as ${state.name}. Keep this page open — the first question comes up on its own.`}
+          </p>
           {state.rank && (
             <p className="play-final">
               You came {ordinal(state.rank)} with {state.score} points.
