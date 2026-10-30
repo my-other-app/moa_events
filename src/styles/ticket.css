@@ -21,7 +21,20 @@
   position: relative;
 }
 
-/* Overlay to reduce brightness */
+/*
+ * The poster behind the text, on the ticket this page draws itself.
+ *
+ * A 0.7 black scrim was already here and was doing its job -- the poster is
+ * plainly darkened. What was still hard to read came from the poster's own
+ * lettering and hard edges showing through as ghost text behind the words,
+ * and from the stub's grey-on-dark line (.qr-info). So: a heavier scrim,
+ * which flattens the ghosting, and the type given a shadow to sit on.
+ *
+ * Deliberately a flat colour and not `backdrop-filter: blur()`, which would
+ * be prettier: Download draws this element with html2canvas, which honours
+ * neither backdrop-filter nor filter, so the blur would leave the PDF with
+ * exactly the ghosting this is meant to remove.
+ */
 .ticket::before {
   content: "";
   position: absolute;
@@ -29,7 +42,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7); /* Adjust opacity to control darkness */
+  background: rgba(0, 0, 0, 0.82);
   z-index: 1;
 }
 
@@ -69,15 +82,18 @@
 
 .ticket-info-label {
   font-size: 14px;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.78);
   margin-bottom: 4px;
   font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+  /* The label sits on whatever the poster left behind the scrim. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .ticket-info-value {
   font-size: 20px;
   font-weight: 400;
   font-family: var(--font-bebas-neue), "Bebas Neue", sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 /* Guidelines section */
@@ -143,9 +159,11 @@
   padding: 0 10px 0 0;
 }
 
+/* The stub's line. #999 grey on the scrimmed poster was the least readable
+ * thing on the ticket; white at 80% clears AA against it at this size. */
 .qr-info {
-  font-size: 12px;
-  color: #999;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.86);
   margin: 0;
   line-height: 1.5;
 }
@@ -192,3 +210,84 @@
   pointer-events: none;
 }
 
+
+/* ---------- the club's own design, as the server drew it ---------- */
+
+/*
+ * The ticket the club designed (src/components/ticketrender.jsx): the
+ * server's render of the same template, payload and engine as the emailed
+ * PDF. It replaces the ticket this page used to draw from the raw fields,
+ * so what the web shows is what the email sent.
+ *
+ * The picture's own shape decides the height -- a club's design can be any
+ * ratio -- so nothing here crops or stretches it. While it is being drawn
+ * the same box waits at the usual ticket's ratio, so the page doesn't jump.
+ */
+.ticket-render {
+  width: min(680px, 100%);
+  margin: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.18);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.55);
+  z-index: 1;
+}
+
+.ticket-render img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ticket-render.is-loading {
+  aspect-ratio: 1560 / 690;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* What the design may not print: the ticket's id and type, and the way to
+   the event's guidelines -- as the app keeps its type line beside the
+   rendered ticket. */
+.ticket-aside {
+  width: min(680px, 100%);
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  text-align: center;
+  z-index: 1;
+}
+
+.ticket-aside-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  align-items: baseline;
+  margin: 0;
+}
+
+.ticket-aside-id {
+  font-family: var(--font-bebas-neue), "Bebas Neue", sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+}
+
+.ticket-aside-kind {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.ticket-aside-note {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.ticket-aside-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: #fff;
+  font-size: 14px;
+  text-decoration: underline;
+}
