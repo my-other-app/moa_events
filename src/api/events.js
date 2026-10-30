@@ -81,6 +81,36 @@ export const eventsApi = {
         }
     },
 
+    /**
+     * The ticket as the club designed it: the server's own render of the
+     * same template, payload and engine as the emailed PDF (GET
+     * /events/tickets/{id}/image).
+     *
+     * It is read with the token, exactly as the ticket's details are — the
+     * endpoint allows the ticket's holder, the owning club (or a co-host)
+     * and an admin, and a QR is an entry pass, not a public picture. So it
+     * cannot be an `<img src>`: that carries no Authorization header. It
+     * comes back as a blob the caller shows from an object URL.
+     *
+     * The answer is `private, max-age=300` with an ETag, so the browser's
+     * own cache does what the app does by hand: the same ticket opened
+     * again costs a 304, or nothing at all.
+     *
+     * Null when the server won't draw it -- an older API, a failed render,
+     * or a browser that may not read this ticket -- and the page falls back
+     * to the ticket it draws itself rather than showing nothing.
+     */
+    fetchTicketImage: async (ticketId) => {
+        try {
+            const response = await apiClient.get(`/api/v1/events/tickets/${ticketId}/image`, { responseType: "blob" });
+            const data = response?.data;
+            return data && data.size !== 0 ? data : null;
+        } catch (error) {
+            console.error("Error fetching the rendered ticket:", error);
+            return null;
+        }
+    },
+
     fetchCertificateStyle: async (ticketId) => {
         try {
             const response = await apiClient.get(`/api/v1/events/certificates/${ticketId}/style`);
