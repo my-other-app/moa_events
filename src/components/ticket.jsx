@@ -9,7 +9,9 @@ import Download from "@/components/download";
 import { formatDate, formatPrice, formatTime } from "@/utils/format";
 import { loadDone } from "@/utils/register";
 import { ticketTypeName } from "@/utils/ticketing";
+import { isTicketRevoked, REVOKED_DETAIL, REVOKED_STAMP } from "@/utils/revoked";
 import { CancelledNote, ownState, useEventStates } from "./cancelled";
+import { RevokedNote } from "./revoked";
 import { useRenderedTicket } from "./ticketrender";
 
 /**
@@ -103,13 +105,22 @@ const Ticket = ({ ticketid }) => {
   const cancelled = state?.status === "cancelled";
 
   /*
+   * Revoked by the organiser, as the ticket itself says (`ticket_revoked`).
+   * Like a called-off event it means no QR anywhere on this page -- but for
+   * a different reason, and with different words: the event is still on,
+   * this one way in was taken away, and only the organiser can give it back.
+   */
+  const revoked = isTicketRevoked(ticketData);
+
+  /*
    * The ticket as the club designed it, drawn by the server (see
    * ./ticketrender). Shown in place of the ticket this page draws itself,
    * which stays as the fallback for an older server, a render that failed
-   * or a browser that may not read this ticket. A called-off event is not
-   * asked for one: its ticket must show no QR, and the render carries one.
+   * or a browser that may not read this ticket. A called-off event and a
+   * revoked ticket are not asked for one: they must show no QR, and the
+   * render carries one.
    */
-  const design = useRenderedTicket(ticketid, { skip: cancelled, attempt: retryCount });
+  const design = useRenderedTicket(ticketid, { skip: cancelled || revoked, attempt: retryCount });
   const rendered = design.state === "shown";
 
   if (error) {
@@ -164,12 +175,13 @@ const Ticket = ({ ticketid }) => {
   /*
    * The ticket this page draws itself, from the raw fields: the fallback
    * for an older server, a render that failed, a browser that may not read
-   * this ticket, and a called-off event (whose ticket must show no QR at
-   * all, so the render -- which carries one -- is never asked for).
+   * this ticket, a called-off event and a revoked ticket (both of which must
+   * show no QR at all, so the render -- which carries one -- is never asked
+   * for).
    */
   const drawnTicket = (
     <div
-      className={`ticket${cancelled ? " is-cancelled" : ""}`}
+      className={`ticket${cancelled ? " is-cancelled" : ""}${revoked ? " is-revoked" : ""}`}
       id="ticket"
       style={{
         background: `url(${ticketData.event?.poster?.original || ""}) no-repeat center center`,
@@ -208,7 +220,7 @@ const Ticket = ({ ticketid }) => {
 
         <div className="ticket-info">
           <span className="ticket-info-label">Ticket Type</span>
-          <span className="ticket-info-value">{cancelled ? "Cancelled" : typeName ? `${typeName} · ${kind}` : kind}</span>
+          <span className="ticket-info-value">{cancelled ? "Cancelled" : revoked ? REVOKED_STAMP : typeName ? `${typeName} · ${kind}` : kind}</span>
         </div>
       </div>
 
@@ -228,6 +240,12 @@ const Ticket = ({ ticketid }) => {
           <p className="ticket-void">Cancelled</p>
           <p className="qr-info">This event was called off, so this ticket is no longer valid.</p>
         </div>
+      ) : revoked ? (
+        // No QR for a ticket the door refuses: it must not look like one that gets you in.
+        <div className="qr-section qr-section--void">
+          <p className="ticket-void">{REVOKED_STAMP}</p>
+          <p className="qr-info">{REVOKED_DETAIL}</p>
+        </div>
       ) : (
         <div className="qr-section">
           <div className="qr-code">
@@ -242,6 +260,7 @@ const Ticket = ({ ticketid }) => {
   return (
     <div className="ticket-container">
       {cancelled ? <CancelledNote cancellation={state.cancellation} paid={wasPaid(ticketData)} className="ticket-cancelled" /> : null}
+      {!cancelled && revoked ? <RevokedNote eventName={ticketData.event?.name || null} ticketId={ticketid} className="ticket-revoked" /> : null}
 
       {design.state === "loading" ? (
         // A ticket-shaped wait while the server draws it, not a flash of the
@@ -253,12 +272,13 @@ const Ticket = ({ ticketid }) => {
         drawnTicket
       )}
 
-      {competition?.enabled && ticketData.event?.id && !cancelled ? (
+      {competition?.enabled && ticketData.event?.id && !cancelled && !revoked ? (
         <Link href={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>
           Your team and submission
         </Link>
       ) : null}
-      {cancelled ? null : <Download />}
+      {/* No PDF either: Download draws #ticket, so it would carry whatever is on it. */}
+      {cancelled || revoked ? null : <Download />}
     </div>
   );
 };

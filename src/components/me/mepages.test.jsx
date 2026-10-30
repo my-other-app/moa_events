@@ -499,6 +499,51 @@ describe("My tickets: ticket types and cancelled events", () => {
   });
 });
 
+/*
+ * A ticket the organiser revoked: GET /events/list?is_registered=true has
+ * said `ticket_revoked` all along, and the row used to read exactly like a
+ * working ticket.
+ */
+describe("My tickets: a revoked ticket", () => {
+  beforeEach(() => {
+    forgetEvents();
+    enableSignIn();
+    signInAs();
+  });
+
+  it("marks the row, says what to do, and offers no ticket to show at a door", async () => {
+    answer({ upcoming: [row({ ticket_revoked: true, is_paid: true })], past: [] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    const item = within(upcoming).getByRole("listitem");
+    expect(await within(item).findByText("Revoked")).toBeInTheDocument();
+    expect(within(item).getByText("This ticket was revoked by the organiser")).toBeInTheDocument();
+    expect(within(item).getByText("The organiser revoked this ticket. Contact them if you think this is a mistake.")).toBeInTheDocument();
+    expect(within(item).queryByRole("link", { name: "View ticket for Hack Night 04" })).toBeNull();
+    expect(within(item).getByRole("link", { name: "See the revoked ticket for Hack Night 04" })).toHaveAttribute("href", "/tickets/MOA7Q4K2X");
+  });
+
+  it("has nothing left to pay when its payment never went through", async () => {
+    answer({ upcoming: [row({ ticket_revoked: true, is_paid: false })], past: [] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    const item = within(upcoming).getByRole("listitem");
+    expect(await within(item).findByText("Nothing to pay")).toBeInTheDocument();
+    expect(within(item).queryByRole("button", { name: /Finish payment/ })).toBeNull();
+    expect(within(item).queryByText("Awaiting payment")).toBeNull();
+  });
+
+  it("leaves a working ticket as it was", async () => {
+    answer({ upcoming: [row({ ticket_revoked: false, is_paid: true })], past: [] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    const item = within(upcoming).getByRole("listitem");
+    expect(await within(item).findByRole("link", { name: "View ticket for Hack Night 04" })).toBeInTheDocument();
+    expect(within(item).queryByText("Revoked")).toBeNull();
+    expect(within(item).queryByText("This ticket was revoked by the organiser")).toBeNull();
+  });
+});
+
 describe("My tickets: registrations under review (registration approval)", () => {
   const T1 = "Rq7abcdefghijklmnopqrstuvwxyz001";
   const T2 = "Rq7abcdefghijklmnopqrstuvwxyz002";

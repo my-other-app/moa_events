@@ -417,11 +417,13 @@
 }
 
 /* My tickets */
-.me-pill--cancelled {
+.me-pill--cancelled,
+.me-pill--revoked {
   background: #b91c1c;
   color: #fff;
 }
-.me-ticket.is-cancelled .me-ticket-number {
+.me-ticket.is-cancelled .me-ticket-number,
+.me-ticket.is-revoked .me-ticket-number {
   text-decoration: line-through;
   color: var(--dc-muted);
 }
@@ -436,13 +438,15 @@
 }
 
 /* The ticket's own page */
-.ticket-cancelled {
+.ticket-cancelled,
+.ticket-revoked {
   width: 360px;
   max-width: 100%;
   margin-bottom: 14px;
   font-family: var(--dc-font, inherit);
 }
-.ticket.is-cancelled {
+.ticket.is-cancelled,
+.ticket.is-revoked {
   filter: grayscale(1);
 }
 .qr-section--void {
