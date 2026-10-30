@@ -46,6 +46,9 @@ export function parseMyEvent(e) {
     ticket_id: o.ticket_id,
     attended: Boolean(o.is_attended),
     certificate: Boolean(str(o.certificate_url)),
+    // Revoked by the organiser, as the list already says (src/utils/revoked.js):
+    // the row says so instead of reading like a ticket that still works.
+    revoked: o.ticket_revoked === true,
     // A paid event's registration whose payment never went through: not a ticket yet.
     awaitingPayment: Boolean(o.has_fee) && o.is_paid === false,
     ...(typeName ? { ticketType: typeName } : {}),

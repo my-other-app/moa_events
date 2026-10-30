@@ -390,3 +390,67 @@ describe("a called-off event", () => {
     expect(document.querySelector(".qr-section--void")).toBeInTheDocument();
   });
 });
+
+/*
+ * A ticket the organiser revoked (GET /events/tickets/{id}:
+ * `ticket_revoked`). The door refuses it, so the page must show no QR by
+ * either route -- not the club's rendered design, not the one it draws
+ * itself -- and must not offer the PDF, which is drawn from whichever of
+ * those is on screen.
+ */
+describe("a revoked ticket", () => {
+  const revoked = (over = {}, event = {}) => ticket({ ticket_revoked: true, ...over }, event);
+
+  it("says what happened, where to go about it, and draws no QR", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(revoked());
+    eventsApi.fetchTicketImage.mockResolvedValue(null);
+    open();
+    expect(await screen.findByText("This ticket was revoked by the organiser")).toBeInTheDocument();
+    expect(screen.getByText("Hack Night 04 · MOA77")).toBeInTheDocument();
+    expect(screen.getByText("If you think this is a mistake, contact the organiser of the event.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("QR code for ticket MOA77")).toBeNull();
+    expect(QRCodeCanvas).not.toHaveBeenCalled();
+    expect(document.querySelector(".qr-section--void")).toBeInTheDocument();
+    expect(screen.getByText("Revoked", { selector: ".ticket-void" })).toBeInTheDocument();
+    expect(field("Ticket Type")).toBe("Revoked");
+  });
+
+  it("drops the club's design once it knows, design or no design: it carries a QR", async () => {
+    withObjectUrls();
+    eventsApi.fetchTicketDetails.mockResolvedValue(revoked());
+    eventsApi.fetchTicketImage.mockResolvedValue(new Blob(["png"], { type: "image/png" }));
+    open();
+    await screen.findByText("This ticket was revoked by the organiser");
+    await waitFor(() => expect(screen.queryByRole("img", { name: /as the club designed it/i })).toBeNull());
+    expect(screen.queryByLabelText("Loading your ticket")).toBeNull();
+    expect(screen.queryByLabelText("QR code for ticket MOA77")).toBeNull();
+  });
+
+  it("offers no download: the PDF is drawn from the ticket on screen", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(revoked());
+    eventsApi.fetchTicketImage.mockResolvedValue(null);
+    open();
+    await screen.findByText("This ticket was revoked by the organiser");
+    expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
+  });
+
+  it("keeps the way to the team's page shut, as a called-off event does", async () => {
+    competitionApi.leaderboard.mockResolvedValue({ event_id: 68, enabled: true, public: true, rows: [] });
+    eventsApi.fetchTicketDetails.mockResolvedValue(revoked());
+    eventsApi.fetchTicketImage.mockResolvedValue(null);
+    open();
+    await screen.findByText("This ticket was revoked by the organiser");
+    expect(screen.queryByRole("link", { name: "Your team and submission" })).toBeNull();
+  });
+
+  it("leaves a working ticket alone -- its QR, its type and its download", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({ ticket_revoked: false, ticket_label: "VIP" }));
+    eventsApi.fetchTicketImage.mockResolvedValue(null);
+    open();
+    await screen.findByRole("heading", { level: 1, name: "Hack Night 04" });
+    expect(screen.getByLabelText("QR code for ticket MOA77")).toBeInTheDocument();
+    expect(field("Ticket Type")).toBe("VIP · Free");
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+    expect(screen.queryByText("This ticket was revoked by the organiser")).toBeNull();
+  });
+});

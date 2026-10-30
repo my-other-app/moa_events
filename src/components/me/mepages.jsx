@@ -18,7 +18,9 @@ import { ClubCard, ClubCardSkeleton } from "../discover/clubcard";
 import { EventCover } from "../discover/cover";
 import Icon from "../discover/icons";
 import { FinishPaymentButton } from "../register/finishpayment";
+import { REVOKED_STAMP } from "@/utils/revoked";
 import { CancelledNote, ownState, useEventStates } from "../cancelled";
+import { RevokedNote } from "../revoked";
 
 /**
  * The signed-in person's own pages: /me/tickets and /me/following. Their
@@ -190,8 +192,15 @@ function TicketRow({ item, past, onPaid, state = null }) {
   const ticketPath = `/tickets/${encodeURIComponent(item.ticket_id)}`;
   // Called off by the club (docs: club_ops): said on the row, with the refund for a ticket that was paid for.
   const cancelled = state?.status === "cancelled";
+  /*
+   * Revoked by the organiser: the list says so (`ticket_revoked`), and this
+   * row used to read exactly like a working ticket. There is nothing to
+   * refund -- the event is still on -- so it is said plainly, and the way to
+   * the ticket's own page no longer promises a ticket to show at a door.
+   */
+  const revoked = Boolean(item.revoked) && !cancelled;
   return (
-    <li className={`me-ticket${past ? " is-past" : ""}${cancelled ? " is-cancelled" : ""}`}>
+    <li className={`me-ticket${past ? " is-past" : ""}${cancelled ? " is-cancelled" : ""}${revoked ? " is-revoked" : ""}`}>
       <div className="me-ticket-main">
         <Thumb event={e} />
         <div className="me-ticket-info">
@@ -216,7 +225,8 @@ function TicketRow({ item, past, onPaid, state = null }) {
               </span>
             ) : null}
             {cancelled ? <span className="me-pill me-pill--cancelled">Cancelled</span> : null}
-            {item.awaitingPayment && !cancelled ? (
+            {revoked ? <span className="me-pill me-pill--revoked">{REVOKED_STAMP}</span> : null}
+            {item.awaitingPayment && !cancelled && !revoked ? (
               <span className="me-pill">{past ? "Payment not completed" : "Awaiting payment"}</span>
             ) : null}
             {item.ticketType ? <span className="me-ticket-type">{item.ticketType}</span> : null}
@@ -229,6 +239,7 @@ function TicketRow({ item, past, onPaid, state = null }) {
               className="me-cancelled"
             />
           ) : null}
+          {revoked ? <RevokedNote compact className="me-revoked" /> : null}
         </div>
       </div>
       <div className="me-ticket-stub">
@@ -238,8 +249,8 @@ function TicketRow({ item, past, onPaid, state = null }) {
         </div>
         <div className="me-ticket-actions">
           {item.awaitingPayment ? (
-            past || cancelled ? (
-              cancelled ? <span className="me-nothing">Nothing to pay</span> : null
+            past || cancelled || revoked ? (
+              cancelled || revoked ? <span className="me-nothing">Nothing to pay</span> : null
             ) : (
               <FinishPaymentButton
                 eventId={e.id}
@@ -250,8 +261,12 @@ function TicketRow({ item, past, onPaid, state = null }) {
               />
             )
           ) : (
-            <Link className="dc-btn dc-btn--sm" href={ticketPath} aria-label={`View ticket for ${e.name}`}>
-              View ticket
+            <Link
+              className={revoked ? "dc-btn dc-btn--sm dc-btn--ghost" : "dc-btn dc-btn--sm"}
+              href={ticketPath}
+              aria-label={revoked ? `See the revoked ticket for ${e.name}` : `View ticket for ${e.name}`}
+            >
+              {revoked ? "See details" : "View ticket"}
             </Link>
           )}
           {item.certificate ? (
