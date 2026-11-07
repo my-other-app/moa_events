@@ -33,13 +33,16 @@ describe("the find pages at the edge", () => {
     }
   });
 
-  it.each(["/", "/events/hack-night-04", "/events/hack-night-04/register", "/clubs/circuit-society", "/topics", "/me/tickets", "/tickets/MOA77", "/events/in/pune"])("leaves %s to its own caching", async (path) => {
+  it.each(["/", "/events/hack-night-04", "/events/hack-night-04/register", "/clubs/circuit-society", "/topics", "/me/tickets", "/events/in/pune"])("leaves %s to its own caching", async (path) => {
     expect(await edgeOf(path)).toBeNull();
   });
 
-  it("never keeps a certificate check's result at the edge", async () => {
+  it("never keeps an address that is itself a credential at the edge", async () => {
     expect(await edgeOf("/verify/CERT-AB12CD34")).toBe("no-store");
     expect(await edgeOf("/certificates/MOA77")).toBe("no-store");
+    expect(await edgeOf("/certificates/q7Hb2kLm9Zx41PwT0aRe")).toBe("no-store");
+    expect(await edgeOf("/tickets/MOA77")).toBe("no-store");
+    expect(await edgeOf("/feedback/68/reg-1")).toBe("no-store");
   });
 });
 

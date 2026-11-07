@@ -1,6 +1,7 @@
 import apiClient from "./client";
 import { parseClub, parseClubRef, parseComment, parsePoll } from "./discover";
 import { ticketTypeName } from "@/utils/ticketing";
+import { SITE_URL } from "@/config";
 
 /**
  * The signed-in person's side of the API: signing in (with Google, or an
@@ -21,6 +22,27 @@ const num = (v) => {
 };
 const idOf = (v) => (typeof v === "number" || (typeof v === "string" && v !== "") ? v : null);
 const list = (v, fn) => (Array.isArray(v) ? v.map(fn).filter(Boolean) : []);
+
+/**
+ * A link the API handed out to one of this site's pages (a certificate's
+ * `certificate_url`), as the site links it: its path when it is the site's
+ * own address (so it opens wherever the site runs), else the address as
+ * given; null when it is no web address at all. The link is the API's to
+ * make: nothing here builds one.
+ */
+export function siteHref(v) {
+  const s = str(v);
+  if (!s) return null;
+  let url;
+  try {
+    url = new URL(s.trim(), SITE_URL);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+  const site = new URL(SITE_URL).host;
+  return url.host === site || url.host === `www.${site}` ? `${url.pathname}${url.search}${url.hash}` : url.href;
+}
 
 /** The paging the API answers with: `next` is set when there is more. */
 const page = (d, items, offset) => {
@@ -45,7 +67,8 @@ export function parseMyEvent(e) {
   return {
     ticket_id: o.ticket_id,
     attended: Boolean(o.is_attended),
-    certificate: Boolean(str(o.certificate_url)),
+    // The certificate's page, by the link the API gave: never one made from the ticket.
+    certificate: siteHref(o.certificate_url),
     // Revoked by the organiser, as the list already says (src/utils/revoked.js):
     // the row says so instead of reading like a ticket that still works.
     revoked: o.ticket_revoked === true,

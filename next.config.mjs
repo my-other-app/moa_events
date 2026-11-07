@@ -9,10 +9,11 @@
  *   - the find pages (/events, /clubs) and a topic's page (/topics/{slug})
  *     kept a minute at Vercel's edge: they are rendered per request, but
  *     their HTML depends on the address alone;
- *   - the certificate check (/verify) never framed by another site, and its
- *     results (/verify/{number}) and a guest's certificate
- *     (/certificates/{ticket id}) never stored, indexed or referred on (the
- *     code is in the address);
+ *   - the certificate check (/verify) never framed by another site, and the
+ *     addresses that are themselves a credential -- a check's result
+ *     (/verify/{number}), a ticket (/tickets/{id}), a guest's certificate
+ *     (/certificates/{id}), a survey link (/feedback/...), a claim or a
+ *     request link -- never framed, stored, indexed or referred on;
  *   - the OG fonts traced into the functions that read them;
  *   - Sentry's build settings, only when it is on (withSentry, below).
  */
@@ -31,12 +32,19 @@ export const VERIFY_HEADERS = [
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "X-Content-Type-Options", value: "nosniff" },
 ];
-export const VERIFY_RESULT_HEADERS = [
+/**
+ * An address that is itself a credential: a check's result, a ticket (its
+ * id is the door's QR), a guest's certificate, a survey link (the
+ * registration and its key). Never framed, kept by a browser or a cache,
+ * indexed, nor named to another site in a Referer -- not even the origin.
+ */
+export const PRIVATE_LINK_HEADERS = [
   ...VERIFY_HEADERS,
   { key: "Cache-Control", value: "no-store, max-age=0" },
   { key: "Vercel-CDN-Cache-Control", value: "no-store" },
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
+export const VERIFY_RESULT_HEADERS = PRIVATE_LINK_HEADERS;
 
 /**
  * A waiting list's claim link (/claim/{token}), and a request's status link
@@ -87,8 +95,12 @@ const nextConfig = {
       { source: "/topics/:slug", headers: edge },
       { source: "/verify", headers: VERIFY_HEADERS },
       { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
-      // A guest's certificate: its address holds the ticket's code.
-      { source: "/certificates/:ticketid", headers: VERIFY_RESULT_HEADERS },
+      // A ticket: its id is what the door scans.
+      { source: "/tickets/:ticketid", headers: PRIVATE_LINK_HEADERS },
+      // A guest's certificate, by the id in the link the API hands out.
+      { source: "/certificates/:id", headers: PRIVATE_LINK_HEADERS },
+      // The survey after an event: the registration and the link's key.
+      { source: "/feedback/:eventId/:registrationId", headers: PRIVATE_LINK_HEADERS },
       // A waiting list's offer: its address is the claim's credential.
       { source: "/claim/:token", headers: CLAIM_HEADERS },
       // A request for a place (registration approval): its address is the request's only credential too.

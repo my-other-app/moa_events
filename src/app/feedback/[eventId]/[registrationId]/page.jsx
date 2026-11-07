@@ -10,7 +10,11 @@ import { isEventId, isKey, queryValue } from "@/server/flows";
  */
 export const dynamic = "force-dynamic";
 
-export const metadata = pageMetadata({ title: "Feedback", description: "Tell the organisers how it went.", path: null, noindex: true });
+// The address carries the registration and the link's key: never passed on as a referrer (next.config.mjs too).
+export const metadata = {
+  ...pageMetadata({ title: "Feedback", description: "Tell the organisers how it went.", path: null, noindex: true }),
+  referrer: "no-referrer",
+};
 
 export default async function FeedbackPage({ params, searchParams }) {
   const { eventId, registrationId } = await params;

@@ -8,49 +8,59 @@ import { getSession, guestToken } from "@/auth/session";
 import { API_BASE_URL, SITE_URL } from "@/config";
 import { certificateNumberOf, verifyPath } from "@/utils/certcode";
 
-/** Someone on this browser may hold the ticket: signed in, or the guest a registration left. */
+/** Someone on this browser may hold the certificate: signed in, or the guest a registration left. */
 const mayHoldIt = () => Boolean(getSession() || guestToken());
 
 /**
- * A guest's certificate, from the link in its email or My tickets
- * (/certificates/{ticket id}).
+ * A guest's certificate, from the link the API hands out
+ * (/certificates/{id}, its `certificate_url`).
  *
  * It shows the club's own design as the server draws it: the picture is
  * page one of the very PDF the email attaches (GET
- * /events/certificates/{ticket}/image), and Download is that PDF. Both are
- * public by ticket id already, so the page shows a visitor nothing the
- * address doesn't open on its own.
+ * /events/certificates/{id}/image), and Download is that PDF. Both are
+ * public by the link's id already, so the page shows a visitor nothing the
+ * address doesn't open on its own. The id goes to the API exactly as the
+ * link carried it: the site never reads what kind of id it is.
  *
- * The number, and the public check's link, come only from the ticket's
- * details, which only the guest (signed in, or the guest token their
- * registration left), their club or an admin can read. Anyone else gets
- * the picture, the PDF and the check by the number printed on it. The
- * address holds the ticket's code, which is the door's QR: the guest is
- * told to share the check's link instead.
+ * The number, and the public check's link, are the holder's alone: the
+ * number the API names in the details it gives for this id to the guest
+ * (signed in, or the guest token their registration left), their club or
+ * an admin -- never one worked out from the address. Anyone else gets the
+ * picture, the PDF and the check by the number printed on it. The holder is
+ * told to share the check rather than this page.
+ *
+ * Those details are the ticket's (GET /events/tickets/{id}), which answer
+ * while the link's id is the ticket's. For a link with the certificate's
+ * own id they say nothing, and the page shows the check by the printed
+ * number until the API names the number for that id.
  */
-export default function Certificate({ ticketid, apiBase = API_BASE_URL, loadDetails = eventsApi.fetchTicketDetails, canAsk = mayHoldIt }) {
+export default function Certificate({ id, apiBase = API_BASE_URL, loadDetails = eventsApi.fetchTicketDetails, canAsk = mayHoldIt }) {
   const img = useRef(null);
   const [state, setState] = useState("loading"); // loading | shown | missing
   const [number, setNumber] = useState(null);
   const [copied, setCopied] = useState(false);
-  const base = `${apiBase}/api/v1/events/certificates/${encodeURIComponent(ticketid)}`;
+  const base = `${apiBase}/api/v1/events/certificates/${encodeURIComponent(id)}`;
 
   // A picture that failed before the page woke up fired its error unheard.
   useEffect(() => {
     const el = img.current;
     if (el?.complete && el.currentSrc) setState(el.naturalWidth > 0 ? "shown" : "missing");
-  }, [ticketid]);
+  }, [id]);
 
   useEffect(() => {
-    if (!ticketid || !canAsk()) return undefined;
+    if (!id || !canAsk()) return undefined;
     let alive = true;
-    loadDetails(ticketid).then((data) => {
-      if (alive && data) setNumber(certificateNumberOf(data.ticket_id || ticketid, data.certificate_no) || null);
-    });
+    Promise.resolve()
+      .then(() => loadDetails(id))
+      .then(
+        // The number from what the API said, never from the address.
+        (data) => alive && data && setNumber(certificateNumberOf(data.ticket_id, data.certificate_no) || null),
+        () => {}
+      );
     return () => {
       alive = false;
     };
-  }, [ticketid, loadDetails, canAsk]);
+  }, [id, loadDetails, canAsk]);
 
   // Nothing to share for a certificate the server won't draw (not issued, or revoked).
   const shared = state === "missing" ? null : number;
@@ -115,8 +125,8 @@ export default function Certificate({ ticketid, apiBase = API_BASE_URL, loadDeta
             <p className="cert-own-label">Certificate number</p>
             <p className="vf-mono cert-own-number">{shared}</p>
             <p>
-              To show someone it&rsquo;s genuine, share the check, not this page: its address carries your ticket&rsquo;s code, which is what the door
-              scans.
+              To show someone it&rsquo;s genuine, share the check&rsquo;s link rather than this page: anyone can open it, and it shows what MyOtherApp&rsquo;s
+              records say about this certificate.
             </p>
             <div className="cert-own-link">
               <span className="vf-mono">{checkUrl.replace(/^https?:\/\//, "")}</span>

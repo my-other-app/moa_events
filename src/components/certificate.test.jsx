@@ -4,10 +4,10 @@ import { MemoryRouter } from "react-router-dom";
 import Certificate from "./certificate";
 
 const TICKET = "MOA-AAAAA-BBBBB";
-const show = (props = {}) =>
+const show = (props = {}, id = TICKET) =>
   render(
-    <MemoryRouter initialEntries={[`/certificates/${TICKET}`]}>
-      <Certificate ticketid={TICKET} apiBase="https://api.test" {...props} />
+    <MemoryRouter initialEntries={[`/certificates/${id}`]}>
+      <Certificate id={id} apiBase="https://api.test" {...props} />
     </MemoryRouter>,
   );
 
@@ -33,7 +33,7 @@ describe("a guest's certificate", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Your certificate" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Check it.s genuine/ })).toHaveAttribute("href", "/verify/CERT-7K3QF-X9PWM");
     expect(screen.getByText("myotherapp.in/verify/CERT-7K3QF-X9PWM")).toBeInTheDocument();
-    expect(screen.getByText(/share the check, not this page/)).toBeInTheDocument();
+    expect(screen.getByText(/share the check.s link rather than this page/)).toBeInTheDocument();
     // Never the ticket id as its number.
     expect(screen.queryByText(TICKET)).toBeNull();
   });
@@ -41,6 +41,23 @@ describe("a guest's certificate", () => {
   it("an older certificate's number is the one made from its ticket", async () => {
     show({ loadDetails: async () => ({ ticket_id: "MOA-2BCEBA8-PFZG3", certificate_no: null }), canAsk: () => true });
     expect(await screen.findByText("CERT-2BCEBA8-PFZG3")).toBeInTheDocument();
+  });
+
+  it("hands the link's own id to the API as it is, and never makes a number from it", async () => {
+    const ID = "q7Hb2_kLm9Zx-41PwT0aRe";
+    const loadDetails = vi.fn(async () => ({ certificate_no: null }));
+    show({ loadDetails, canAsk: () => true }, ID);
+    expect(screen.getByRole("img", { name: /as the club designed it/ })).toHaveAttribute("src", `https://api.test/api/v1/events/certificates/${ID}/image`);
+    expect(screen.getByRole("link", { name: "Download PDF" })).toHaveAttribute("href", `https://api.test/api/v1/events/certificates/${ID}/pdf`);
+    await waitFor(() => expect(loadDetails).toHaveBeenCalledWith(ID));
+    expect(screen.queryByText(/CERT-/)).toBeNull();
+    expect(screen.getByRole("link", { name: /Check a certificate/ })).toHaveAttribute("href", "/verify");
+  });
+
+  it("nor from a ticket-shaped address the API said nothing about", async () => {
+    show({ loadDetails: async () => ({}), canAsk: () => true });
+    await waitFor(() => expect(screen.getByRole("link", { name: /Check a certificate/ })).toBeInTheDocument());
+    expect(screen.queryByText(/CERT-/)).toBeNull();
   });
 
   it("someone who can't read the ticket is a visitor", async () => {

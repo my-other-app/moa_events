@@ -1,6 +1,32 @@
 import apiClient from "./client";
 import { isSignedIn, storeGuestTokens } from "@/auth/session";
 
+/**
+ * Why a ticket's details didn't come, from the API's answer:
+ *
+ *   "not_yours"    401 / 403: the ticket is there, but this browser holds no
+ *                  token that may read it (another account's, or nobody's)
+ *   "missing"      404 (or an address the API won't take): no such ticket
+ *   "unreachable"  no answer, a server error, or an answer with nothing in it
+ */
+export function ticketProblem(error) {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) return "not_yours";
+    if (status === 404 || status === 400 || status === 422) return "missing";
+    return "unreachable";
+}
+
+async function readTicket(ticketId) {
+    try {
+        const response = await apiClient.get(`/api/v1/events/tickets/${encodeURIComponent(ticketId)}`);
+        const data = response?.data;
+        return data && typeof data === "object" ? { ticket: data, problem: null } : { ticket: null, problem: "unreachable" };
+    } catch (error) {
+        console.error("Error fetching ticket details:", error);
+        return { ticket: null, problem: ticketProblem(error) };
+    }
+}
+
 export const eventsApi = {
     /** What the event sells with its ticket; `{enabled:false, items:[]}` when nothing. */
     fetchStoreCatalog: async (eventId) => {
@@ -71,15 +97,15 @@ export const eventsApi = {
         }
     },
 
-    fetchTicketDetails: async (ticketId) => {
-        try {
-            const response = await apiClient.get(`/api/v1/events/tickets/${ticketId}`);
-            return response.data;
-        } catch (error) {
-            console.error("Error fetching ticket details:", error);
-            return null;
-        }
-    },
+    /** The ticket's details (GET /events/tickets/{id}), or null when they didn't come, for whatever reason. */
+    fetchTicketDetails: async (ticketId) => (await readTicket(ticketId)).ticket,
+
+    /**
+     * The same, saying why when they didn't come: `{ticket}`, or `{ticket:
+     * null, problem}` with `problem` one of ticketProblem's. The ticket's
+     * page tells a visitor which it is.
+     */
+    fetchTicket: (ticketId) => readTicket(ticketId),
 
     /**
      * The ticket as the club designed it: the server's own render of the
@@ -111,13 +137,4 @@ export const eventsApi = {
         }
     },
 
-    fetchCertificateStyle: async (ticketId) => {
-        try {
-            const response = await apiClient.get(`/api/v1/events/certificates/${ticketId}/style`);
-            return response.data;
-        } catch (error) {
-            console.error("Error fetching certificate style:", error);
-            return null;
-        }
-    },
 };

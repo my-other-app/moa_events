@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/auth/context";
 import { eventsApi } from "@/api/events";
 import { competitionApi } from "@/api/competition";
 import { QRCodeCanvas } from "qrcode.react";
@@ -61,6 +62,64 @@ function eventPageOf(event) {
 }
 
 /**
+ * What the page says when the ticket didn't come, by why (eventsApi.fetchTicket):
+ * a ticket this browser may not read is not a connection problem, and a
+ * visitor is told how to open their own.
+ */
+export const TICKET_PROBLEMS = {
+  not_yours: {
+    title: "This ticket belongs to another account",
+    text: "Only the person who registered can open it here. Sign in with the account you registered with, or use the ticket in your registration email.",
+  },
+  missing: {
+    title: "No such ticket",
+    text: "There's no ticket at this address. Check the link, or find your tickets in My tickets.",
+  },
+  unreachable: {
+    title: "Failed to load ticket details",
+    text: "Please check your connection and try again.",
+  },
+};
+
+/*
+ * Signing in is My tickets' (it lists every ticket the account holds, this
+ * one among them if it is theirs), not a sheet opened here: this page sends
+ * no referrer (next.config.mjs), and Google's sign-in learns the page's origin
+ * from it.
+ */
+function TicketProblem({ problem, onRetry }) {
+  const auth = useAuth();
+  const words = TICKET_PROBLEMS[problem] || TICKET_PROBLEMS.unreachable;
+  // Who is signed in is the browser's to say: until it has, the neutral "My tickets".
+  const signedIn = auth.ready && auth.status === "signed-in";
+  const signedOut = auth.enabled && auth.ready && !signedIn;
+  return (
+    <div className="ticket-container">
+      <div className={`cx-note ticket-problem ticket-problem--${problem}`} role="alert">
+        <p className="cx-title">{words.title}</p>
+        <p className="cx-when">{words.text}</p>
+        {problem === "not_yours" && signedIn && auth.user?.email ? (
+          <p className="cx-when">
+            You&rsquo;re signed in as <strong>{auth.user.email}</strong>.
+          </p>
+        ) : null}
+        <div className="ticket-problem-actions">
+          {problem === "unreachable" ? (
+            <button type="button" className="dc-btn dc-btn--sm" onClick={onRetry}>
+              Retry
+            </button>
+          ) : (
+            <Link href="/me/tickets" className="dc-btn dc-btn--sm">
+              {problem === "not_yours" && signedOut ? "Sign in" : "My tickets"}
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * A ticket, from the link in its email or My tickets. Its server half
  * (src/app/tickets/[ticketid]/page.jsx) hands over the id; the ticket itself
  * is read in the browser, with the token that may open it (the account's, or
@@ -70,7 +129,7 @@ function eventPageOf(event) {
 const Ticket = ({ ticketid }) => {
   const [competition, setCompetition] = useState(null);
   const [ticketData, setTicketData] = useState(null);
-  const [error, setError] = useState(false);
+  const [problem, setProblem] = useState(null); // null | "not_yours" | "missing" | "unreachable"
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -84,18 +143,17 @@ const Ticket = ({ ticketid }) => {
   }, [ticketData?.event?.id]);
 
   useEffect(() => {
-    if (!ticketid) return;
-    setError(false);
-    const getTicketDetails = async () => {
-      const data = await eventsApi.fetchTicketDetails(ticketid);
-      if (data) {
-        setTicketData(data);
-      } else {
-        setError(true);
-      }
+    if (!ticketid) return undefined;
+    let alive = true;
+    setProblem(null);
+    eventsApi.fetchTicket(ticketid).then(({ ticket, problem: why }) => {
+      if (!alive) return;
+      if (ticket) setTicketData(ticket);
+      else setProblem(why || "unreachable");
+    });
+    return () => {
+      alive = false;
     };
-
-    getTicketDetails();
   }, [ticketid, retryCount]);
 
   // Whether the event was called off: the ticket doesn't say, its event's public page does.
@@ -123,15 +181,8 @@ const Ticket = ({ ticketid }) => {
   const design = useRenderedTicket(ticketid, { skip: cancelled || revoked, attempt: retryCount });
   const rendered = design.state === "shown";
 
-  if (error) {
-    return (
-      <div className="ticket-container">
-        <p>Failed to load ticket details. Please check your connection and try again.</p>
-        <button className="download-button" onClick={() => setRetryCount((c) => c + 1)}>
-          RETRY
-        </button>
-      </div>
-    );
+  if (problem) {
+    return <TicketProblem problem={problem} onRetry={() => setRetryCount((c) => c + 1)} />;
   }
 
   if (!ticketData) {

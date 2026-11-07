@@ -97,7 +97,7 @@ describe("which file answers which address", () => {
     ["/tickets/abc-123", "tickets/[ticketid]/page.jsx"],
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", "claim/[token]/page.jsx"],
     ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", "requests/[token]/page.jsx"],
-    ["/certificates/abc-123", "certificates/[ticketid]/page.jsx"],
+    ["/certificates/abc-123", "certificates/[id]/page.jsx"],
     ["/sitemap.xml", "sitemap.xml/route.js"],
     ["/sitemaps/events-1.xml", "sitemaps/[name]/route.js"],
     ["/sitemaps/topics.xml", "sitemaps/[name]/route.js"],

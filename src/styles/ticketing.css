@@ -449,6 +449,40 @@
 .ticket.is-revoked {
   filter: grayscale(1);
 }
+/*
+ * The ticket didn't come (src/components/ticket.jsx): the note's shape, in
+ * calm colours -- nothing here was cancelled or taken away. Above the
+ * page's pattern, and with its own buttons (.download-button hides on phones).
+ */
+.ticket-problem {
+  position: relative;
+  z-index: 1;
+  width: 360px;
+  max-width: 100%;
+  gap: 8px;
+  padding: 18px 18px 16px;
+  border-color: var(--dc-line);
+  border-left-color: var(--dc-primary);
+  background: var(--dc-bg);
+  font-family: var(--dc-font, inherit);
+  box-shadow: var(--dc-shadow);
+}
+.ticket-problem .cx-title {
+  color: var(--dc-ink);
+}
+.ticket-problem--unreachable {
+  border-left-color: var(--dc-warn);
+}
+.ticket-problem-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+.ticket-problem-actions .dc-btn {
+  border: 0;
+  text-decoration: none;
+}
 .qr-section--void {
   gap: 6px;
 }

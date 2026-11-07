@@ -270,7 +270,7 @@ function TicketRow({ item, past, onPaid, state = null }) {
             </Link>
           )}
           {item.certificate ? (
-            <Link className="me-cert" href={`/certificates/${encodeURIComponent(item.ticket_id)}`} aria-label={`Certificate for ${e.name}`}>
+            <Link className="me-cert" href={item.certificate} aria-label={`Certificate for ${e.name}`}>
               <Icon name="award" size={15} />
               Certificate
             </Link>
