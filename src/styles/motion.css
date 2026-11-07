@@ -405,6 +405,10 @@
   .rg-form.is-stepping :is(.rg-fields, .rg-merch, .rg-review) {
     animation-delay: var(--motion-stagger);
   }
+  /* A question an earlier answer has just brought in drops into its place. */
+  .rg-field.is-revealed {
+    animation: motion-drop var(--motion-base) var(--motion-ease-out) backwards;
+  }
   /* The form takes over from its skeleton with a fade. */
   .rg-form {
     animation: motion-fade var(--motion-base) var(--motion-ease-out) backwards;

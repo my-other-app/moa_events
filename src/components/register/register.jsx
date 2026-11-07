@@ -25,6 +25,7 @@ import {
   myRegistration,
   orderLines,
   parseQuestions,
+  revealNote,
   rupees,
   saveDraft,
   stepsFor,
@@ -33,6 +34,7 @@ import {
   validateDetails,
   wantsWhatsapp,
 } from "@/utils/register";
+import { hasConditions, pruneHidden, visibleKeys, visibleQuestions } from "@/utils/conditions";
 import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { CANCELLED_TITLE, REFUND_DETAIL, REFUND_NOTE, cancelledLine } from "@/utils/cancelled";
 import { ticketingApi } from "@/api/ticketing";
@@ -651,6 +653,9 @@ function Flow({ event, club, info, onDone }) {
   const [draft] = useState(() => loadDraft(eventId));
   const [values, setValues] = useState(() => withAccount(draft?.values || EMPTY, accountEmail, accountName, accountPhone));
   const [answers, setAnswers] = useState(() => draft?.answers || {});
+  // Questions an answer has just brought in (they drop in), and what a screen reader is told about the change.
+  const [revealed, setRevealed] = useState(() => new Set());
+  const [revealSaid, setRevealSaid] = useState("");
   const [picks, setPicks] = useState(() => draft?.picks || {});
   // "Send my ticket and event reminders on WhatsApp": unticked until the guest ticks it.
   const [whatsapp, setWhatsapp] = useState(() => draft?.whatsapp === true);
@@ -717,11 +722,17 @@ function Flow({ event, club, info, onDone }) {
 
   const ready = info.status === "ready" && items !== null && tix.ready;
   const questions = useMemo(() => parseQuestions(info.data?.additional_details), [info.data]);
+  // The questions this person is shown (a conditional one only after the answer it depends on), and
+  // the answers to those alone: a hidden question's answer is never shown, checked or sent.
+  const shownQuestions = useMemo(() => visibleQuestions(questions, answers), [questions, answers]);
+  const kept = useMemo(() => pruneHidden(questions, answers), [questions, answers]);
+  // A form where some question depends on another; without one, the form is exactly what it always was.
+  const branching = useMemo(() => hasConditions(questions), [questions]);
   const infoFee = Number(info.data?.reg_fee) > 0 ? Number(info.data.reg_fee) : null;
   // A registration under review carries no add-ons (the API keeps none with it), so the shelf isn't offered.
   const shelf = useMemo(() => (approval ? [] : items || []), [items, approval]);
   const chooseTicket = needsPicker(ticketing);
-  const steps = useMemo(() => stepsFor({ questions, items: shelf, chooseTicket }), [questions, shelf, chooseTicket]);
+  const steps = useMemo(() => stepsFor({ questions: shownQuestions, items: shelf, chooseTicket }), [shownQuestions, shelf, chooseTicket]);
 
   // The ticket and what it costs: the type picked, else the one a link names, the one picked before this
   // reload (the draft) or the event's only one; on an older server, the event's fee.
@@ -771,9 +782,9 @@ function Flow({ event, club, info, onDone }) {
     [values, byWhatsapp, byClubUpdates]
   );
   const answerErrors = useMemo(() => {
-    const raw = validateAnswers(questions, answers);
+    const raw = validateAnswers(questions, kept);
     return Object.fromEntries(Object.entries(raw).map(([k, v]) => [`q:${k}`, v]));
-  }, [questions, answers]);
+  }, [questions, kept]);
   const ticketErrors = !chooseTicket
     ? {}
     : !chosen
@@ -783,7 +794,7 @@ function Flow({ event, club, info, onDone }) {
         : {};
   const errorsOf = (stepId) => (stepId === "details" ? detailErrors : stepId === "questions" ? answerErrors : stepId === "ticket" ? ticketErrors : {});
   const orderOf = (stepId) =>
-    stepId === "details" ? DETAIL_KEYS : stepId === "questions" ? questions.map((q) => `q:${q.key}`) : stepId === "ticket" ? ["ticket_type"] : [];
+    stepId === "details" ? DETAIL_KEYS : stepId === "questions" ? shownQuestions.map((q) => `q:${q.key}`) : stepId === "ticket" ? ["ticket_type"] : [];
 
   // The step: the one the address names, but never past a step that still needs something.
   const want = params.get("step");
@@ -834,6 +845,8 @@ function Flow({ event, club, info, onDone }) {
       return;
     }
     setStepping(true);
+    setRevealed((r) => (r.size ? new Set() : r));
+    setRevealSaid("");
     scrollTop();
     if (focusNext.current) {
       const key = focusNext.current;
@@ -873,9 +886,26 @@ function Flow({ event, club, info, onDone }) {
     setValues((s) => ({ ...s, [key]: v }));
     changed(key);
   };
+  // An answer that changes which questions apply: those that no longer do are hidden and their
+  // answers cleared (contract §8); those it brings in appear in place, focus staying where it is.
   const setAnswer = (key) => (v) => {
-    setAnswers((s) => ({ ...s, [key]: v }));
+    // From the answers kept (none to a hidden question, an older draft's included), so none comes back.
+    const next = pruneHidden(questions, { ...kept, [key]: v });
+    setAnswers(next);
     changed(`q:${key}`);
+    const before = visibleKeys(questions, kept);
+    const after = visibleKeys(questions, next);
+    const added = questions.filter((q) => after.has(q.key) && !before.has(q.key));
+    const removed = questions.filter((q) => before.has(q.key) && !after.has(q.key));
+    if (!added.length && !removed.length) return;
+    setRevealed(new Set(added.map((q) => q.key)));
+    setRevealSaid(revealNote(added, removed) || "");
+    if (removed.length) {
+      const gone = removed.map((q) => `q:${q.key}`);
+      const drop = (o) => (gone.some((k) => k in o) ? Object.fromEntries(Object.entries(o).filter(([k]) => !gone.includes(k))) : o);
+      setServerErrors(drop);
+      setTouched(drop);
+    }
   };
   const setShelfPicks = (next) => {
     setPicks(next);
@@ -954,7 +984,8 @@ function Flow({ event, club, info, onDone }) {
 
   const showError = (error) => {
     // A registration under review is never offered a waiting list, whatever the refusal says.
-    const p = describeRegisterError(error, questions.map((q) => q.key), { approval });
+    // Only the questions shown: one the server names that is hidden here is said in its words instead.
+    const p = describeRegisterError(error, shownQuestions.map((q) => q.key), { approval });
     // Add-ons refused because the club reviews registrations now: the form becomes that event's form, add-ons gone.
     if (p.kind === "approval" && p.addOns) setReviewedNow(true);
     // The tickets changed under the form (sold out, off sale, full): read them again.
@@ -1019,7 +1050,7 @@ function Flow({ event, club, info, onDone }) {
     const payload = buildPayload({
       values,
       questions,
-      answers,
+      answers: kept,
       ref: currentRef(),
       items: shelf,
       picks,
@@ -1301,16 +1332,22 @@ function Flow({ event, club, info, onDone }) {
 
           {step.id === "questions" ? (
             <div className="rg-fields">
-              {questions.map((q) => (
+              {shownQuestions.map((q) => (
                 <QuestionField
                   key={q.key}
                   question={q}
-                  value={answers[q.key] || ""}
+                  value={kept[q.key] || ""}
                   error={errorFor(`q:${q.key}`)}
                   onChange={setAnswer(q.key)}
-                  onBlur={leave(`q:${q.key}`, answers[q.key] || "")}
+                  onBlur={leave(`q:${q.key}`, kept[q.key] || "")}
+                  revealed={revealed.has(q.key)}
                 />
               ))}
+              {branching ? (
+                <p className="dc-sr" role="status" aria-live="polite" data-testid="rg-reveal-note">
+                  {revealSaid}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -1358,13 +1395,13 @@ function Flow({ event, club, info, onDone }) {
                   ) : null}
                 </dl>
               </ReviewBlock>
-              {questions.length ? (
+              {shownQuestions.length ? (
                 <ReviewBlock title="Your answers" editLabel="Edit your answers" onEdit={() => goTo("questions", { edit: true })}>
                   <dl className="rg-dl rg-dl--stack">
-                    {questions.map((q) => (
+                    {shownQuestions.map((q) => (
                       <div key={q.key}>
                         <dt>{q.label}</dt>
-                        <dd className={answers[q.key] ? undefined : "is-empty"}>{answers[q.key] || "Not answered"}</dd>
+                        <dd className={kept[q.key] ? undefined : "is-empty"}>{kept[q.key] || "Not answered"}</dd>
                       </div>
                     ))}
                   </dl>

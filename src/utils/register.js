@@ -1,5 +1,6 @@
 import { formatWhen } from "./format";
 import { picksToPayload } from "./picks";
+import { conditionOf, visibleQuestions } from "./conditions";
 import { discountRefusal, ticketTypeRefusal } from "./ticketing";
 
 /**
@@ -22,6 +23,13 @@ const sentence = (s) => {
  * The event's own questions (`additional_details` from /events/info/{id}),
  * cleaned up. A question the server left `required` off is required: that
  * is the server's default too.
+ *
+ * A conditional question (`show_if`: shown only after a given answer to an
+ * earlier one; utils/conditions.js) comes with `required: false`, so that
+ * an older app showing every question is never held up by one that doesn't
+ * apply, and the organiser's own setting in `required_when_shown`. For such a
+ * question `required` here is that setting: required when shown. A question
+ * without `show_if` is read exactly as it always was, with no `showIf`.
  */
 export function parseQuestions(list) {
   if (!Array.isArray(list)) return [];
@@ -33,12 +41,15 @@ export function parseQuestions(list) {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     const options = Array.isArray(q.options) ? q.options.filter((o) => typeof o === "string" && o.trim()) : [];
+    const showIf = conditionOf(q);
+    const required = showIf && typeof q.required_when_shown === "boolean" ? q.required_when_shown : q.required !== false;
     out.push({
       key,
       label: typeof q.label === "string" && q.label.trim() ? q.label.trim() : key,
       type: typeof q.field_type === "string" ? q.field_type.toLowerCase() : "text",
-      required: q.required !== false,
+      required,
       options,
+      ...(showIf ? { showIf } : {}),
     });
   }
   return out;
@@ -68,6 +79,21 @@ export function questionControl(q) {
   if (q.type === "checkbox") return q.options.length > 1 ? { kind: "choice" } : { kind: "check", value: q.options[0] || "Yes" };
   if (q.type === "textarea") return { kind: "textarea" };
   return { kind: "text", ...(TEXT_INPUTS[q.type] || TEXT_INPUTS.text) };
+}
+
+/**
+ * What a screen reader hears when an answer changes which questions are
+ * shown (contract §8): the questions it brought in, by name, and those that
+ * no longer apply (their answers are cleared). Null when nothing changed.
+ */
+export function revealNote(added = [], removed = []) {
+  const names = (qs) => qs.map((q) => q.label).join(", ");
+  const parts = [];
+  if (added.length === 1) parts.push(`New question: ${added[0].label}.`);
+  else if (added.length > 1) parts.push(`${added.length} new questions: ${names(added)}.`);
+  if (removed.length === 1) parts.push(`${removed[0].label} no longer applies.`);
+  else if (removed.length > 1) parts.push(`${names(removed)} no longer apply.`);
+  return parts.length ? parts.join(" ") : null;
 }
 
 /* ---------- validation ---------- */
@@ -170,9 +196,10 @@ export function validateAnswer(q, value) {
   }
 }
 
+/** Every answer's problem, keyed by question: only the questions shown, as a hidden one is never required. */
 export function validateAnswers(questions, answers) {
   const errors = {};
-  for (const q of questions) {
+  for (const q of visibleQuestions(questions, answers)) {
     const e = validateAnswer(q, answers[q.key]);
     if (e) errors[q.key] = e;
   }
@@ -242,7 +269,8 @@ export function stepsFor({ questions = [], items = [], chooseTicket = false } = 
  * sent it: the three details as typed, the answers (or `{}` for an event
  * that asks nothing), the tracking link's code when there is one, and the
  * shelf picks. Unanswered optional questions are left out, as an untouched
- * field always was. `whatsapp_opt_in: true` goes only when the WhatsApp box
+ * field always was, and so is any answer to a question hidden by an earlier
+ * answer (utils/conditions.js). `whatsapp_opt_in: true` goes only when the WhatsApp box
  * is ticked with a phone number in, and `club_updates_whatsapp: true` only
  * when "Get updates from <club> on WhatsApp" is (the form shows that box only
  * for a club that offers it, and passes `clubUpdates` false otherwise).
@@ -278,7 +306,8 @@ export function buildPayload({
   let details = {};
   if (questions.length > 0) {
     details = undefined;
-    for (const q of questions) {
+    // Only the questions shown: an answer to one that no longer applies is never sent.
+    for (const q of visibleQuestions(questions, answers)) {
       const v = answers[q.key];
       if (typeof v === "string" && v !== "") details = { ...details, [q.key]: v };
     }
