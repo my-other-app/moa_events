@@ -42,7 +42,7 @@ export function ErrorText({ id, error }) {
 const describedBy = (...ids) => ids.filter(Boolean).join(" ") || undefined;
 
 /** A text box (or a textarea), with its label, hint and error. `extra` sits under the hint (the email typo fix). */
-export function TextField({ name, label, required, hint, error, value, onChange, onBlur, multiline = false, extra = null, inputProps = {} }) {
+export function TextField({ name, label, required, hint, error, value, onChange, onBlur, multiline = false, extra = null, inputProps = {}, className = "" }) {
   const id = fieldId(name);
   const hintId = hint ? `${id}-hint` : null;
   const errId = `${id}-err`;
@@ -58,7 +58,7 @@ export function TextField({ name, label, required, hint, error, value, onChange,
     "aria-describedby": describedBy(hintId, errId),
   };
   return (
-    <div className={`rg-field${error ? " is-invalid" : ""}`}>
+    <div className={`rg-field${error ? " is-invalid" : ""}${className ? ` ${className}` : ""}`}>
       <Label htmlFor={id} required={required}>
         {label}
       </Label>
@@ -75,11 +75,11 @@ export function TextField({ name, label, required, hint, error, value, onChange,
 }
 
 /** A native select: the phone's own picker is the best one there is. */
-export function SelectField({ name, label, required, error, value, options, onChange, onBlur }) {
+export function SelectField({ name, label, required, error, value, options, onChange, onBlur, className = "" }) {
   const id = fieldId(name);
   const errId = `${id}-err`;
   return (
-    <div className={`rg-field${error ? " is-invalid" : ""}`}>
+    <div className={`rg-field${error ? " is-invalid" : ""}${className ? ` ${className}` : ""}`}>
       <Label htmlFor={id} required={required}>
         {label}
       </Label>
@@ -113,12 +113,12 @@ export function SelectField({ name, label, required, error, value, options, onCh
 }
 
 /** Pick one, as a list of rows big enough for a thumb. */
-export function ChoiceField({ name, label, required, error, value, options, onChange, onBlur }) {
+export function ChoiceField({ name, label, required, error, value, options, onChange, onBlur, className = "" }) {
   const id = fieldId(name);
   const legendId = `${id}-legend`;
   const errId = `${id}-err`;
   return (
-    <fieldset className={`rg-field rg-fieldset${error ? " is-invalid" : ""}`} aria-describedby={errId}>
+    <fieldset className={`rg-field rg-fieldset${error ? " is-invalid" : ""}${className ? ` ${className}` : ""}`} aria-describedby={errId}>
       <Label as="legend" id={legendId} required={required}>
         {label}
       </Label>
@@ -149,13 +149,13 @@ export function ChoiceField({ name, label, required, error, value, options, onCh
 }
 
 /** One tick box ("I agree to the rules"): ticked means the option's own text is the answer. */
-export function CheckField({ name, label, required, error, value, option, onChange, onBlur }) {
+export function CheckField({ name, label, required, error, value, option, onChange, onBlur, className = "" }) {
   const id = fieldId(name);
   const errId = `${id}-err`;
   const checked = value === option;
   const sameText = option.trim().toLowerCase() === label.trim().toLowerCase() || option === "Yes";
   return (
-    <div className={`rg-field${error ? " is-invalid" : ""}`}>
+    <div className={`rg-field${error ? " is-invalid" : ""}${className ? ` ${className}` : ""}`}>
       <label className={`rg-choice rg-check${checked ? " is-on" : ""}`} htmlFor={id}>
         <input
           type="checkbox"
@@ -191,11 +191,16 @@ export function CheckField({ name, label, required, error, value, option, onChan
   );
 }
 
-/** One of the organiser's questions, with the control its type calls for. */
-export function QuestionField({ question: q, value, error, onChange, onBlur }) {
+/**
+ * One of the organiser's questions, with the control its type calls for.
+ * `revealed`: it has just appeared because of an earlier answer, and comes in
+ * with a short drop (styles/motion.css; none when less motion is asked for).
+ * A conditional question's `required` is already "required when shown".
+ */
+export function QuestionField({ question: q, value, error, onChange, onBlur, revealed = false }) {
   const control = questionControl(q);
   const name = `q:${q.key}`;
-  const props = { name, label: q.label, required: q.required, error, value, onChange, onBlur };
+  const props = { name, label: q.label, required: q.required, error, value, onChange, onBlur, className: revealed ? "is-revealed" : "" };
   switch (control.kind) {
     case "select":
       return <SelectField {...props} options={q.options} />;
