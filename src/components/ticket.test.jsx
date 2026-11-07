@@ -8,7 +8,16 @@ import { MemoryRouter } from "react-router-dom";
  * event runs a competition, to the team's page. The API is mocked; the QR is
  * the real component, watched for what it encodes.
  */
-vi.mock("@/api/events", () => ({ eventsApi: { fetchTicketDetails: vi.fn(), fetchTicketImage: vi.fn() } }));
+vi.mock("@/api/events", () => {
+  const fetchTicketDetails = vi.fn();
+  // The page asks fetchTicket, which also says why nothing came. Most tests
+  // give the details; a null from them reads as no answer at all.
+  const fetchTicket = vi.fn(async (id) => {
+    const data = await fetchTicketDetails(id);
+    return data ? { ticket: data, problem: null } : { ticket: null, problem: "unreachable" };
+  });
+  return { eventsApi: { fetchTicketDetails, fetchTicket, fetchTicketImage: vi.fn() } };
+});
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn() } }));
 // The event's public page, which says whether it was cancelled: not found unless a test says otherwise.
 vi.mock("@/api/discover", () => ({ discoverApi: { event: vi.fn(() => Promise.reject(Object.assign(new Error("No such event"), { notFound: true }))) } }));
@@ -21,7 +30,8 @@ vi.mock("qrcode.react", async (importOriginal) => {
 const { eventsApi } = await import("@/api/events");
 const { competitionApi } = await import("@/api/competition");
 const { QRCodeCanvas } = await import("qrcode.react");
-const { default: Ticket, SHOW_AT_VENUE, ticketKind } = await import("./ticket.jsx");
+const { default: Ticket, SHOW_AT_VENUE, TICKET_PROBLEMS, ticketKind } = await import("./ticket.jsx");
+const { AuthContext } = await import("@/auth/context");
 
 /** GET /events/tickets/{id} (TicketDetailsResponse): the time as the API writes it, in UTC. */
 const ticket = (over = {}, event = {}) => ({
@@ -49,12 +59,14 @@ const ticket = (over = {}, event = {}) => ({
   ...over,
 });
 
-const open = (id = "MOA77") =>
-  render(
+const open = (id = "MOA77", auth = null) => {
+  const page = (
     <MemoryRouter initialEntries={[`/tickets/${id}`]}>
       <Ticket ticketid={id} />
     </MemoryRouter>
   );
+  return render(auth ? <AuthContext.Provider value={auth}>{page}</AuthContext.Provider> : page);
+};
 
 /** The value under a label on the ticket. */
 const field = (label) => screen.getByText(label).closest(".ticket-info").querySelector(".ticket-info-value").textContent;
@@ -177,9 +189,73 @@ describe("the ticket page", () => {
     eventsApi.fetchTicketDetails.mockResolvedValueOnce(null).mockResolvedValueOnce(ticket());
     open();
     expect(await screen.findByText(/Failed to load ticket details/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "RETRY" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Hack Night 04" })).toBeInTheDocument();
     expect(eventsApi.fetchTicketDetails).toHaveBeenCalledTimes(2);
+  });
+});
+
+/*
+ * Why the ticket didn't come (eventsApi.fetchTicket): someone else's ticket
+ * is not a connection problem, and is told how to open their own. None of
+ * them shows a QR, nor asks for the club's render a second time.
+ */
+describe("a ticket that didn't come", () => {
+  const SIGNED_OUT = { enabled: true, ready: true, status: "signed-out", user: null, openSignIn: vi.fn() };
+  const SIGNED_IN = { ...SIGNED_OUT, status: "signed-in", user: { email: "ravi@example.org" } };
+  const answer = (problem) => eventsApi.fetchTicket.mockResolvedValueOnce({ ticket: null, problem });
+  const noQr = () => {
+    expect(screen.queryByRole("img", { name: /QR code/ })).toBeNull();
+    expect(QRCodeCanvas).not.toHaveBeenCalled();
+  };
+
+  it("someone else's (401 / 403): another account's, with the way to their own, and no talk of the connection", async () => {
+    answer("not_yours");
+    open();
+    const note = await screen.findByRole("alert");
+    expect(note).toHaveTextContent(TICKET_PROBLEMS.not_yours.title);
+    expect(note).toHaveTextContent("This ticket belongs to another account");
+    expect(note).toHaveTextContent(/Sign in with the account you registered with, or use the ticket in your registration email/);
+    expect(note).not.toHaveTextContent(/connection/);
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.getByRole("link", { name: "My tickets" })).toHaveAttribute("href", "/me/tickets");
+    noQr();
+  });
+
+  it("someone else's, signed out: signing in is on My tickets", async () => {
+    answer("not_yours");
+    open("MOA77", SIGNED_OUT);
+    expect(await screen.findByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/me/tickets");
+    expect(SIGNED_OUT.openSignIn).not.toHaveBeenCalled();
+  });
+
+  it("someone else's, signed in: says which account this is", async () => {
+    answer("not_yours");
+    open("MOA77", SIGNED_IN);
+    expect(await screen.findByRole("alert")).toHaveTextContent("You’re signed in as ravi@example.org.");
+    expect(screen.getByRole("link", { name: "My tickets" })).toHaveAttribute("href", "/me/tickets");
+  });
+
+  it("no such ticket (404): says so, with no Retry", async () => {
+    answer("missing");
+    open();
+    const note = await screen.findByRole("alert");
+    expect(note).toHaveTextContent("No such ticket");
+    expect(note).not.toHaveTextContent(/connection/);
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.getByRole("link", { name: "My tickets" })).toHaveAttribute("href", "/me/tickets");
+    noQr();
+  });
+
+  it("no answer, or the server's error: the connection, and Retry", async () => {
+    answer("unreachable");
+    open();
+    const note = await screen.findByRole("alert");
+    expect(note).toHaveTextContent("Failed to load ticket details");
+    expect(note).toHaveTextContent("Please check your connection and try again.");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "My tickets" })).toBeNull();
+    noQr();
   });
 });
 

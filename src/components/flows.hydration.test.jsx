@@ -16,7 +16,7 @@ vi.mock("@/api/events", () => ({
     fetchStoreCatalog: vi.fn(() => Promise.resolve({ enabled: false, items: [] })),
     registerForEvent: vi.fn(),
     fetchTicketDetails: vi.fn(() => new Promise(() => {})),
-    fetchCertificateStyle: vi.fn(() => new Promise(() => {})),
+    fetchTicket: vi.fn(() => new Promise(() => {})),
   },
 }));
 vi.mock("@/api/live", () => ({
@@ -122,7 +122,7 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     ["/play/123", () => <Play eventId="123" />, null],
     ["/feedback/123/reg-1?k=tok", () => <Feedback eventId="123" registrationId="reg-1" k="tok" />, null],
     ["/tickets/MOA-1", () => <Ticket ticketid="MOA-1" />, "Loading ticket details"],
-    ["/certificates/MOA-1", () => <Certificate ticketid="MOA-1" />, null],
+    ["/certificates/MOA-1", () => <Certificate id="MOA-1" />, null],
     // A waiting list's offer: who is signed in and the offer are the browser's to read.
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", () => <Claim token="Xy3abcdefghijklmnopqrstuvwxyz012" />, "Loading your offer"],
     // A request for a place: where it stands is the browser's to read.

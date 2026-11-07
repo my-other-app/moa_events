@@ -585,7 +585,7 @@
   margin-top: 14px;
 }
 
-/* ---------- a guest's own certificate (/certificates/{ticket id}) ---------- */
+/* ---------- a guest's own certificate (/certificates/{id}) ---------- */
 
 .cert-own h1 {
   margin-top: 10px;

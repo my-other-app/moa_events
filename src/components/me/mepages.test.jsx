@@ -147,6 +147,21 @@ describe("My tickets, signed in", () => {
     expect(get).toHaveBeenCalledWith("/api/v1/events/list", { params: { is_registered: true, is_ended: true, offset: 0, limit: 20 } });
   });
 
+  it("links a certificate by the address the API gave, never one made from the ticket", async () => {
+    answer({
+      upcoming: [],
+      past: [
+        { ...PAST[0], certificate_url: "https://myotherapp.in/certificates/q7Hb2_kLm9Zx-41PwT0aRe" },
+        row({ id: 851, name: "Old Night", slug: "old-night", event_datetime: "2026-07-01T10:00:00+05:30", duration: 2, ticket_id: "MOA5OLD98", is_attended: true, certificate_url: null }),
+      ],
+    });
+    show("/me/tickets");
+    const past = await screen.findByRole("region", { name: /Past/ });
+    expect(await within(past).findByRole("link", { name: "Certificate for Solder Sprint" })).toHaveAttribute("href", "/certificates/q7Hb2_kLm9Zx-41PwT0aRe");
+    // No link from the API, no certificate link at all.
+    expect(within(past).queryByRole("link", { name: "Certificate for Old Night" })).toBeNull();
+  });
+
   it("leaves the head to the server (its title and noindex are the route's metadata)", async () => {
     answer();
     show("/me/tickets");

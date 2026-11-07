@@ -6,11 +6,16 @@ import { isKey } from "@/server/flows";
 /*
  * A ticket, from the link in the email or My tickets. The server checks the
  * address (else a 404); the ticket opens in the browser, with the token that
- * may read it. Never indexed.
+ * may read it. The address holds the ticket's id, which is what the door
+ * scans: never indexed, kept, framed or passed on as a referrer
+ * (next.config.mjs sets the same as headers).
  */
 export const dynamic = "force-dynamic";
 
-export const metadata = pageMetadata({ title: "Your ticket", description: "Your ticket on MyOtherApp.", path: null, noindex: true });
+export const metadata = {
+  ...pageMetadata({ title: "Your ticket", description: "Your ticket on MyOtherApp.", path: null, noindex: true }),
+  referrer: "no-referrer",
+};
 
 export default async function TicketPage({ params }) {
   const { ticketid } = await params;

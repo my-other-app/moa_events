@@ -101,7 +101,9 @@ describe("the transactional pages", () => {
     ["/play/{eventId}", "../play/[eventId]/page.jsx", { eventId: "68" }, {}, "Play", { eventId: "68" }],
     ["/feedback/{eventId}/{registrationId}", "../feedback/[eventId]/[registrationId]/page.jsx", { eventId: "68", registrationId: "0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f" }, { k: "tok" }, "Feedback", { eventId: "68", registrationId: "0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", k: "tok" }],
     ["/tickets/{ticketid}", "../tickets/[ticketid]/page.jsx", { ticketid: "MOA-1A2B3-XY7QZ" }, {}, "Ticket", { ticketid: "MOA-1A2B3-XY7QZ" }],
-    ["/certificates/{ticketid}", "../certificates/[ticketid]/page.jsx", { ticketid: "MOA-1A2B3-XY7QZ" }, {}, "Certificate", { ticketid: "MOA-1A2B3-XY7QZ" }],
+    ["/certificates/{id}", "../certificates/[id]/page.jsx", { id: "MOA-1A2B3-XY7QZ" }, {}, "Certificate", { id: "MOA-1A2B3-XY7QZ" }],
+    // The certificate's own id, whatever its shape: handed on as it is.
+    ["/certificates/{id}", "../certificates/[id]/page.jsx", { id: "q7Hb2_kLm9Zx-41PwT0aRe" }, {}, "Certificate", { id: "q7Hb2_kLm9Zx-41PwT0aRe" }],
   ])("%s hands its client component the address, asks the API nothing, and is never indexed", async (_, file, p, q, component, props) => {
     const route = await import(/* @vite-ignore */ file);
     expect(route.dynamic).toBe("force-dynamic");
@@ -120,7 +122,8 @@ describe("the transactional pages", () => {
     ["../feedback/[eventId]/[registrationId]/page.jsx", { eventId: "68", registrationId: "a b" }],
     ["../feedback/[eventId]/[registrationId]/page.jsx", { eventId: "x", registrationId: "reg-1" }],
     ["../tickets/[ticketid]/page.jsx", { ticketid: "<script>" }],
-    ["../certificates/[ticketid]/page.jsx", { ticketid: "-x" }],
+    ["../certificates/[id]/page.jsx", { id: "-x" }],
+    ["../certificates/[id]/page.jsx", { id: "a".repeat(129) }],
   ])("%s is a real 404 for %o", async (file, p) => {
     const route = await import(/* @vite-ignore */ file);
     expect(await outcome(() => route.default({ params: params(p), searchParams: params({}) }))).toEqual({ notFound: true });

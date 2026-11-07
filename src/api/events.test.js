@@ -137,3 +137,47 @@ describe("what a refusal carries to the form", () => {
     await expect(eventsApi.registerForEvent("62", BODY)).rejects.toMatchObject({ network: true, status: 0 });
   });
 });
+
+/*
+ * A ticket's details (GET /events/tickets/{id}), and why they didn't come:
+ * the ticket's page says another account's ticket, no such ticket, or no
+ * connection, from this.
+ */
+describe("a ticket's details", () => {
+  const TICKET_URL = "/api/v1/events/tickets/MOA-7K3QF-X9PWM";
+
+  it("come with no problem", async () => {
+    serve((config) => reply(config, 200, { ticket_id: "MOA-7K3QF-X9PWM" }));
+    expect(await eventsApi.fetchTicket("MOA-7K3QF-X9PWM")).toEqual({ ticket: { ticket_id: "MOA-7K3QF-X9PWM" }, problem: null });
+    expect(seen[0].url).toBe(TICKET_URL);
+  });
+
+  it.each([
+    [401, "not_yours"],
+    [403, "not_yours"],
+    [404, "missing"],
+    [422, "missing"],
+    [500, "unreachable"],
+    [502, "unreachable"],
+    [503, "unreachable"],
+  ])("a %i is %s", async (status, problem) => {
+    serve((config) => reply(config, status, { message: "No" }));
+    expect(await eventsApi.fetchTicket("MOA-7K3QF-X9PWM")).toEqual({ ticket: null, problem });
+    expect(await eventsApi.fetchTicketDetails("MOA-7K3QF-X9PWM")).toBeNull();
+  });
+
+  it("a guest token another browser's ticket refuses is still someone else's ticket, once the visitor is refused too", async () => {
+    localStorage.setItem("access_token", "a-guest");
+    serve((config) => reply(config, 401, { message: "Not allowed" }));
+    expect(await eventsApi.fetchTicket("MOA-7K3QF-X9PWM")).toEqual({ ticket: null, problem: "not_yours" });
+  });
+
+  it("no answer at all, or an empty one, is the connection", async () => {
+    serve(() => {
+      throw new Error("Network Error");
+    });
+    expect(await eventsApi.fetchTicket("MOA-7K3QF-X9PWM")).toEqual({ ticket: null, problem: "unreachable" });
+    serve((config) => reply(config, 200, ""));
+    expect(await eventsApi.fetchTicket("MOA-7K3QF-X9PWM")).toEqual({ ticket: null, problem: "unreachable" });
+  });
+});
