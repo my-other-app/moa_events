@@ -15,6 +15,13 @@ import { formatTime, formatWhen } from "@/utils/format";
  */
 const fmtWhen = (iso) => `${formatWhen(iso)} IST`;
 
+/**
+ * A key for someone in a list the API sends by name alone (the team's
+ * members, the others looking for a team): where they sit and their name,
+ * so two people with the same name are still two.
+ */
+export const listKey = (index, name) => `${index}:${name ?? ""}`;
+
 function Section({ title, sub, children }) {
   return (
     <section className="cp-card">
@@ -99,8 +106,8 @@ function TeamUp({ eventId, me, onChange, say }) {
         <>
           <h3 className="cp-h3">Also looking</h3>
           <ul className="cp-list">
-            {me.seekers.map((s) => (
-              <li key={s.registration_id} className="cp-team">
+            {me.seekers.map((s, i) => (
+              <li key={listKey(i, s.name)} className="cp-team">
                 <span>
                   <strong>{s.name}</strong>
                   <small>{s.skills.join(" · ") || "—"}</small>
@@ -138,8 +145,8 @@ function MyTeam({ eventId, me, onChange, say }) {
     <>
       <Section title={t.name} sub={`${t.track ?? "No track yet"} · ${t.members.length} of ${me.team_max}${t.stage !== "entered" ? ` · ${t.stage === "finalist" ? "Finalist" : "Shortlisted"}` : ""}`}>
         <ul className="cp-members">
-          {t.members.map((m) => (
-            <li key={m.registration_id}>{m.name}</li>
+          {t.members.map((m, i) => (
+            <li key={listKey(i, m.name)}>{m.name}</li>
           ))}
         </ul>
         {!me.teams_locked ? (

@@ -8,9 +8,9 @@ import { FileCheck } from "./filecheck";
 
 /*
  * The public certificate verifier: /verify (the landing, indexable) and
- * /verify/{number} (a result, never indexed or cached). Rendered on the
- * server, so a result is whole without JavaScript; the form and the file
- * check are the only islands.
+ * /verify/{number} or /verify/{public id} (a result, never indexed or
+ * cached). Rendered on the server, so a result is whole without
+ * JavaScript; the form and the file check are the only islands.
  */
 
 export const VERIFY_META = {
@@ -136,6 +136,8 @@ const VERDICT = {
   limited: { tone: "muted", icon: "alert", kicker: "Slow down", title: "Too many checks from here" },
   unavailable: { tone: "muted", icon: "alert", kicker: "Try again", title: "We couldn't check just now" },
 };
+/** Not found, asked by a certificate's link rather than its number. */
+const NOT_FOUND_BY_LINK = { ...VERDICT.not_found, title: "No certificate has this link" };
 
 function Club({ result }) {
   if (!result.orgName) return "—";
@@ -177,7 +179,7 @@ function Facts({ number, result }) {
   );
 }
 
-function Explain({ state, result }) {
+function Explain({ state, result, byLink }) {
   if (state === "valid")
     return (
       <p>
@@ -187,6 +189,13 @@ function Explain({ state, result }) {
     );
   if (state === "revoked")
     return <p>The club issued this certificate, then withdrew it. It is no longer valid: don&rsquo;t accept it as proof.</p>;
+  if (state === "not_found" && byLink)
+    return (
+      <p>
+        Check that the whole link was pasted, or check by the number printed on the certificate instead: it looks like{" "}
+        <span className="vf-mono">{EXAMPLE_NUMBER}</span>.
+      </p>
+    );
   if (state === "not_found" || state === "invalid")
     return (
       <p>
@@ -204,14 +213,16 @@ function Explain({ state, result }) {
  * this was checked; and the box again.
  *
  *   number     the canonical number, or null when the address held none
+ *              (checked by a link: the number the API answered with)
+ *   byLink     checked by the public id in a certificate's link
  *   result     checkCertificate's answer ({state, ...}), or {state: "invalid"}
  *   checkedAt  ISO time the check was made
  */
-export function VerifyResult({ number, result, checkedAt, apiBase = API_BASE_URL }) {
+export function VerifyResult({ number, result, checkedAt, byLink = false, apiBase = API_BASE_URL }) {
   const state = result?.state in VERDICT ? result.state : "unavailable";
-  const v = VERDICT[state];
+  const v = state === "not_found" && byLink ? NOT_FOUND_BY_LINK : VERDICT[state];
   const answered = state === "valid" || state === "revoked" || state === "not_found";
-  const preview = state === "valid" ? `${apiBase}/api/v1/verify/certificates/${encodeURIComponent(number)}/image` : null;
+  const preview = state === "valid" && number ? `${apiBase}/api/v1/verify/certificates/${encodeURIComponent(number)}/image` : null;
   return (
     <div className="dc-wrap vf-wrap">
       <p className="vf-back">
@@ -227,7 +238,7 @@ export function VerifyResult({ number, result, checkedAt, apiBase = API_BASE_URL
           <div>
             <p className="vf-verdict-kicker">{v.kicker}</p>
             <h1 id="vf-verdict">{v.title}</h1>
-            <Explain state={state} result={result || {}} />
+            <Explain state={state} result={result || {}} byLink={byLink} />
           </div>
         </div>
         {number && state !== "limited" && state !== "unavailable" ? <Facts number={number} result={result} /> : null}
@@ -246,7 +257,7 @@ export function VerifyResult({ number, result, checkedAt, apiBase = API_BASE_URL
         </figure>
       ) : null}
 
-      {state === "valid" ? <FileCheck number={number} apiBase={apiBase} /> : null}
+      {state === "valid" && number ? <FileCheck number={number} apiBase={apiBase} /> : null}
 
       <section className="vf-again" aria-labelledby="vf-again-title">
         <h2 id="vf-again-title">Check another</h2>

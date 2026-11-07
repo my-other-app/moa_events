@@ -15,6 +15,8 @@ let requestHeaders;
 vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
 
 const NUMBER = "CERT-7K3QF-X9PWM";
+/** A certificate's public id, as its page's link carries it. */
+const PUBLIC_ID = "q7Hb2_kLm9Zx-41PwT0aReXy";
 const VALID = {
   valid: true, reason: "ok", number: NUMBER, attendee_name: "Ananya Iyer", event_name: "LAN Night",
   org_name: "Respawn Room", org_slug: "respawn-room", issued_at: "2026-09-12T13:00:00Z",
@@ -68,15 +70,33 @@ describe("/verify, the landing", () => {
 
   it("sends a code that is a number on to its own page, however it was written", async () => {
     const route = await landing();
-    for (const code of ["cert-7k3qf-x9pwm", " CERT 7K3QF X9PWM ", "certificate:MOA-7K3QF-X9PWM", "https://myotherapp.in/verify/CERT-7K3QF-X9PWM"]) {
+    for (const code of ["cert-7k3qf-x9pwm", " CERT 7K3QF X9PWM ", "certificate:CERT-7K3QF-X9PWM", "https://myotherapp.in/verify/CERT-7K3QF-X9PWM"]) {
       expect(await outcome(() => route.default({ searchParams: params({ code }) }))).toEqual({ redirect: { url: `/verify/${NUMBER}`, status: 307 } });
+    }
+    expect(fetch.calls).toHaveLength(0);
+  });
+
+  it("sends a pasted link to a certificate's page on to the check by its public id, as it is", async () => {
+    const route = await landing();
+    for (const code of [`https://myotherapp.in/certificates/${PUBLIC_ID}`, `myotherapp.in/certificates/${PUBLIC_ID}?utm_source=x`]) {
+      expect(await outcome(() => route.default({ searchParams: params({ code }) }))).toEqual({ redirect: { url: `/verify/${PUBLIC_ID}`, status: 307 } });
     }
     expect(fetch.calls).toHaveLength(0);
   });
 
   it("keeps a code that is not a number here, says so, and looks nothing up", async () => {
     const route = await landing();
-    for (const code of ["Ananya Iyer", "ananya@example.com", "CERT-7K3QO-X9PWM"]) {
+    for (const code of [
+      "Ananya Iyer",
+      "ananya@example.com",
+      "CERT-7K3QO-X9PWM",
+      // A ticket id is not a certificate's number, however it is written.
+      "MOA-7K3QF-X9PWM",
+      "certificate:MOA-7K3QF-X9PWM",
+      "https://myotherapp.in/certificates/MOA-7K3QF-X9PWM",
+      // Nor is a public id typed on its own: only a certificate's link carries one.
+      PUBLIC_ID,
+    ]) {
       const out = html(await route.default({ searchParams: params({ code }) }), "/verify");
       expect(out).toContain("That isn&#x27;t a certificate number");
       expect(out).toContain('aria-invalid="true"');
@@ -171,7 +191,7 @@ describe("/verify/{number}, a result", () => {
 
   it("sends any other way of writing a number to the number's own address", async () => {
     const route = await result();
-    for (const code of ["cert-7k3qf-x9pwm", "MOA-7K3QF-X9PWM", "certificate:MOA-7K3QF-X9PWM", "certificate%3AMOA-7K3QF-X9PWM"]) {
+    for (const code of ["cert-7k3qf-x9pwm", "CERT7K3QFX9PWM", "certificate:CERT-7K3QF-X9PWM", "certificate%3ACERT-7K3QF-X9PWM"]) {
       expect(await outcome(() => route.default({ params: params({ code }) }))).toEqual({ redirect: { url: `/verify/${NUMBER}`, status: 307 } });
     }
     expect(fetch.calls).toHaveLength(0);
@@ -179,13 +199,57 @@ describe("/verify/{number}, a result", () => {
 
   it("answers an address that holds no number without asking anyone", async () => {
     const route = await result();
-    for (const code of ["Ananya%20Iyer", "ananya@example.com", "%E0%A4%A", "CERT-7K3QF"]) {
+    for (const code of ["Ananya%20Iyer", "ananya@example.com", "%E0%A4%A", "CERT-7K3QF", "MOA-7K3QF-X9PWM", "certificate%3AMOA-7K3QF-X9PWM", "CERT-2BCEBA8-PFZG3"]) {
       const out = html(await route.default({ params: params({ code }) }), `/verify/${code}`);
       expect(out).toContain('data-state="invalid"');
       expect(out).toContain("That isn&#x27;t a certificate number");
       expect(out).not.toContain("Ananya");
     }
     expect(fetch.calls).toHaveLength(0);
+  });
+});
+
+describe("/verify/{public id}, a result by a certificate's link", () => {
+  it("asks the API by the public id exactly as it is, and shows the number it answered with", async () => {
+    vi.stubEnv("API_SITE_TOKEN", "s".repeat(64));
+    answers[PUBLIC_ID] = { body: VALID };
+    const route = await result();
+    const out = html(await route.default({ params: params({ code: PUBLIC_ID }) }), `/verify/${PUBLIC_ID}`);
+    const [call] = verifyCalls();
+    expect(verifyCalls()).toHaveLength(1);
+    expect(call.url).toBe(`https://api.myotherapp.in/api/v1/verify/certificates/${PUBLIC_ID}`);
+    expect(call.init.headers["X-Visitor-IP"]).toBe("49.37.10.2");
+    expect(out).toContain('data-state="valid"');
+    for (const fact of ["Ananya Iyer", "LAN Night", "Respawn Room", NUMBER]) expect(out).toContain(fact);
+    // The picture and the file check go by the number.
+    expect(out).toContain(`src="https://api.myotherapp.in/api/v1/verify/certificates/${NUMBER}/image"`);
+    expect(out).toContain("Check a file");
+  });
+
+  it("revoked: which event and club, no picture", async () => {
+    answers[PUBLIC_ID] = { body: REVOKED };
+    const route = await result();
+    const out = html(await route.default({ params: params({ code: PUBLIC_ID }) }), `/verify/${PUBLIC_ID}`);
+    expect(out).toContain('data-state="revoked"');
+    expect(out).toContain("LAN Night");
+    expect(out).not.toContain("/image");
+    expect(out).not.toContain("Check a file");
+  });
+
+  it("not found: says no certificate has this link, without repeating it", async () => {
+    const route = await result();
+    const out = html(await route.default({ params: params({ code: PUBLIC_ID }) }), `/verify/${PUBLIC_ID}`);
+    expect(out).toContain('data-state="not_found"');
+    expect(out).toContain("No certificate has this link");
+    expect(out).toContain("the whole link was pasted");
+    expect(out).not.toContain("Number checked");
+    expect(out).not.toContain("/image");
+  });
+
+  it("is never sent on elsewhere: its case is part of it", async () => {
+    answers[PUBLIC_ID] = { body: VALID };
+    const route = await result();
+    expect((await outcome(() => route.default({ params: params({ code: PUBLIC_ID }) }))).redirect).toBeUndefined();
   });
 });
 

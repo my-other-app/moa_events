@@ -39,7 +39,7 @@ const Feedback = (await import("./feedback.jsx")).default;
 const Ticket = (await import("./ticket.jsx")).default;
 const Claim = (await import("./claim.jsx")).default;
 const RequestStatus = (await import("./request.jsx")).default;
-const Certificate = (await import("./certificate.jsx")).default;
+const { default: Certificate, OldCertificateAddress } = await import("./certificate.jsx");
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
 const page = parseEventPage(fullEvent());
@@ -122,7 +122,13 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     ["/play/123", () => <Play eventId="123" />, null],
     ["/feedback/123/reg-1?k=tok", () => <Feedback eventId="123" registrationId="reg-1" k="tok" />, null],
     ["/tickets/MOA-1", () => <Ticket ticketid="MOA-1" />, "Loading ticket details"],
-    ["/certificates/MOA-1", () => <Certificate id="MOA-1" />, null],
+    // A certificate's page, as the server checked it; and an older address, read in the browser.
+    [
+      "/certificates/q7Hb2_kLm9Zx-41PwT0aReXy",
+      () => <Certificate id="q7Hb2_kLm9Zx-41PwT0aReXy" result={{ state: "valid", number: "CERT-7K3QF-X9PWM", attendeeName: "Ananya Iyer", eventName: "LAN Night", orgName: "Respawn Room", orgSlug: null, issuedAt: "2026-09-12T13:00:00Z" }} />,
+      "CERT-7K3QF-X9PWM",
+    ],
+    ["/certificates/MOA-1", () => <OldCertificateAddress ticketId="MOA-1" />, "Opening your certificate"],
     // A waiting list's offer: who is signed in and the offer are the browser's to read.
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", () => <Claim token="Xy3abcdefghijklmnopqrstuvwxyz012" />, "Loading your offer"],
     // A request for a place: where it stands is the browser's to read.

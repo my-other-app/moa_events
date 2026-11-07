@@ -29,9 +29,26 @@ describe("the box", () => {
 
   it("goes to the number's own page, read and upper-cased in the browser", () => {
     form();
-    fireEvent.change(screen.getByLabelText(/Certificate number/), { target: { value: " certificate:moa-7k3qf-x9pwm " } });
+    fireEvent.change(screen.getByLabelText(/Certificate number/), { target: { value: " certificate:cert-7k3qf x9pwm " } });
     fireEvent.submit(screen.getByRole("search"));
     expect(screen.getByTestId("where")).toHaveTextContent("/verify/CERT-7K3QF-X9PWM");
+  });
+
+  it("goes to the check by public id for a pasted link to a certificate's page, its case kept", () => {
+    form();
+    fireEvent.change(screen.getByLabelText(/Certificate number/), { target: { value: "https://myotherapp.in/certificates/q7Hb2_kLm9Zx-41PwT0aReXy" } });
+    fireEvent.submit(screen.getByRole("search"));
+    expect(screen.getByTestId("where")).toHaveTextContent(/^\/verify\/q7Hb2_kLm9Zx-41PwT0aReXy$/);
+  });
+
+  it("takes no ticket id for a number, and goes nowhere", () => {
+    form();
+    for (const value of ["certificate:moa-7k3qf-x9pwm", "https://myotherapp.in/certificates/MOA-7K3QF-X9PWM"]) {
+      fireEvent.change(screen.getByLabelText(/Certificate number/), { target: { value } });
+      fireEvent.submit(screen.getByRole("search"));
+      expect(screen.getByRole("alert")).toHaveTextContent("That isn't a certificate number");
+      expect(screen.getByTestId("where")).toHaveTextContent(/^\/verify$/);
+    }
   });
 
   it("says at once when it is not a number, and goes nowhere", () => {
