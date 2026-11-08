@@ -7,6 +7,7 @@ import { eventPath } from "@/utils/eventpage";
 import { formatWhen } from "@/utils/format";
 import { rupees } from "@/utils/register";
 import { clubName, describeRequestError, statusWord, underReviewNote } from "@/utils/requests";
+import { AnswersNeededNote } from "./answersneeded";
 import { ErrorState } from "./discover/bits";
 import { SitePage } from "./discover/chrome";
 import { EpIcon } from "./discover/eventbits";
@@ -40,6 +41,8 @@ import { Summary } from "./register/summary";
  *   closed      by its `closed_reason`: the event ended (or was deleted)
  *               first, the event was cancelled, or a ticket came another way
  * and an address that is no registration: "This link isn't valid".
+ * While it is open (under review, or confirmed), details the club asked for
+ * since (`answers_needed`) are noted under it, with the way to add them.
  *
  * `askToCancel` (the email's "Cancel my registration" link,
  * `{status_url}?withdraw=1`): once the registration has loaded, and only if
@@ -438,6 +441,9 @@ function Status({ request, token, askToCancel = false, onWithdrawn, onChanged, n
         {title}
       </h1>
       {body}
+      {request.answersNeeded && (request.status === "pending" || request.status === "approved") ? (
+        <AnswersNeededNote needed={request.answersNeeded} what={request.ticketId ? "ticket" : "registration"} className="rq-answers" />
+      ) : null}
       <Facts request={request} />
       {actions ? <div className="rg-closed-actions">{actions}</div> : null}
       {after}

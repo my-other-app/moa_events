@@ -11,6 +11,8 @@ import { formatDate, formatPrice, formatTime } from "@/utils/format";
 import { loadDone } from "@/utils/register";
 import { ticketTypeName } from "@/utils/ticketing";
 import { isTicketRevoked, REVOKED_DETAIL, REVOKED_STAMP } from "@/utils/revoked";
+import { parseAnswersNeeded } from "@/utils/answers";
+import { AnswersNeededNote } from "./answersneeded";
 import { CancelledNote, ownState, useEventStates } from "./cancelled";
 import { RevokedNote } from "./revoked";
 import { useRenderedTicket } from "./ticketrender";
@@ -171,6 +173,14 @@ const Ticket = ({ ticketid }) => {
   const revoked = isTicketRevoked(ticketData);
 
   /*
+   * Details the club asked for since sign-up (`answers_needed`:
+   * utils/answers.js), with the way to add them. Only on a ticket that still
+   * counts; it never stands in for the ticket, which works with or without
+   * them, and it sits outside #ticket, so the PDF never carries it.
+   */
+  const needed = !cancelled && !revoked ? parseAnswersNeeded(ticketData?.answers_needed) : null;
+
+  /*
    * The ticket as the club designed it, drawn by the server (see
    * ./ticketrender). Shown in place of the ticket this page draws itself,
    * which stays as the fallback for an older server, a render that failed
@@ -312,6 +322,7 @@ const Ticket = ({ ticketid }) => {
     <div className="ticket-container">
       {cancelled ? <CancelledNote cancellation={state.cancellation} paid={wasPaid(ticketData)} className="ticket-cancelled" /> : null}
       {!cancelled && revoked ? <RevokedNote eventName={ticketData.event?.name || null} ticketId={ticketid} className="ticket-revoked" /> : null}
+      {needed ? <AnswersNeededNote needed={needed} className="ticket-answers" /> : null}
 
       {design.state === "loading" ? (
         // A ticket-shaped wait while the server draws it, not a flash of the

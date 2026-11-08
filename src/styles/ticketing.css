@@ -437,9 +437,36 @@
   color: var(--dc-muted);
 }
 
+/*
+ * Details the club asked for since sign-up (src/components/answersneeded.jsx):
+ * the note's shape in amber, as nothing is wrong with the ticket -- there is
+ * just something to add. The link is the note's one action.
+ */
+.cx-note--needed {
+  border-color: #fde68a;
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+.cx-note--needed .cx-title {
+  color: #92400e;
+}
+.cx-note--needed .cx-link {
+  color: #92400e;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.cx-note--needed .cx-link:hover {
+  color: #78350f;
+}
+.cx-note--needed.is-compact .cx-when {
+  font-size: 13px;
+}
+
 /* The ticket's own page */
 .ticket-cancelled,
-.ticket-revoked {
+.ticket-revoked,
+.ticket-answers {
   width: 360px;
   max-width: 100%;
   margin-bottom: 14px;
@@ -727,4 +754,9 @@
 /* The thanks, focused once saved: read out, with no ring around plain text. */
 .an-panel .rg-h1:focus {
   outline: none;
+}
+/* The same note on a registration's page, under what it means. */
+.rq-answers {
+  max-width: 54ch;
+  margin-top: 16px;
 }

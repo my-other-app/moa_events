@@ -674,3 +674,90 @@ describe("My tickets: registrations under review (registration approval)", () =>
     expect(screen.queryByRole("region", { name: /Under review/ })).toBeNull();
   });
 });
+
+/*
+ * Details the club asked for since sign-up (feature-register/missing-answers-contract.md
+ * §2.4): a row that carries `answers_needed` says so in an amber note, with
+ * the way to the person's own answers page. An older API says nothing, and
+ * the row is what it was.
+ */
+describe("My tickets: details the club asked for", () => {
+  const LINK = "https://myotherapp.in/answers/901/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7";
+  const PATH = "/answers/901/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7";
+  const needed = { count: 2, url: LINK, deadline: "2026-11-14T12:30:00Z" };
+
+  function answerWith({ upcoming, mine = [] }) {
+    get.mockImplementation(async (url, config) => {
+      if (url === "/api/v1/user/profile/me") return { data: PROFILE };
+      if (url === "/api/v1/events/list") return pageOf(config.params.is_ended ? [] : upcoming);
+      if (url === "/api/v1/registration-requests/mine") return { data: { items: mine } };
+      throw new Error(`unexpected GET ${url}`);
+    });
+  }
+  const upcomingRow = async () => within(await screen.findByRole("region", { name: /Upcoming/ })).getByRole("listitem");
+
+  beforeEach(() => {
+    forgetEvents();
+    enableSignIn();
+    signInAs();
+  });
+
+  it("notes them on the ticket's row, with the deadline and the way to add them", async () => {
+    answerWith({ upcoming: [row({ is_paid: true, answers_needed: needed })] });
+    show("/me/tickets");
+    const item = await upcomingRow();
+    const note = await within(item).findByText(/2 details needed/);
+    expect(note).toHaveTextContent("2 details needed · Add them");
+    expect(within(item).getByRole("link", { name: "Add them" })).toHaveAttribute("href", PATH);
+    expect(within(item).getByText("Add them by Sat, 14 Nov · 6:00 PM IST.")).toBeInTheDocument();
+    // The ticket itself works as ever.
+    expect(within(item).getByRole("link", { name: "View ticket for Hack Night 04" })).toBeInTheDocument();
+  });
+
+  it("one detail, no deadline", async () => {
+    answerWith({ upcoming: [row({ is_paid: true, answers_needed: { count: 1, url: LINK, deadline: null } })] });
+    show("/me/tickets");
+    const item = await upcomingRow();
+    expect(await within(item).findByText(/1 detail needed/)).toHaveTextContent("1 detail needed · Add it");
+    expect(within(item).queryByText(/ by /)).toBeNull();
+  });
+
+  it("says nothing without the flag, with it null, or from an older API's shapes", async () => {
+    answerWith({ upcoming: [row({ is_paid: true }), row({ id: 902, slug: "ctf-night", name: "CTF Night", ticket_id: "MOA8CTF01", answers_needed: null }), row({ id: 903, slug: "x", name: "X", ticket_id: "MOAX", answers_needed: { count: 2 } })] });
+    show("/me/tickets");
+    const upcoming = await screen.findByRole("region", { name: /Upcoming/ });
+    expect(within(upcoming).getAllByRole("listitem")).toHaveLength(3);
+    expect(upcoming.querySelector(".cx-note--needed")).toBeNull();
+    expect(within(upcoming).queryByText(/details? needed/)).toBeNull();
+  });
+
+  it("never on a revoked ticket", async () => {
+    answerWith({ upcoming: [row({ is_paid: true, ticket_revoked: true, answers_needed: needed })] });
+    show("/me/tickets");
+    const item = await upcomingRow();
+    expect(await within(item).findByText("This ticket was revoked by the organiser")).toBeInTheDocument();
+    expect(within(item).queryByText(/details needed/)).toBeNull();
+  });
+
+  it("notes them on a registration under review too", async () => {
+    const T1 = "Rq7abcdefghijklmnopqrstuvwxyz001";
+    answerWith({
+      upcoming: [],
+      mine: [
+        {
+          id: "r1",
+          token: T1,
+          status: "pending",
+          event: { id: 903, slug: "maker-night", name: "Maker Night", event_datetime: "2026-11-08T18:00:00+05:30", poster: null, club: { name: "Circuit Society", slug: "circuit-society" } },
+          full_name: "Asha Rao",
+          answers_needed: { count: 3, url: "https://myotherapp.in/answers/903/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=abcdefabcdefabcdefabcdefabcdefab", deadline: null },
+        },
+      ],
+    });
+    show("/me/tickets");
+    const group = await screen.findByRole("region", { name: /Under review/ });
+    const item = within(group).getByRole("listitem");
+    expect(within(item).getByText(/3 details needed/)).toHaveTextContent("3 details needed · Add them");
+    expect(within(item).getByRole("link", { name: "Add them" })).toHaveAttribute("href", "/answers/903/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=abcdefabcdefabcdefabcdefabcdefab");
+  });
+});
