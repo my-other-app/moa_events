@@ -59,7 +59,8 @@ const PAST = [
     duration: 4,
     ticket_id: "MOA5OLD99",
     is_attended: true,
-    certificate_url: "https://myotherapp.in/certificates/MOA5OLD99",
+    certificate_url: "https://myotherapp.in/certificates/q7Hb2_kLm9Zx-41PwT0aReXy",
+    certificate_no: "CERT-7K3QF-X9PWM",
   }),
 ];
 const pageOf = (items, next = null) => ({ data: { limit: 20, offset: 0, total: null, next, items } });
@@ -140,7 +141,7 @@ describe("My tickets, signed in", () => {
     const past = screen.getByRole("region", { name: /Past/ });
     const old = within(past).getByRole("listitem");
     expect(within(old).getByText("Attended")).toBeInTheDocument();
-    expect(within(old).getByRole("link", { name: "Certificate for Solder Sprint" })).toHaveAttribute("href", "/certificates/MOA5OLD99");
+    expect(within(old).getByRole("link", { name: "Certificate for Solder Sprint" })).toHaveAttribute("href", "/certificates/q7Hb2_kLm9Zx-41PwT0aReXy");
     expect(within(old).getByRole("link", { name: "Solder Sprint" })).toHaveAttribute("href", "/events/solder-sprint");
 
     expect(get).toHaveBeenCalledWith("/api/v1/events/list", { params: { is_registered: true, is_ended: false, offset: 0, limit: 20 } });
@@ -151,13 +152,15 @@ describe("My tickets, signed in", () => {
     answer({
       upcoming: [],
       past: [
-        { ...PAST[0], certificate_url: "https://myotherapp.in/certificates/q7Hb2_kLm9Zx-41PwT0aRe" },
+        { ...PAST[0], certificate_url: "https://myotherapp.in/certificates/-Hb2_kLm9Zx-41PwT0aReXy_" },
         row({ id: 851, name: "Old Night", slug: "old-night", event_datetime: "2026-07-01T10:00:00+05:30", duration: 2, ticket_id: "MOA5OLD98", is_attended: true, certificate_url: null }),
       ],
     });
     show("/me/tickets");
     const past = await screen.findByRole("region", { name: /Past/ });
-    expect(await within(past).findByRole("link", { name: "Certificate for Solder Sprint" })).toHaveAttribute("href", "/certificates/q7Hb2_kLm9Zx-41PwT0aRe");
+    expect(await within(past).findByRole("link", { name: "Certificate for Solder Sprint" })).toHaveAttribute("href", "/certificates/-Hb2_kLm9Zx-41PwT0aReXy_");
+    // Never the ticket's id in the link.
+    expect(within(past).getByRole("link", { name: "Certificate for Solder Sprint" }).getAttribute("href")).not.toContain("MOA5OLD99");
     // No link from the API, no certificate link at all.
     expect(within(past).queryByRole("link", { name: "Certificate for Old Night" })).toBeNull();
   });

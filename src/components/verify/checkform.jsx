@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { useNavigate } from "@/lib/router";
-import { EXAMPLE_NUMBER, MAX_INPUT, certificateNumberFrom, verifyPath } from "@/utils/certcode";
+import { EXAMPLE_NUMBER, MAX_INPUT, certificateLookupFrom, verifyPath } from "@/utils/certcode";
 
 export const NOT_A_NUMBER = `That isn't a certificate number. It looks like ${EXAMPLE_NUMBER}: CERT, then two groups of five letters and digits.`;
 
@@ -10,10 +10,11 @@ export const NOT_A_NUMBER = `That isn't a certificate number. It looks like ${EX
  * "Check a certificate": one box for the number, the QR's text or a link.
  *
  * A plain GET form to /verify?code=…, so it works without JavaScript: the
- * server reads the code and sends the visitor on to /verify/{number}. With
- * JavaScript the code is read and held to the pattern here first, and a
+ * server reads the code and sends the visitor on to /verify/{number} (or,
+ * for a link to a certificate's page, /verify/{its public id}). With
+ * JavaScript the code is read and held to the patterns here first, and a
  * mistake is said at once, without a round trip. Nothing that cannot be a
- * number is ever looked up.
+ * number or a certificate's link is ever looked up.
  */
 export function CheckForm({ initial = "", error = null, label = "Certificate number, QR text or link" }) {
   const id = useId();
@@ -24,13 +25,13 @@ export function CheckForm({ initial = "", error = null, label = "Certificate num
 
   const onSubmit = (e) => {
     e.preventDefault();
-    const number = certificateNumberFrom(value);
-    if (!number) {
+    const lookup = certificateLookupFrom(value);
+    if (!lookup) {
       setProblem(value.trim() ? NOT_A_NUMBER : "Type the certificate's number first.");
       return;
     }
     setProblem(null);
-    navigate(verifyPath(number));
+    navigate(verifyPath(lookup));
   };
 
   return (

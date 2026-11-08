@@ -1,42 +1,44 @@
 /**
- * Certificate numbers, as the public verifier (/verify) reads them.
+ * Certificate numbers and links, as the public verifier (/verify) reads them.
  *
  * A certificate issued on MyOtherApp carries a number, CERT-XXXXX-XXXXX,
- * printed beside a QR code. The QR opens https://myotherapp.in/verify/{number};
- * on certificates printed before October 2026 it held
- * `certificate:MOA-XXXXX-XXXXX` (the ticket's id, whose body the number
- * shares) and the number's first group could be one to seven hex digits.
+ * printed beside a QR code that opens https://myotherapp.in/verify/{number}.
+ * Its page, the link its holder shares, is
+ * https://myotherapp.in/certificates/{public id}: 24 URL-safe characters,
+ * case and all, that the API draws for each certificate. A ticket id is
+ * neither, and is never looked up here.
  *
  * What someone types, scans or pastes is read the way the app reads it
  * (certificateCodeFrom in the app's certificate_verification.dart), then
  * held to a strict pattern before anything is asked: a name, an email or
- * anything else that cannot be a number is never sent anywhere.
+ * anything else that cannot be a number or a certificate's link is never
+ * sent anywhere.
  */
 
 /** The letters and digits a number is made of: no 0/O, 1/I/L, so it reads back off paper. */
 export const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const A = `[${ALPHABET}]`;
-const BODY = `(?:${A}{5}|[0-9A-F]{1,7})-${A}{5}`;
 
-/** A code the verifier takes, upper case: the number, or the ticket id an older QR held. */
-export const CODE_PATTERN = new RegExp(`^(?:CERT|MOA)-(${BODY})$`);
-/** A certificate number, as the result pages' addresses carry it. */
-export const NUMBER_PATTERN = new RegExp(`^CERT-${BODY}$`);
+/** A certificate number, upper case, as the result pages' addresses carry it (the API's CERTIFICATE_CODE). */
+export const NUMBER_PATTERN = new RegExp(`^CERT-${A}{5}-${A}{5}$`);
+/** A certificate's public id, exactly as its link carries it (the API's CERTIFICATE_PUBLIC_ID). */
+export const PUBLIC_ID_PATTERN = /^[A-Za-z0-9_-]{24}$/;
+/** True for a certificate's public id: the id in its page's address. Case matters. */
+export const isCertificatePublicId = (v) => typeof v === "string" && PUBLIC_ID_PATTERN.test(v);
 export const EXAMPLE_NUMBER = "CERT-7K3QF-X9PWM";
 /** Longer than any link to a certificate: anything longer is not one. */
 export const MAX_INPUT = 300;
 
+/** The pages whose address ends in a certificate's public id: its own, and its check. */
+const PUBLIC_ID_PAGES = new Set(["certificates", "verify"]);
+
 /**
- * What was typed, scanned or pasted, as the code to look up, upper case;
- * null when there is nothing in it. Not yet checked against the pattern.
- *
- *   https://myotherapp.in/verify/CERT-7K3QF-X9PWM   the last part of a link
- *   myotherapp.in/certificates/MOA-7K3QF-X9PWM       (with or without https://)
- *   certificate:MOA-7K3QF-X9PWM                      an older certificate's QR
- *   cert-7k3qf x9pwm                                 any case, spaces anywhere
- *   certificate-CERT-7K3QF-X9PWM.pdf                 the file's own name
+ * What was typed, scanned or pasted: {code} upper case, not yet checked
+ * against a pattern, or {publicId} as it is when it was a link to a
+ * certificate's page (or its check) by public id; null when there is
+ * nothing in it.
  */
-export function certificateCodeFrom(input) {
+function readCode(input) {
   let code = String(input ?? "").trim();
   if (!code || code.length > MAX_INPUT) return null;
   if (code.includes("/")) {
@@ -50,40 +52,58 @@ export function certificateCodeFrom(input) {
     } catch {
       return null;
     }
+    // A certificate's page: its public id, whose case is part of it.
+    if (parts.length >= 2 && PUBLIC_ID_PAGES.has(parts[parts.length - 2].toLowerCase()) && isCertificatePublicId(code)) return { publicId: code };
   }
   if (code.toLowerCase().startsWith("certificate:")) code = code.slice("certificate:".length);
   code = code.replace(/\s/g, "").toUpperCase();
   if (code.startsWith("CERTIFICATE-")) code = code.slice("CERTIFICATE-".length);
   code = code.replace(/\.(PDF|PNG)$/, "");
-  return code || null;
+  return code ? { code } : null;
+}
+
+/**
+ * What was typed, scanned or pasted, as the code to look up; null when
+ * there is nothing in it. Not yet checked against a pattern. A number comes
+ * back upper case; the public id in a link to a certificate's page, as it is.
+ *
+ *   https://myotherapp.in/verify/CERT-7K3QF-X9PWM            the last part of a link
+ *   https://myotherapp.in/certificates/q7Hb2_kLm9Zx-41PwT0aReXy
+ *                                                           a certificate's page: its public id
+ *   myotherapp.in/verify/CERT-7K3QF-X9PWM                    (with or without https://)
+ *   certificate:CERT-7K3QF-X9PWM                             after certificate:
+ *   cert-7k3qf x9pwm                                         any case, spaces anywhere
+ *   certificate-CERT-7K3QF-X9PWM.pdf                         the file's own name
+ */
+export function certificateCodeFrom(input) {
+  const read = readCode(input);
+  return read ? read.publicId || read.code : null;
 }
 
 /** The same, typed without its dashes (CERT7K3QFX9PWM, or "CERT 7K3QF X9PWM"): the last five are the second group. */
-const FLAT_PATTERN = new RegExp(`^(?:CERT|MOA)(${A}{5}|[0-9A-F]{1,7})(${A}{5})$`);
+const FLAT_PATTERN = new RegExp(`^CERT(${A}{5})(${A}{5})$`);
 
 /** The certificate number (CERT-…) a typed, scanned or pasted thing names; null when it cannot be one. */
 export function certificateNumberFrom(input) {
-  const code = certificateCodeFrom(input);
+  const code = readCode(input)?.code;
   if (!code) return null;
-  const found = CODE_PATTERN.exec(code);
-  if (found) return `CERT-${found[1]}`;
+  if (NUMBER_PATTERN.test(code)) return code;
   const flat = FLAT_PATTERN.exec(code.replace(/-/g, ""));
   return flat ? `CERT-${flat[1]}-${flat[2]}` : null;
 }
 
-/**
- * The number a guest's certificate carries, for their own view of it: the
- * one the API names (certificate_no), else, for one printed before numbers
- * were drawn on their own, CERT- and the ticket id's body.
- */
-export function certificateNumberOf(ticketId, certificateNo = null) {
-  if (typeof certificateNo === "string" && NUMBER_PATTERN.test(certificateNo)) return certificateNo;
-  const body = String(ticketId ?? "").split("-").slice(1).join("-");
-  return body ? `CERT-${body}` : "";
-}
+/** The public id a pasted link to a certificate's page carries, as it is; null for anything else. */
+export const certificatePublicIdFrom = (input) => readCode(input)?.publicId || null;
 
-/** The result page's address for a number. */
-export const verifyPath = (number) => `/verify/${number}`;
+/**
+ * What /verify looks a typed, scanned or pasted thing up by: the public id
+ * in a link to a certificate's page, else its number; null when it is
+ * neither, and then nothing is asked.
+ */
+export const certificateLookupFrom = (input) => certificatePublicIdFrom(input) || certificateNumberFrom(input);
+
+/** The result page's address for a number, or for the public id a certificate's link carries. */
+export const verifyPath = (code) => `/verify/${code}`;
 
 const SLUG = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const text = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);

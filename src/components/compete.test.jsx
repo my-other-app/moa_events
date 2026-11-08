@@ -26,7 +26,7 @@ vi.mock("@/api/competition", () => ({
 }));
 
 const { competitionApi: api } = await import("@/api/competition");
-const { default: Compete } = await import("./compete.jsx");
+const { default: Compete, listKey } = await import("./compete.jsx");
 
 const TRACKS = [
   { id: 1, name: "Edge AI", description: "Models on microcontrollers", sponsor: "Espressif", prize: "₹20,000", sort_order: 0, teams: 3 },
@@ -54,7 +54,8 @@ const state = (over = {}) => ({
   team: null,
   open_teams: [{ id: 12, name: "Null Pointers", track: "Open hardware", members: 3, open_spots: 1 }],
   seeking: null,
-  seekers: [{ registration_id: "r9", name: "Kiran", skills: ["PCB", "Rust"] }],
+  // Other guests by name only (SeekerPublic): no registration's id.
+  seekers: [{ name: "Kiran", skills: ["PCB", "Rust"], note: null }],
   mentors: [],
   board: null,
   ...over,
@@ -66,10 +67,8 @@ const team = (over = {}) => ({
   track_id: 1,
   track: "Edge AI",
   stage: "entered",
-  members: [
-    { registration_id: "r1", name: "Asha Rao" },
-    { registration_id: "r2", name: "Rohan P." },
-  ],
+  // Teammates by name only (TeammateOut).
+  members: [{ name: "Asha Rao" }, { name: "Rohan P." }],
   open_spots: 2,
   submission: { fields: { repo: "https://github.com/circuit/blink" }, status: "in_progress", missing: ["video"], completed_at: null, updated_at: null },
   score: null,
@@ -100,6 +99,14 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("the keys for people listed by name", () => {
+  it("are where they sit and their name, never an id the API no longer sends", () => {
+    expect(listKey(0, "Kiran")).toBe("0:Kiran");
+    expect(listKey(1, "Kiran")).not.toBe(listKey(0, "Kiran"));
+    expect(listKey(2, undefined)).toBe("2:");
+  });
 });
 
 describe("loading the page", () => {
@@ -239,7 +246,7 @@ describe("making or joining a team", () => {
 describe("looking for teammates", () => {
   it("lists you as looking, then saves what you bring when you leave the box", async () => {
     api.me.mockResolvedValue(state());
-    api.seeking.mockResolvedValueOnce(state({ seeking: { registration_id: "r1", name: "Asha Rao", skills: [] } })).mockResolvedValueOnce(state({ seeking: { registration_id: "r1", name: "Asha Rao", skills: ["ML", "PCB"] } }));
+    api.seeking.mockResolvedValueOnce(state({ seeking: { name: "Asha Rao", skills: [], note: null } })).mockResolvedValueOnce(state({ seeking: { name: "Asha Rao", skills: ["ML", "PCB"], note: null } }));
     open();
     const box = await screen.findByRole("checkbox", { name: /Find me teammates/ });
     expect(box).not.toBeChecked();
@@ -254,7 +261,7 @@ describe("looking for teammates", () => {
   });
 
   it("stops listing you, with what you said you bring", async () => {
-    api.me.mockResolvedValue(state({ seeking: { registration_id: "r1", name: "Asha Rao", skills: ["ML", "PCB"] } }));
+    api.me.mockResolvedValue(state({ seeking: { name: "Asha Rao", skills: ["ML", "PCB"], note: null } }));
     api.seeking.mockResolvedValue(state());
     open();
     expect(await screen.findByLabelText("Skills")).toHaveValue("ML, PCB");
@@ -264,7 +271,7 @@ describe("looking for teammates", () => {
   });
 
   it("shows the others looking, with their skills", async () => {
-    api.me.mockResolvedValue(state({ seekers: [...state().seekers, { registration_id: "r10", name: "Meera", skills: [] }] }));
+    api.me.mockResolvedValue(state({ seekers: [...state().seekers, { name: "Meera", skills: [], note: null }] }));
     open();
     const others = (await screen.findByRole("heading", { level: 3, name: "Also looking" })).nextElementSibling;
     const rows = within(others).getAllByRole("listitem");
@@ -272,6 +279,26 @@ describe("looking for teammates", () => {
     expect(rows[0]).toHaveTextContent("PCB · Rust");
     expect(rows[1]).toHaveTextContent("Meera");
     expect(rows[1]).toHaveTextContent("—");
+  });
+
+  it("keys the others and your teammates by where they sit and their name: two of the same name are two", async () => {
+    // The key React holds for a rendered list item.
+    const keyOf = (el) => el[Object.keys(el).find((k) => k.startsWith("__reactFiber$"))]?.key;
+    const twins = [{ name: "Kiran", skills: ["PCB"], note: null }, { name: "Kiran", skills: ["Rust"], note: null }];
+    api.me.mockResolvedValue(state({ seekers: twins }));
+    const first = open();
+    const others = (await screen.findByRole("heading", { level: 3, name: "Also looking" })).nextElementSibling;
+    const rows = within(others).getAllByRole("listitem");
+    expect(rows.map((li) => li.textContent)).toEqual(["KiranPCB", "KiranRust"]);
+    expect(rows.map(keyOf)).toEqual(["0:Kiran", "1:Kiran"]);
+    first.unmount();
+
+    api.me.mockResolvedValue(onTeam({}, { members: [{ name: "Guest" }, { name: "Guest" }, { name: "Asha Rao" }] }));
+    open();
+    const card = (await screen.findByRole("heading", { level: 2, name: "Blinkenlights" })).closest("section");
+    const members = within(card).getAllByRole("listitem");
+    expect(members.map((li) => li.textContent)).toEqual(["Guest", "Guest", "Asha Rao"]);
+    expect(members.map(keyOf)).toEqual(["0:Guest", "1:Guest", "2:Asha Rao"]);
   });
 });
 

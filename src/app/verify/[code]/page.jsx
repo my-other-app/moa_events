@@ -4,18 +4,19 @@ import { VerifyResult } from "@/components/verify/verifypage";
 import { pageMetadata } from "@/seo/metadata";
 import { checkCertificate } from "@/server/verify";
 import { requestVisitor } from "@/server/visitor";
-import { certificateNumberFrom, verifyPath } from "@/utils/certcode";
+import { NUMBER_PATTERN, certificateNumberFrom, isCertificatePublicId, verifyPath } from "@/utils/certcode";
 
 /*
  * /verify/{number}: one certificate's check, made now, for this visitor.
+ * /verify/{public id} is the same check by the id in a certificate's link
+ * (what the box sends a pasted link to), taken exactly as it is.
  *
  * Never indexed, cached, framed or referred on (next.config.mjs sets
  * no-store, noindex, frame-ancestors 'none' and no-referrer for these
  * addresses; the head says noindex, nofollow and no-referrer too). Any
- * other way of writing a number (lower case, an older QR's
- * certificate:MOA-…) is sent on to the number's own address, so a ticket
- * id never stays in the address bar. An address that holds no number is
- * answered without asking anyone.
+ * other way of writing a number (lower case, without its dashes) is sent
+ * on to the number's own address. An address that holds neither a number
+ * nor a public id is answered without asking anyone.
  */
 export const dynamic = "force-dynamic";
 
@@ -40,13 +41,17 @@ function decoded(code) {
 export default async function VerifyResultPage({ params }) {
   const { code } = await params;
   const given = decoded(code);
-  const number = certificateNumberFrom(given);
+  const publicId = isCertificatePublicId(given) ? given : null;
+  const number = publicId ? null : certificateNumberFrom(given);
   if (number && number !== given) redirect(verifyPath(number));
   const checkedAt = new Date().toISOString();
-  const result = number ? await checkCertificate(number, { visitor: await requestVisitor() }) : { state: "invalid" };
+  const lookup = publicId || number;
+  const result = lookup ? await checkCertificate(lookup, { visitor: await requestVisitor() }) : { state: "invalid" };
+  // By a link, the number is the one the API answered with (none for a link that names nothing).
+  const shown = publicId ? (NUMBER_PATTERN.test(result?.number ?? "") ? result.number : null) : number;
   return (
     <SitePage>
-      <VerifyResult number={number} result={result} checkedAt={checkedAt} />
+      <VerifyResult number={shown} byLink={Boolean(publicId)} result={result} checkedAt={checkedAt} />
     </SitePage>
   );
 }
