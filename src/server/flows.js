@@ -20,5 +20,21 @@ export const isClaimToken = (v) => TOKEN.test(String(v ?? ""));
 /** A registration request's status link (/requests/{token}): the same kind of URL-safe secret. */
 export const isRequestToken = (v) => TOKEN.test(String(v ?? ""));
 
+/**
+ * Who a missing-answers link is for (/answers/{eventId}/{ref}): a
+ * registration's id (a UUID), or a registration request's ("q" and its UUID,
+ * no separator). feature-register/missing-answers-contract.md §0.
+ */
+const ANSWER_REF = /^q?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isAnswerRef = (v) => ANSWER_REF.test(String(v ?? ""));
+
+/**
+ * A signed link's key (`?k=`): the same kind of URL-safe secret as the
+ * tokens above (the API's are 32 hex characters). Absent is fine where the
+ * holder's own sign-in also opens the page; anything else that isn't one is
+ * no link of ours.
+ */
+export const isLinkKey = (v) => TOKEN.test(String(v ?? ""));
+
 /** One query value as a string ("" when absent; the first when repeated). */
 export const queryValue = (v) => (Array.isArray(v) ? String(v[0] ?? "") : typeof v === "string" ? v : "");

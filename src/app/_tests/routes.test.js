@@ -94,6 +94,7 @@ describe("which file answers which address", () => {
     ["/me/following", "me/following/page.jsx"],
     ["/play/123", "play/[eventId]/page.jsx"],
     ["/feedback/123/456", "feedback/[eventId]/[registrationId]/page.jsx"],
+    ["/answers/123/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", "answers/[eventId]/[ref]/page.jsx"],
     ["/tickets/abc-123", "tickets/[ticketid]/page.jsx"],
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", "claim/[token]/page.jsx"],
     ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", "requests/[token]/page.jsx"],

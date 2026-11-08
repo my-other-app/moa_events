@@ -12,8 +12,9 @@
  *   - the certificate check (/verify) never framed by another site, and the
  *     addresses that are themselves a credential -- a check's result
  *     (/verify/{number}), a ticket (/tickets/{id}), a guest's certificate
- *     (/certificates/{id}), a survey link (/feedback/...), a claim or a
- *     request link -- never framed, stored, indexed or referred on;
+ *     (/certificates/{id}), a survey link (/feedback/...), a missing-answers
+ *     link (/answers/...), a claim or a request link -- never framed,
+ *     stored, indexed or referred on;
  *   - the OG fonts traced into the functions that read them;
  *   - Sentry's build settings, only when it is on (withSentry, below).
  */
@@ -35,7 +36,8 @@ export const VERIFY_HEADERS = [
 /**
  * An address that is itself a credential: a check's result, a ticket (its
  * id is the door's QR), a guest's certificate, a survey link (the
- * registration and its key). Never framed, kept by a browser or a cache,
+ * registration and its key), a missing-answers link (the person and its
+ * key). Never framed, kept by a browser or a cache,
  * indexed, nor named to another site in a Referer -- not even the origin.
  */
 export const PRIVATE_LINK_HEADERS = [
@@ -101,6 +103,8 @@ const nextConfig = {
       { source: "/certificates/:id", headers: PRIVATE_LINK_HEADERS },
       // The survey after an event: the registration and the link's key.
       { source: "/feedback/:eventId/:registrationId", headers: PRIVATE_LINK_HEADERS },
+      // The details a club asks for after sign-up: who they are for, and the link's key.
+      { source: "/answers/:eventId/:ref", headers: PRIVATE_LINK_HEADERS },
       // A waiting list's offer: its address is the claim's credential.
       { source: "/claim/:token", headers: CLAIM_HEADERS },
       // A request for a place (registration approval): its address is the request's only credential too.

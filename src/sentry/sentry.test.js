@@ -246,6 +246,24 @@ describe("what an event may carry", () => {
     expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("app:///_next/server/app/requests/[token]/page.js");
   });
 
+  it("masks who a missing-answers link is for, on the site's page and in the API's address", async () => {
+    // A registration's UUID whose digits would otherwise read as a phone number, and a request's ("q" + UUID).
+    const reg = "0b6e1f9a-4c1d-4d7e-9a51-987654321012";
+    const req = "q7d0f3c2a-1111-4c4c-9a9a-000000000001";
+    const out = await send({
+      request: { url: `https://myotherapp.in/answers/68/${reg}?k=3f2a` },
+      breadcrumbs: [
+        { message: `GET https://api.myotherapp.in/api/v1/events/68/answers/${req}?k=3f2a` },
+        { message: `POST https://api.myotherapp.in/api/v1/events/68/answers/${reg}` },
+      ],
+      exception: { values: [{ value: "x", stacktrace: { frames: [{ filename: "app:///_next/server/app/answers/[eventId]/[ref]/page.js" }] } }] },
+    });
+    expect(out.request.url).toBe("https://myotherapp.in/answers/68/[code]?k=3f2a");
+    expect(out.breadcrumbs[0].message).toBe("GET https://api.myotherapp.in/api/v1/events/68/answers/[code]?k=3f2a");
+    expect(out.breadcrumbs[1].message).toBe("POST https://api.myotherapp.in/api/v1/events/68/answers/[code]");
+    expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("app:///_next/server/app/answers/[eventId]/[ref]/page.js");
+  });
+
   it("leaves numbers that are not phones alone", async () => {
     const { options } = await fresh();
     expect(options.maskText("at 1729771234567, order 12345, ₹799, 2026-10-24T19:40:58+05:30, /verify")).toBe(

@@ -4,9 +4,9 @@
  * - Nothing personal by default (sendDefaultPii off), and on top of that:
  *   no cookies, no Authorization or other headers beyond a short list, no
  *   request bodies, no user; emails and phone numbers masked in every string
- *   an event carries; the codes in a ticket's, a certificate's, a check's and
- *   a feedback form's address replaced (they open the page; see the
- *   no-referrer headers in next.config.mjs).
+ *   an event carries; the codes in a ticket's, a certificate's, a check's, a
+ *   feedback form's and a missing-answers link's address replaced (they open
+ *   the page; see the no-referrer headers in next.config.mjs).
  * - A small share of traces (NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE, 5% unless
  *   set), with no trace headers sent from the browser; no session replay
  *   unless NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_RATE says so, and then only of
@@ -42,10 +42,15 @@ const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
 // status link, /requests/{token}, and the API's /registration-requests/{token}).
 const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests)\/(?!\[)[^/?#\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
+// A missing-answers link names the person: the site's /answers/{eventId}/{ref}
+// and the API's /events/{eventId}/answers/{ref} (a registration's UUID, or "q" and a request's).
+const ANSWERS = /\/answers\/(\d+\/)?q?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\w-])/gi;
 
 export function maskText(text) {
   if (typeof text !== "string" || !text) return text;
+  // The answers link first: its UUID's digits must not be read as a phone number.
   return text
+    .replace(ANSWERS, "/answers/$1[code]")
     .replace(EMAIL, "[email]")
     .replace(MOBILE, "$1[phone]")
     .replace(INTL, "$1[phone]")

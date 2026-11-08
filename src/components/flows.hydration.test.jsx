@@ -39,6 +39,7 @@ const Feedback = (await import("./feedback.jsx")).default;
 const Ticket = (await import("./ticket.jsx")).default;
 const Claim = (await import("./claim.jsx")).default;
 const RequestStatus = (await import("./request.jsx")).default;
+const Answers = (await import("./answers.jsx")).default;
 const { default: Certificate, OldCertificateAddress } = await import("./certificate.jsx");
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
@@ -133,6 +134,11 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", () => <Claim token="Xy3abcdefghijklmnopqrstuvwxyz012" />, "Loading your offer"],
     // A request for a place: where it stands is the browser's to read.
     ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", () => <RequestStatus token="Rq7abcdefghijklmnopqrstuvwxyz012" />, "Loading your registration"],
+    [
+      "/answers/123/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7",
+      () => <Answers eventId="123" answerRef="0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f" k="3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7" />,
+      "Loading your details",
+    ],
   ])("%s hydrates without a mismatch", async (path, make, text) => {
     // The quiz's player is in storage: read once the page is up, never in the first paint.
     localStorage.setItem("moa.live.player.123", JSON.stringify({ player_key: "k", name: "Sneha" }));
