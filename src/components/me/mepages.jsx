@@ -21,6 +21,7 @@ import { FinishPaymentButton } from "../register/finishpayment";
 import { REVOKED_STAMP } from "@/utils/revoked";
 import { CancelledNote, ownState, useEventStates } from "../cancelled";
 import { RevokedNote } from "../revoked";
+import { AnswersNeededNote } from "../answersneeded";
 
 /**
  * The signed-in person's own pages: /me/tickets and /me/following. Their
@@ -240,6 +241,8 @@ function TicketRow({ item, past, onPaid, state = null }) {
             />
           ) : null}
           {revoked ? <RevokedNote compact className="me-revoked" /> : null}
+          {/* Details the club asked for since: never on a ticket that no longer counts. */}
+          {!cancelled && !revoked && item.answersNeeded ? <AnswersNeededNote compact needed={item.answersNeeded} className="me-answers" /> : null}
         </div>
       </div>
       <div className="me-ticket-stub">
@@ -320,6 +323,7 @@ function RequestRow({ request }) {
                 : `${club} confirmed your registration: your ticket is on its way by email.`
               : underReviewNote(e.club)}
           </p>
+          {request.answersNeeded ? <AnswersNeededNote compact needed={request.answersNeeded} what="registration" className="me-answers" /> : null}
         </div>
       </div>
       <div className="me-ticket-stub">

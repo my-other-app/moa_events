@@ -35,6 +35,7 @@ export const RESERVED = new Set([
   "tickets",
   "claim",
   "requests",
+  "answers",
   "certificates",
   "verify",
   "register",

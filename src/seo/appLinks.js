@@ -31,6 +31,10 @@
  *                                   each one: where it stands, and
  *                                   cancelling it (moa_mobileapp's
  *                                   feat/registration-approval)
+ *   /answers/{event}/{ref}?k=       the details a club asked for after
+ *                                   sign-up (missing answers: the app's
+ *                                   own answers screen, and its Android
+ *                                   intent filter lists /answers/ too)
  *
  * What stays in the browser, and why:
  *   - the feeds (rss.xml) under /events, /clubs and /topics: a feed reader's
@@ -73,6 +77,7 @@ export const APP_PATHS = [
   "/play/*",
   "/claim/*",
   "/requests/*",
+  "/answers/*",
 ];
 
 /** The paths that stay in the browser, checked first (the first match wins). */

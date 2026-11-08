@@ -196,10 +196,17 @@ export function validateAnswer(q, value) {
   }
 }
 
-/** Every answer's problem, keyed by question: only the questions shown, as a hidden one is never required. */
-export function validateAnswers(questions, answers) {
+/**
+ * Every answer's problem, keyed by question: only the questions shown, as a
+ * hidden one is never required. `keys`: only these questions are checked
+ * (the missing-answers page asks for a few of the form's questions, the
+ * others still deciding which are shown).
+ */
+export function validateAnswers(questions, answers, { keys = null } = {}) {
   const errors = {};
+  const only = keys ? new Set(Array.from(keys, String)) : null;
   for (const q of visibleQuestions(questions, answers)) {
+    if (only && !only.has(q.key)) continue;
     const e = validateAnswer(q, answers[q.key]);
     if (e) errors[q.key] = e;
   }

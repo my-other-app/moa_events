@@ -4,8 +4,8 @@ import nextConfig, { CLAIM_HEADERS, PRIVATE_LINK_HEADERS } from "../../../next.c
 
 /*
  * The addresses that are themselves a credential: a ticket (its id is the
- * door's QR), a guest's certificate, the survey link, a check's result, a
- * claim and a request link. Each is never framed by another site, never
+ * door's QR), a guest's certificate, the survey link, a missing-answers
+ * link, a check's result, a claim and a request link. Each is never framed by another site, never
  * kept or indexed, and never names its path to another site in a Referer.
  * The claim and request pages tell other sites the origin alone (their
  * payment needs it); the rest tell them nothing.
@@ -25,6 +25,8 @@ describe("addresses that are a credential", () => {
     ["/certificates/MOA-7K3QF-X9PWM", "no-referrer"],
     ["/certificates/q7Hb2_kLm9Zx-41PwT0aRe", "no-referrer"],
     ["/feedback/68/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", "no-referrer"],
+    ["/answers/68/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", "no-referrer"],
+    ["/answers/68/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", "no-referrer"],
     ["/verify/CERT-7K3QF-X9PWM", "no-referrer"],
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", "strict-origin"],
     ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", "strict-origin"],
@@ -39,7 +41,7 @@ describe("addresses that are a credential", () => {
   });
 
   it("the ticket and the survey say no-referrer in the head too", async () => {
-    for (const file of ["../tickets/[ticketid]/page.jsx", "../feedback/[eventId]/[registrationId]/page.jsx", "../certificates/[id]/page.jsx"]) {
+    for (const file of ["../tickets/[ticketid]/page.jsx", "../feedback/[eventId]/[registrationId]/page.jsx", "../certificates/[id]/page.jsx", "../answers/[eventId]/[ref]/page.jsx"]) {
       const { metadata } = await import(/* @vite-ignore */ file);
       expect(metadata.referrer).toBe("no-referrer");
       expect(metadata.robots).toMatchObject({ index: false });

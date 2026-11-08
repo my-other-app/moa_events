@@ -1,7 +1,8 @@
 import apiClient from "./client";
 import { parseClub, parseClubRef, parseComment, parsePoll } from "./discover";
 import { ticketTypeName } from "@/utils/ticketing";
-import { SITE_URL } from "@/config";
+import { parseAnswersNeeded } from "@/utils/answers";
+import { siteHref } from "@/lib/href";
 
 /**
  * The signed-in person's side of the API: signing in (with Google, or an
@@ -23,26 +24,8 @@ const num = (v) => {
 const idOf = (v) => (typeof v === "number" || (typeof v === "string" && v !== "") ? v : null);
 const list = (v, fn) => (Array.isArray(v) ? v.map(fn).filter(Boolean) : []);
 
-/**
- * A link the API handed out to one of this site's pages (a certificate's
- * `certificate_url`), as the site links it: its path when it is the site's
- * own address (so it opens wherever the site runs), else the address as
- * given; null when it is no web address at all. The link is the API's to
- * make: nothing here builds one.
- */
-export function siteHref(v) {
-  const s = str(v);
-  if (!s) return null;
-  let url;
-  try {
-    url = new URL(s.trim(), SITE_URL);
-  } catch {
-    return null;
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  const site = new URL(SITE_URL).host;
-  return url.host === site || url.host === `www.${site}` ? `${url.pathname}${url.search}${url.hash}` : url.href;
-}
+// A link the API handed out to one of this site's pages, as the site links it (src/lib/href.js).
+export { siteHref };
 
 /** The paging the API answers with: `next` is set when there is more. */
 const page = (d, items, offset) => {
@@ -64,6 +47,8 @@ export function parseMyEvent(e) {
   const category = obj(o.category);
   // The ticket's type, and whether the event was cancelled, once the list says them (docs/TICKETING.md, club_ops).
   const typeName = ticketTypeName(o);
+  // Details the club asked for since (feature-register/missing-answers-contract.md §2.4): none, or an older API, says nothing.
+  const needed = parseAnswersNeeded(o.answers_needed);
   return {
     ticket_id: o.ticket_id,
     attended: Boolean(o.is_attended),
@@ -74,6 +59,7 @@ export function parseMyEvent(e) {
     revoked: o.ticket_revoked === true,
     // A paid event's registration whose payment never went through: not a ticket yet.
     awaitingPayment: Boolean(o.has_fee) && o.is_paid === false,
+    ...(needed ? { answersNeeded: needed } : {}),
     ...(typeName ? { ticketType: typeName } : {}),
     event: {
       ...(o.status === "cancelled" ? { status: "cancelled", cancellation: obj(o.cancellation) } : {}),

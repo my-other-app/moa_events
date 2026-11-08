@@ -83,6 +83,9 @@ describe(AASA, () => {
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", true],
     // A request for a place (the club confirms each one): the app's own status screen.
     ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", true],
+    // The details a club asks for after sign-up: the app's own answers screen.
+    ["/answers/123/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", true],
+    ["/answers/123/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", true],
     // So do the city pages, which the app has no screen for.
     ["/events/in", false],
     ["/events/in/kochi", false],

@@ -1,3 +1,4 @@
+import { parseAnswersNeeded } from "./answers";
 import { formatWhen } from "./format";
 import { rupees } from "./register";
 import { parseRequestRef, tokenOf } from "./requestlink";
@@ -50,14 +51,17 @@ export const CLOSED_REASONS = new Set(["event_ended", "event_deleted", "event_ca
  *
  *   {id, token, status, event: {id, slug, name, starts_at, location_name, is_online, poster, club},
  *    ticketType: {id, name} | null, fullName, submittedAt, decidedAt, declineNote,
- *    closedReason, ticketId, pay: {amount, payBy, claimToken, claimUrl} | null}
+ *    closedReason, ticketId, pay: {amount, payBy, claimToken, claimUrl} | null,
+ *    answersNeeded?: {count, href, deadline}}
  *
  * `status` is one of REQUEST_STATUSES, or "other" for one this site doesn't
  * know yet. `ticketId` once registered; `pay` only for a confirmed paid
  * request still inside its hold (the claim link pays it). `closedReason`
  * only for a closed one, and only one of CLOSED_REASONS (else null, said as
  * the event having ended). `token` when the answer carries one (`token`, or
- * `status_url`): the status page's address. Null when it isn't a request.
+ * `status_url`): the status page's address. `answersNeeded` only while the
+ * club asks this person for details it is missing (`answers_needed`:
+ * utils/answers.js). Null when it isn't a request.
  */
 export function parseRequest(d) {
   const o = obj(d);
@@ -69,6 +73,7 @@ export function parseRequest(d) {
   const claimToken = str(pay?.claim_token);
   const ticket = o.ticket_id === null || o.ticket_id === undefined ? null : str(String(o.ticket_id));
   const token = tokenOf(o);
+  const needed = parseAnswersNeeded(o.answers_needed);
   return {
     id: o.id === null || o.id === undefined ? null : String(o.id),
     token,
@@ -91,6 +96,7 @@ export function parseRequest(d) {
     closedReason: o.status === "closed" && CLOSED_REASONS.has(o.closed_reason) ? o.closed_reason : null,
     ticketId: ticket,
     pay: claimToken ? { amount: Math.max(0, num(pay.amount) ?? 0), payBy: iso(pay.pay_by), claimToken, claimUrl: str(pay.claim_url) } : null,
+    ...(needed ? { answersNeeded: needed } : {}),
   };
 }
 

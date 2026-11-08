@@ -418,3 +418,42 @@ describe("the event beside the registration", () => {
     expect(await screen.findByRole("complementary", { name: "Your registration" })).toHaveTextContent("Lab 3B, COEP");
   });
 });
+
+/*
+ * Details the club asked for since sign-up (`answers_needed` on
+ * GET /registration-requests/{token}: feature-register/missing-answers-contract.md
+ * §2.4): noted under where the registration stands, while it is open.
+ */
+describe("details the club asked for", () => {
+  const LINK = "https://myotherapp.in/answers/123/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7";
+  const needed = { count: 2, url: LINK, deadline: null };
+
+  it("under review: noted, with the way to add them, and the registration stays as it is", async () => {
+    requestsApi.byToken.mockResolvedValue(request({ answers_needed: needed }));
+    show();
+    await heading("Your registration is under review");
+    const note = screen.getByText(/2 details needed/).closest(".cx-note");
+    expect(note).toHaveTextContent("2 details needed · Add them");
+    expect(note).toHaveTextContent("Your registration stays as it is.");
+    expect(link("Add them")).toHaveAttribute("href", "/answers/123/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f?k=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7");
+  });
+
+  it("confirmed with its ticket: the ticket stays as it is", async () => {
+    requestsApi.byToken.mockResolvedValue(request({ status: "approved", ticket_id: "MOA7Q4K2X", answers_needed: { ...needed, count: 1 } }));
+    show();
+    await heading("You're in");
+    expect(screen.getByText(/1 detail needed/).closest(".cx-note")).toHaveTextContent("Your ticket stays as it is.");
+  });
+
+  it("nothing on one that is over, or from an older API", async () => {
+    requestsApi.byToken.mockResolvedValue(request({ status: "declined", answers_needed: needed }));
+    const first = show();
+    await heading("Your registration wasn't confirmed");
+    expect(screen.queryByText(/details needed/)).toBeNull();
+    first.unmount();
+    requestsApi.byToken.mockResolvedValue(request());
+    show();
+    await heading("Your registration is under review");
+    expect(screen.queryByText(/details needed/)).toBeNull();
+  });
+});
