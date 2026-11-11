@@ -18,6 +18,7 @@
  * and escaped; a bad row is skipped, never trusted.
  */
 import { SITE_URL } from "@/config";
+import { DOCS_PAGES } from "@/content/developers/nav";
 import { w3c } from "./time";
 
 export const PAGE_SIZE = 5000;
@@ -42,6 +43,8 @@ export const STATIC_PAGES = [
   // What we keep from a club's social accounts and how it is deleted (Meta's required data deletion page).
   ["/data-deletion", "yearly", "0.2"],
   ["/terms", "yearly", "0.3"],
+  // The developer docs (the Integrations API): the overview, then each page.
+  ...DOCS_PAGES.map((p) => [p.path, "monthly", p.slug ? "0.4" : "0.5"]),
 ];
 
 export const xml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");

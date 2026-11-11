@@ -32,6 +32,7 @@ export const RESERVED = new Set([
   "help",
   "for-clubs",
   "pricing",
+  "developers",
   "me",
   "play",
   "feedback",

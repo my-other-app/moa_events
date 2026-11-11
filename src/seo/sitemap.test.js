@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { parseXml, texts } from "@/test/xml";
+import { DOCS_PAGES } from "@/content/developers/nav";
 import { entriesFor, indexEntries, parseSitemapName, sitemapIndexXml, staticEntries, urlsetXml } from "./sitemap";
 
 describe("the sitemap's parts", () => {
@@ -19,12 +20,16 @@ describe("the sitemap's parts", () => {
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/events/x?a=1&b=2");
     expect(xml).toContain("<loc>https://myotherapp.in/events/x?a=1&amp;b=2</loc>");
     expect(texts(doc, "loc").slice(0, 3)).toEqual(["https://myotherapp.in/", "https://myotherapp.in/events", "https://myotherapp.in/clubs"]);
-    // The fixed pages (/verify, /support, /help and /data-deletion among them) and the one added.
-    expect(texts(doc, "url")).toHaveLength(14);
+    // The fixed pages (/verify, /support, /help and /data-deletion among them), the 14 developer docs pages, and the one added.
+    expect(texts(doc, "url")).toHaveLength(28);
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/data-deletion");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/verify");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/support");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/help");
+    expect(texts(doc, "loc")).toContain("https://myotherapp.in/developers");
+    for (const page of DOCS_PAGES) expect(texts(doc, "loc")).toContain(`https://myotherapp.in${page.path}`);
+    // The downloads are files, not pages: never listed.
+    expect(texts(doc, "loc").filter((l) => l.endsWith(".json"))).toEqual([]);
   });
 
   it("indexes one sitemap per page: the API's paged sitemap when it has one", () => {
