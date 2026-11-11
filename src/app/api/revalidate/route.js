@@ -1,17 +1,19 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { TAGS } from "@/server/discover";
 import { SPEAKER_TAG } from "@/server/speakers";
+import { HELP_TAG } from "@/server/support";
 
 /*
  * POST /api/revalidate — for the API to say "this changed" the moment it
  * does, instead of the pages catching up within the minute.
  *
  *   Authorization: Bearer <REVALIDATE_SECRET>
- *   {"events": ["hack-night-04", "123"], "clubs": ["circuit-society"], "speakers": ["asha-rao"], "sitemap": true, "topics": true}
+ *   {"events": ["hack-night-04", "123"], "clubs": ["circuit-society"], "speakers": ["asha-rao"], "sitemap": true, "topics": true, "help": true}
  *
  * Each event and club named is looked up afresh on its next visit (its
  * page, its share picture, its media links, the feeds); "topics" reads the
- * topics and their interests again (after an admin edits them); each speaker
+ * topics and their interests again (after an admin edits them); "help" the
+ * help page's answers and topics (after the desk's are edited); each speaker
  * named (by slug) has their page and photo read again. Without
  * REVALIDATE_SECRET set, this answers 404: it is off.
  */
@@ -46,7 +48,8 @@ export async function POST(request) {
   if (events.length || clubs.length) revalidateTag(TAGS.lists, "max");
   if (body?.sitemap) revalidateTag(TAGS.sitemap, "max");
   if (body?.topics) revalidateTag(TAGS.topics, "max");
+  if (body?.help) revalidateTag(HELP_TAG, "max");
   return Response.json({
-    revalidated: { events, clubs, ...(speakers.length ? { speakers } : {}), sitemap: Boolean(body?.sitemap), ...(body?.topics ? { topics: true } : {}) },
+    revalidated: { events, clubs, ...(speakers.length ? { speakers } : {}), sitemap: Boolean(body?.sitemap), ...(body?.topics ? { topics: true } : {}), ...(body?.help ? { help: true } : {}) },
   });
 }

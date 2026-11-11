@@ -6,6 +6,7 @@ import { markPasswordResetMissing, passwordResetOffered } from "@/auth/email";
 import { renderGoogleButton } from "@/auth/google";
 import { Dialog } from "../discover/bits";
 import Icon from "../discover/icons";
+import { GetHelpLink } from "../help/gethelp";
 import { ForgotForm, ResetForm, SignInForm, SignUpForm, TotpForm } from "./emailforms";
 import { Verified, VerifyEmail } from "./verifyemail";
 import logoIcon from "@/assets/logo-icon.png";
@@ -19,6 +20,7 @@ const TITLES = {
   comment: "Sign in to comment",
   register: "Sign in to register",
   speaker: "Sign in to your speaker profile",
+  help: "Sign in to see your requests",
 };
 
 /** How long after Google's window closes a sign-in still counts as on its way. */
@@ -119,7 +121,7 @@ export default function SignInSheet({ open, reason, start = "start", email: type
   const noReset = useCallback((p) => {
     markPasswordResetMissing();
     setResetOffered(false);
-    setNotice({ message: p.message, n: Date.now() });
+    setNotice({ message: p.message, help: p.help || null, n: Date.now() });
     setView("signin");
   }, []);
 
@@ -251,6 +253,7 @@ export default function SignInSheet({ open, reason, start = "start", email: type
           {problem ? (
             <div className={`ac-note${calm ? " ac-note--calm" : ""}`} role="alert">
               <p>{problem.message}</p>
+              {problem.help ? <GetHelpLink help={problem.help} /> : null}
               {gsi === "error" ? (
                 <button type="button" className="dc-btn dc-btn--ghost dc-btn--sm" onClick={() => setTries((t) => t + 1)}>
                   Try again
