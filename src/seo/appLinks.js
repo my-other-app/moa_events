@@ -94,6 +94,10 @@ export const BROWSER_PATHS = [
   ["/media/*", "Pictures"],
   ["/for-clubs", "For clubs"],
   ["/pricing", "Pricing"],
+  // Speakers' pages aren't claimed yet (the app's Speaker screen ships later); claiming and editing a
+  // profile stay in the browser even then (signing in and claiming are the site's).
+  ["/speakers/claim/*", "Claiming a speaker profile"],
+  ["/speakers/me", "Editing a speaker profile"],
 ];
 
 /** /.well-known/apple-app-site-association: the iOS app opens APP_PATHS, less BROWSER_PATHS. */

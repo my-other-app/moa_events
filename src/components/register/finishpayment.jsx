@@ -5,6 +5,7 @@ import { eventsApi } from "@/api/events";
 import { useAuth } from "@/auth/context";
 import { describePayment, finishPayment } from "@/utils/payment";
 import { myRegistration } from "@/utils/register";
+import { GetHelpLink } from "../help/gethelp";
 
 /**
  * "Finish payment" for a registration waiting for payment, wherever it is
@@ -94,6 +95,8 @@ export function PayNote({ problem, className = "" }) {
     <div className={`pay-note pay-note--${problem.tone} ${className}`} role="alert">
       <p className="pay-note-title">{problem.title}</p>
       {problem.text ? <p className="pay-note-text">{problem.text}</p> : null}
+      {/* A refusal that says "write to support@" can be asked about on /help, with the error filled in. */}
+      {problem.help ? <GetHelpLink help={problem.help} /> : null}
     </div>
   );
 }

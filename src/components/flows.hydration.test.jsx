@@ -23,6 +23,11 @@ vi.mock("@/api/live", () => ({
   errorLine: (e, f) => f,
   liveApi: { fetchFeed: vi.fn(() => new Promise(() => {})), playState: vi.fn(() => new Promise(() => {})), fetchSurvey: vi.fn(() => new Promise(() => {})) },
 }));
+vi.mock("@/api/speakers", () => ({ speakersApi: { claimPreview: vi.fn(() => new Promise(() => {})), me: vi.fn(() => new Promise(() => {})), page: vi.fn(() => new Promise(() => {})) } }));
+vi.mock("@/api/support", () => ({
+  supportApi: { topics: vi.fn(() => new Promise(() => {})), mine: vi.fn(() => new Promise(() => {})), request: vi.fn(() => new Promise(() => {})) },
+  leadsApi: { talkToUs: vi.fn() },
+}));
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn(() => new Promise(() => {})), me: vi.fn(() => new Promise(() => {})) } }));
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn(), delete: vi.fn(() => Promise.resolve({ data: {} })) } }));
@@ -41,6 +46,13 @@ const Claim = (await import("./claim.jsx")).default;
 const RequestStatus = (await import("./request.jsx")).default;
 const Answers = (await import("./answers.jsx")).default;
 const { default: Certificate, OldCertificateAddress } = await import("./certificate.jsx");
+const SpeakerClaim = (await import("./speakers/claim.jsx")).default;
+const MySpeakerProfile = (await import("./speakers/myprofile.jsx")).default;
+const { SpeakerFollow } = await import("./speakers/speakerislands.jsx");
+const { HelpForm } = await import("./help/helpform.jsx");
+const { MyRequests } = await import("./help/myrequests.jsx");
+const RequestThread = (await import("./help/thread.jsx")).default;
+const SurveyPage = (await import("./help/survey.jsx")).default;
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
 const page = parseEventPage(fullEvent());
@@ -145,6 +157,44 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     mounted = await hydrate(at(path, make()));
     expect(mounted.problems).toEqual([]);
     if (text) expect(mounted.html).toContain(text);
+  });
+});
+
+describe("speakers", () => {
+  it.each([
+    ["/speakers/claim/Sp3abcdefghijklmnopqrstuv", () => <SpeakerClaim token="Sp3abcdefghijklmnopqrstuv" />, "Loading your invite"],
+    ["/speakers/me", () => <MySpeakerProfile />, "Loading your speaker profile"],
+    ["/speakers/asha-rao", () => <SpeakerFollow slug="asha-rao" name="Asha Rao" followers={4} />, "Follow"],
+  ])("%s hydrates without a mismatch, signed out and in", async (path, make, text) => {
+    mounted = await hydrate(at(path, make()));
+    expect(mounted.problems).toEqual([]);
+    expect(mounted.html).toContain(text);
+    mounted.unmount();
+    signInAs();
+    mounted = await hydrate(at(path, make()));
+    expect(mounted.problems).toEqual([]);
+  });
+});
+
+describe("help", () => {
+  it.each([
+    // The form: the guest's boxes for everyone in the first paint; signed in, they give way after.
+    ["/help?topic=payments&error_code=PAYMENT_ORDER_MISMATCH", () => (
+      <>
+        <HelpForm topics={[{ key: "payments", label: "Payments and refunds" }]} />
+        <MyRequests />
+      </>
+    ), "Your email"],
+    ["/help/requests/1042", () => <RequestThread id="1042" />, "Loading your request"],
+    ["/help/survey/tok-abcdefghijklmnop?solved=yes", () => <SurveyPage token="tok-abcdefghijklmnop" solved />, "How did we do?"],
+  ])("%s hydrates without a mismatch, signed out and in", async (path, make, text) => {
+    mounted = await hydrate(at(path, make()));
+    expect(mounted.problems).toEqual([]);
+    expect(mounted.html).toContain(text);
+    mounted.unmount();
+    signInAs();
+    mounted = await hydrate(at(path, make()));
+    expect(mounted.problems).toEqual([]);
   });
 });
 

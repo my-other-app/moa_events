@@ -39,8 +39,10 @@ const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
 // The last segment of these addresses is a code that opens the page (a
 // waiting list's claim link, /claim/{token}, and the API's
 // /waitlist/offers/{token}, are its only credential; so are a request's
-// status link, /requests/{token}, and the API's /registration-requests/{token}).
-const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests)\/(?!\[)[^/?#\s"'<>]+/g;
+// status link, /requests/{token}, and the API's /registration-requests/{token};
+// and a support survey's, the site's /help/survey/{token} and the API's
+// /support/survey/{token}).
+const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests|survey)\/(?!\[)[^/?#\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
 // A missing-answers link names the person: the site's /answers/{eventId}/{ref}
 // and the API's /events/{eventId}/answers/{ref} (a registration's UUID, or "q" and a request's).

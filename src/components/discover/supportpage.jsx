@@ -29,6 +29,9 @@ export function SupportView() {
             <a className="dc-btn" href={`mailto:${CONTACT_EMAIL}`}>
               <Icon name="mail" size={16} /> Email support
             </a>
+            <Link className="dc-btn dc-btn--ghost" to="/help">
+              <Icon name="comment" size={16} /> Ask on the help page
+            </Link>
             <a className="dc-btn dc-btn--ghost" href="#delete-account">
               Delete your account
             </a>

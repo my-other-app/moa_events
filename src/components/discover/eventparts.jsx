@@ -7,6 +7,7 @@ import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
 import { LogoImg, PosterImg } from "./picture";
 import { coverFields } from "@/utils/cover";
+import { speakerPagePath } from "@/seo/urls";
 import { EventCover } from "./cover";
 import Icon from "./icons";
 import { EpIcon } from "./eventbits";
@@ -212,8 +213,18 @@ export function Speakers({ speakers }) {
               <div className="ep-speaker-body">
                 <div className="ep-speaker-head">
                   <div>
-                    <h3 className="ep-speaker-name">{s.name}</h3>
+                    {/* With a profile (feature-register/speakers-contract.md), the name opens the speaker's own page. */}
+                    <h3 className="ep-speaker-name">
+                      {s.profile_slug ? (
+                        <Link className="ep-speaker-link" to={speakerPagePath(s.profile_slug)}>
+                          {s.name}
+                        </Link>
+                      ) : (
+                        s.name
+                      )}
+                    </h3>
                     {s.designation ? <p className="ep-speaker-role">{s.designation}</p> : null}
+                    {s.talk_title ? <p className="ep-speaker-talk">&ldquo;{s.talk_title}&rdquo;</p> : null}
                   </div>
                   {link && !link.startsWith("mailto:") ? (
                     <a className="ep-iconlink" href={link} target="_blank" rel="noopener noreferrer" aria-label={`${s.name} on ${label}`}>

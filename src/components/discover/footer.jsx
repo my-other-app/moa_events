@@ -104,6 +104,9 @@ export function SiteFooter() {
             <h2>Help &amp; legal</h2>
             <ul>
               <li>
+                <Link to="/help">Help</Link>
+              </li>
+              <li>
                 <Link to="/support">Support</Link>
               </li>
               <li>

@@ -770,6 +770,9 @@ export function parseEventDetail(e) {
   };
 }
 
+/** A speaker profile's address (/speakers/{slug}): a slug, or nothing (feature-register/speakers-contract.md). */
+const profileSlug = (v) => (typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(v.trim()) ? v.trim() : null);
+
 const parseSpeaker = (s) => {
   const o = obj(s);
   if (!o || !str(o.name)) return null;
@@ -780,6 +783,8 @@ const parseSpeaker = (s) => {
     photo: o.photo || null,
     bio: textOf(o.bio),
     link: str(o.link),
+    // Newer APIs: the speaker's own page (null while the profile is hidden) and the talk at this event.
+    ...optional(o, { profile_slug: profileSlug, talk_title: (v) => (str(v) ? v.trim() : null) }),
   };
 };
 
