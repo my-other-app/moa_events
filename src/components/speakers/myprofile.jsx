@@ -30,7 +30,8 @@ const formOf = (p) => ({
   headline: p.headline || "",
   bio: p.bio || "",
   city: p.city || "",
-  links: Object.fromEntries(LINK_KINDS.map(([k]) => [k, typeof p.rawLinks?.[k] === "string" ? p.rawLinks[k] : ""])),
+  // A link that isn't one (not http or https) isn't offered back: saving the links drops it.
+  links: Object.fromEntries(LINK_KINDS.map(([k]) => [k, typeof p.rawLinks?.[k] === "string" && safeLink(p.rawLinks[k]) ? p.rawLinks[k] : ""])),
 });
 
 /** Only what changed, as PATCH /speakers/me takes it (an emptied field clears it; links are sent whole). */
