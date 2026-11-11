@@ -1,0 +1,114 @@
+/*
+ * The attendees' share row on an event's page (X, LinkedIn, Facebook,
+ * WhatsApp, Copy link), under the register card; the toast is the Share
+ * button's (event-page.css, motion.css). Prefixed ep-share.
+ */
+
+.ep-share {
+  margin-top: 16px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--dc-line);
+  border-radius: 14px;
+  background: #fff;
+}
+.ep-share-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.ep-share-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0;
+  list-style: none;
+}
+.ep-sharebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--dc-line);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-out),
+    background-color var(--motion-fast) var(--motion-ease-out);
+}
+.ep-sharebtn:hover {
+  border-color: #9ca3af;
+  background: var(--dc-sunken);
+}
+.ep-sharebtn:focus-visible {
+  outline: 2px solid var(--dc-link);
+  outline-offset: 2px;
+}
+/* A phone shows the icons alone; the names stay for screen readers (aria-label) and wider screens. */
+@media (max-width: 380px) {
+  .ep-sharebtn[data-platform] span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .ep-sharebtn[data-platform] {
+    width: 40px;
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+/* ---------- /data-deletion: a request's status, at the top ---------- */
+
+.dd-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 640px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--dc-line);
+  border-radius: 14px;
+  background: var(--dc-sunken);
+  color: var(--dc-ink);
+}
+.dd-status.is-good {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.dd-status svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+.dd-status-skel {
+  display: block;
+  width: 100%;
+  height: 56px;
+  border-radius: 10px;
+}
+.dd-status-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+.dd-status-code {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-muted);
+  overflow-wrap: anywhere;
+}
+.dd-status-text {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--dc-text);
+}

@@ -39,6 +39,8 @@ export const STATIC_PAGES = [
   // Help: the answers, and the form to ask the support team.
   ["/help", "monthly", "0.5"],
   ["/privacy", "yearly", "0.3"],
+  // What we keep from a club's social accounts and how it is deleted (Meta's required data deletion page).
+  ["/data-deletion", "yearly", "0.2"],
   ["/terms", "yearly", "0.3"],
 ];
 

@@ -24,6 +24,7 @@ import {
   RichText,
   SectionNav,
   ShareButton,
+  ShareRow,
   Speakers,
   Team,
   Venue,
@@ -150,11 +151,12 @@ function Facts({ event, club, venueLink }) {
 /**
  * An event, laid out: hero and card, the sections that have something,
  * then more to go to. `page` is GET /discover/events/{ref} as parseEventPage
- * reads it. No state of its own: the server renders it whole (the page at
+ * reads it; `shareRow`, the attendees' share row (src/server/share.js), or
+ * null for none. No state of its own: the server renders it whole (the page at
  * src/app/events/[slug]/page.jsx), and only the islands (eventislands.jsx)
  * run in the browser.
  */
-export function EventView({ page }) {
+export function EventView({ page, shareRow = null }) {
   const { event, club, speakers, agenda, team, team_source: teamSource, more_from_club: more, similar } = page;
   // The event's own sponsors and partners; an older API sends neither.
   const sponsors = page.sponsors || [];
@@ -231,6 +233,7 @@ export function EventView({ page }) {
         <div className="ep-side">
           <Poster event={event} />
           <RegisterCard event={event} club={club} />
+          {cancelled ? null : <ShareRow row={shareRow} />}
         </div>
 
         <div className="ep-body">
