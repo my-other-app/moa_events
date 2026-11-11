@@ -9,15 +9,16 @@ import { eventStructuredData } from "@/seo/structured";
 import { eventPagePath } from "@/seo/urls";
 import { getEventPage } from "@/server/discover";
 import { preconnectMedia } from "@/server/hints";
+import { getShareRow } from "@/server/share";
 
 /*
  * /events/{slug}: an event's page. SERVER-RENDERED, statically regenerated
  * (ISR): made on its first visit, served from the cache, made again at most
  * once a minute. The whole event is in the HTML (title, club, when and
  * where, price and seats, the description, speakers, agenda, team, more
- * events), with its Event and BreadcrumbList structured data; only the
- * islands (share, calendar, the live strip, section tabs, "Read more") run
- * in the browser.
+ * events, the attendees' share row), with its Event and BreadcrumbList
+ * structured data; only the islands (share, calendar, the live strip,
+ * section tabs, "Read more", Copy link) run in the browser.
  *
  * One address per event: an old slug answers with a 308 here; an id
  * (/events/123) goes to the old-address page by a rewrite (next.config),
@@ -45,10 +46,12 @@ export default async function EventRoute({ params }) {
   if (page.event.slug && page.event.slug !== slug) permanentRedirect(eventPagePath(page.event));
   // The poster is the largest paint: connect to where it is served from before the redirect says so.
   preconnectMedia(page.event.poster, page.club?.logo, ...page.speakers.map((s) => s.photo));
+  // The attendees' share row: null (no row) for an API without it, or anything that goes wrong reading it.
+  const shareRow = page.event.status === "cancelled" ? null : await getShareRow(page.event.id, page.event.slug || null);
   return (
     <SitePage>
       <JsonLd data={eventStructuredData(page)} />
-      <EventView page={stableEventPage(page)} />
+      <EventView page={stableEventPage(page)} shareRow={shareRow} />
     </SitePage>
   );
 }

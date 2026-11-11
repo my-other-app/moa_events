@@ -22,6 +22,7 @@ import { RegisterGo } from "../register/registercta";
  * the registration flow's own, in register/registercta.jsx.
  */
 export { About, CalendarButton, LiveStrips, SectionNav, ShareButton } from "./eventislands";
+import { CopyLinkButton } from "./eventislands";
 export { EpIcon, RichText } from "./eventbits";
 
 /** "Ananya Iyer" → "AI". */
@@ -413,5 +414,38 @@ export function Contact({ contact }) {
         </div>
       </div>
     </EpSection>
+  );
+}
+
+/**
+ * "Share this event": the attendees' share row (X, LinkedIn, Facebook,
+ * WhatsApp, Copy link), each with the club's words and its own tracking
+ * link (src/utils/share.js; read on the server with the page,
+ * src/server/share.js). Each opens the platform's own share page in a new
+ * tab; Copy link copies that link. Nothing at all without a row (an API
+ * without it, or a cancelled event).
+ */
+export function ShareRow({ row }) {
+  if (!row || !row.length) return null;
+  return (
+    <section className="ep-share" aria-labelledby="ep-share-title">
+      <h2 id="ep-share-title" className="ep-share-title">
+        Share this event
+      </h2>
+      <ul className="ep-share-list">
+        {row.map((r) => (
+          <li key={r.platform}>
+            {r.platform === "copy" ? (
+              <CopyLinkButton url={r.url} />
+            ) : (
+              <a className="ep-sharebtn" href={r.href} target="_blank" rel="noopener noreferrer" aria-label={`Share on ${r.label} (opens in a new tab)`} data-platform={r.platform}>
+                <Icon name={r.platform} size={17} />
+                <span>{r.label}</span>
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

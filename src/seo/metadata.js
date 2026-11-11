@@ -9,6 +9,7 @@ import { SITE_URL } from "@/config";
 import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
 import { hostNames, hostsOf } from "@/utils/hosts";
+import { previewImage } from "@/utils/share";
 import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, topicPagePath } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
@@ -65,17 +66,23 @@ export function eventFactsLine(event, club, cohosts = []) {
   return `${facts}${club ? `. Hosted by ${hostNames(hostsOf(club, cohosts))} on ${SITE_NAME}.` : `. On ${SITE_NAME}.`}`;
 }
 
-/** An event's page: its canonical /events/{slug}, its own share picture, and its club's feed. `page` is the raw parsed page. */
+/**
+ * An event's page: its canonical /events/{slug}, its share picture, and its
+ * club's feed. `page` is the raw parsed page. The picture is the 1200 × 630
+ * one the API makes for link previews (`share_image_url`, a lasting public
+ * address) when it has one; else the site's own card (/og/events/{slug}).
+ */
 export function eventMetadata(page) {
   const { event, club } = page;
   const description = summary(event.about) || summary(eventFactsLine(event, club, page.cohosts));
   const when = whenLine(event.starts_at);
+  const made = previewImage(event.share_image_url, imageUrl(event.poster, "original"));
   return pageMetadata({
     title: event.name,
     description,
     path: eventPagePath(event),
     image: {
-      url: absoluteUrl(ogImage.event(event.slug || event.id, eventOgVersion(page))),
+      url: made || absoluteUrl(ogImage.event(event.slug || event.id, eventOgVersion(page))),
       width: 1200,
       height: 630,
       alt: [event.name, when ? `${when} IST` : null, event.is_online ? "Online" : event.location_name].filter(Boolean).join(" · "),

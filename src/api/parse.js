@@ -764,6 +764,8 @@ export function parseEventDetail(e) {
       postal_code: (v) => (typeof v === "string" || typeof v === "number" ? str(String(v)) : null),
       // Only on a cancelled event: why, and when (src/utils/cancelled.js).
       cancellation: (v, all) => (all.status === "cancelled" ? parseCancellation(v) || { reason: null, cancelled_at: null } : null),
+      // The link-preview picture (feature-register/social-posting-contract.md): an https address, or nothing.
+      share_image_url: (v) => (typeof v === "string" && /^https:\/\/[^\s]+$/i.test(v.trim()) ? v.trim() : null),
     }),
   };
 }

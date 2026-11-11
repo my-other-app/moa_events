@@ -35,6 +35,8 @@ export const STATIC_PAGES = [
   // Help: the App Store's Support URL, and Google Play's account-deletion page (/support#delete-account).
   ["/support", "monthly", "0.4"],
   ["/privacy", "yearly", "0.3"],
+  // What we keep from a club's social accounts and how it is deleted (Meta's required data deletion page).
+  ["/data-deletion", "yearly", "0.2"],
   ["/terms", "yearly", "0.3"],
 ];
 
