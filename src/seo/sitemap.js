@@ -34,6 +34,8 @@ export const STATIC_PAGES = [
   ["/verify", "monthly", "0.5"],
   // Help: the App Store's Support URL, and Google Play's account-deletion page (/support#delete-account).
   ["/support", "monthly", "0.4"],
+  // Help: the answers, and the form to ask the support team.
+  ["/help", "monthly", "0.5"],
   ["/privacy", "yearly", "0.3"],
   ["/terms", "yearly", "0.3"],
 ];

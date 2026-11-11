@@ -1,16 +1,18 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { TAGS } from "@/server/discover";
+import { HELP_TAG } from "@/server/support";
 
 /*
  * POST /api/revalidate — for the API to say "this changed" the moment it
  * does, instead of the pages catching up within the minute.
  *
  *   Authorization: Bearer <REVALIDATE_SECRET>
- *   {"events": ["hack-night-04", "123"], "clubs": ["circuit-society"], "sitemap": true, "topics": true}
+ *   {"events": ["hack-night-04", "123"], "clubs": ["circuit-society"], "sitemap": true, "topics": true, "help": true}
  *
  * Each event and club named is looked up afresh on its next visit (its
  * page, its share picture, its media links, the feeds); "topics" reads the
- * topics and their interests again (after an admin edits them). Without
+ * topics and their interests again (after an admin edits them); "help" the
+ * help page's answers and topics (after the desk's are edited). Without
  * REVALIDATE_SECRET set, this answers 404: it is off.
  */
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -39,5 +41,8 @@ export async function POST(request) {
   if (events.length || clubs.length) revalidateTag(TAGS.lists, "max");
   if (body?.sitemap) revalidateTag(TAGS.sitemap, "max");
   if (body?.topics) revalidateTag(TAGS.topics, "max");
-  return Response.json({ revalidated: { events, clubs, sitemap: Boolean(body?.sitemap), ...(body?.topics ? { topics: true } : {}) } });
+  if (body?.help) revalidateTag(HELP_TAG, "max");
+  return Response.json({
+    revalidated: { events, clubs, sitemap: Boolean(body?.sitemap), ...(body?.topics ? { topics: true } : {}), ...(body?.help ? { help: true } : {}) },
+  });
 }

@@ -296,7 +296,7 @@ export function discountRefusal(code) {
 
 /**
  * Normalises an error from the API (axios's, or one of ours) to
- * {status, code, errors, message, network, retryAfter}.
+ * {status, code, errors, message, network, retryAfter, trackId}.
  */
 export function apiFailure(error) {
   if (error && error.__apiFailure) return error;
@@ -314,6 +314,8 @@ export function apiFailure(error) {
     network: !response && !error?.status && !error?.authExpired,
     authExpired: Boolean(error?.authExpired),
     retryAfter: Number.isFinite(retry) && retry > 0 ? retry : null,
+    // The API's own reference for this refusal ({…, track_id}), for "Get help" to pass on (utils/help.js).
+    trackId: str(data?.track_id),
   };
 }
 

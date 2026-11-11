@@ -151,7 +151,7 @@ export function describeAuthError(error, flow) {
   const said = sentence(s(data.message) || s(data.detail));
 
   if (!status || status >= 500) return { kind: "server", message: SERVER };
-  if (status === 404 && (flow === "forgot" || flow === "reset")) return { kind: "unavailable", message: NO_RESET };
+  if (status === 404 && (flow === "forgot" || flow === "reset")) return { kind: "unavailable", message: NO_RESET, help: { topic: "account", errorCode: "PASSWORD_RESET_UNAVAILABLE" } };
   if (status === 429) {
     if (code === "CODE_RECENTLY_SENT" || code === "CODE_DAILY_LIMIT") {
       return { kind: "wait", code, message: said || BUSY, retryAfter: num(errors.retry_after) };

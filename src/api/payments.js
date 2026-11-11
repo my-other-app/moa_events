@@ -46,6 +46,8 @@ export function paymentError(error, stage) {
         errors: data?.errors && typeof data.errors === "object" ? data.errors : null,
         network: !response && !error?.authExpired,
         webUrl: data?.errors?.web_url || null,
+        // The API's reference for this refusal, for "Get help" to pass on (utils/help.js).
+        trackId: typeof data?.track_id === "string" && data.track_id ? data.track_id : null,
     });
 }
 
