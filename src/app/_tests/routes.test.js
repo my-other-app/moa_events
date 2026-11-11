@@ -90,6 +90,7 @@ describe("which file answers which address", () => {
     ["/privacy", "privacy/page.jsx"],
     ["/terms", "terms/page.jsx"],
     ["/support", "support/page.jsx"],
+    ["/data-deletion", "data-deletion/page.jsx"],
     ["/me/tickets", "me/tickets/page.jsx"],
     ["/me/following", "me/following/page.jsx"],
     ["/play/123", "play/[eventId]/page.jsx"],
@@ -134,7 +135,7 @@ describe("which file answers which address", () => {
   });
 
   it("never takes the site's own words for an old event address", async () => {
-    for (const word of ["/events", "/clubs", "/topics", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms", "/support"]) {
+    for (const word of ["/events", "/clubs", "/topics", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms", "/support", "/data-deletion"]) {
       expect((await resolve(word)).file).not.toMatch(/^\[ref\]/);
     }
   });
