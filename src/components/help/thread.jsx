@@ -122,7 +122,7 @@ function Reply({ id, onSent }) {
     <form className="hp-reply" noValidate onSubmit={send} aria-label="Reply">
       <div className={`rg-field${problem ? " is-invalid" : ""}`}>
         <label className="rg-label" htmlFor="hp-reply-box">
-          Reply
+          Your reply
         </label>
         <textarea
           ref={box}
