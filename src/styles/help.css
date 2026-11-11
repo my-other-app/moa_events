@@ -1,0 +1,592 @@
+/*
+ * Help (/help, /help/requests/{id}, /help/survey/{token}), the "Get help"
+ * buttons on error states, and the For-clubs page's "Talk to us" form. The
+ * fields are the registration form's (register.css: rg-field, rg-input,
+ * rg-error, …) and the answers the For-clubs questions' (forclubs.css:
+ * fc-qa); everything here is prefixed hp- (or fc-talk-).
+ */
+
+.hp,
+.fc-talk {
+  --rg-field: #d1d5db;
+  --rg-field-hover: #9ca3af;
+  --rg-bad: #b91c1c;
+  --rg-bad-line: #dc2626;
+  --rg-pick: #fdffd6;
+}
+
+.hp-head {
+  padding-bottom: 8px;
+}
+.hp-h2 {
+  font-family: var(--dc-display);
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+
+/* ---------- answers ---------- */
+
+.hp-answers {
+  display: grid;
+  gap: 16px;
+  margin-top: 32px;
+}
+.hp-group + .hp-group {
+  margin-top: 16px;
+}
+.hp-group-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.hp-qa[id] {
+  scroll-margin-top: 84px;
+}
+.hp-qa .fc-qa-a p + p,
+.hp-qa .fc-qa-a ul,
+.hp-qa .fc-qa-a ol {
+  margin-top: 10px;
+}
+.hp-qa .fc-qa-a a {
+  color: var(--dc-link);
+  font-weight: 600;
+}
+
+/* ---------- ask us ---------- */
+
+.hp-ask {
+  display: grid;
+  gap: 20px;
+  margin-top: 56px;
+  scroll-margin-top: 84px;
+}
+@media (min-width: 960px) {
+  .hp-ask {
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+    gap: 56px;
+    align-items: start;
+  }
+}
+.hp-ask-head p {
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.hp-form,
+.hp-reply,
+.hp-survey {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.hp-form {
+  padding: 24px 20px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+}
+@media (min-width: 600px) {
+  .hp-form {
+    padding: 28px;
+  }
+}
+.hp-two {
+  display: grid;
+  gap: 24px;
+}
+@media (min-width: 600px) {
+  .hp-two {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+}
+.hp-as,
+.hp-carried,
+.hp-secrets {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-text);
+}
+.hp-as svg,
+.hp-carried svg,
+.hp-secrets svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.hp-carried svg {
+  color: #15803d;
+}
+.hp-secrets {
+  margin-top: -8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--dc-sunken);
+}
+.hp-secrets.is-strong {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: var(--dc-ink);
+}
+.hp-note {
+  padding: 10px 12px;
+  border: 1px solid var(--dc-line);
+  border-radius: 10px;
+  background: var(--dc-sunken);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-ink);
+}
+.hp-note.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.hp-note.is-good {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+.hp-note a {
+  color: var(--dc-link);
+  font-weight: 600;
+}
+.hp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 599px) {
+  .hp-actions > .dc-btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* ---------- screenshots ---------- */
+
+.hp-files {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+.hp-file-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.hp-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--dc-line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  color: var(--dc-ink);
+}
+.hp-file.is-done svg:first-child {
+  color: #15803d;
+}
+.hp-file.is-failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.hp-file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.hp-file-size {
+  color: var(--dc-muted);
+}
+.hp-file-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dc-text);
+  cursor: pointer;
+}
+.hp-file-x:hover {
+  background: var(--dc-sunken);
+}
+.hp-file-error {
+  flex: 1 1 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rg-bad);
+}
+
+/* ---------- sent, or email us ---------- */
+
+.hp-sent,
+.hp-mail {
+  padding: 24px 20px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+}
+.hp-sent-title,
+.hp-mail-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--dc-ink);
+}
+.hp-sent-title:focus {
+  outline: none;
+}
+.hp-mail {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.hp-mail-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--dc-accent);
+  color: var(--dc-ink);
+}
+.hp-mail-text {
+  margin-top: 6px;
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.hp-mail-btn {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- my requests ---------- */
+
+.hp-mine {
+  margin-top: 56px;
+  scroll-margin-top: 84px;
+}
+.hp-mine-empty {
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.hp-rows {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.hp-row-skel {
+  display: block;
+  height: 64px;
+  border-radius: 12px;
+}
+.hp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid var(--dc-line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--dc-ink);
+  transition: border-color var(--motion-fast) var(--motion-ease-out);
+}
+.hp-row:hover {
+  border-color: #9ca3af;
+}
+.hp-row-main {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+.hp-row-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-row.is-unread .hp-row-title {
+  font-weight: 800;
+}
+.hp-row-meta {
+  font-size: 13px;
+  color: var(--dc-muted);
+}
+.hp-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--dc-link);
+}
+.hp-chip {
+  flex: 0 0 auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dc-text);
+  white-space: nowrap;
+}
+.hp-chip.is-open {
+  background: var(--dc-link-soft);
+  color: #075985;
+}
+.hp-chip.is-waiting {
+  background: #fffbeb;
+  color: #92400e;
+}
+.hp-chip.is-resolved {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+/* ---------- one request ---------- */
+
+.hp-page {
+  max-width: 760px;
+  padding-top: 8px;
+  padding-bottom: 48px;
+}
+.hp-thread {
+  display: grid;
+  gap: 20px;
+}
+.hp-thread-head {
+  display: grid;
+  gap: 6px;
+}
+.hp-thread-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-muted);
+}
+.hp-thread-when {
+  font-size: 14px;
+  color: var(--dc-muted);
+}
+.hp-msgs {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.hp-msg {
+  padding: 14px 16px;
+  border: 1px solid var(--dc-line);
+  border-radius: 14px;
+  background: #fff;
+}
+.hp-msg.is-ours {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+.hp-msg.is-theirs {
+  margin-left: 0;
+}
+@media (min-width: 600px) {
+  .hp-msg.is-ours {
+    margin-right: 48px;
+  }
+  .hp-msg.is-theirs {
+    margin-left: 48px;
+  }
+}
+.hp-msg.is-system {
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--dc-muted);
+  text-align: center;
+}
+.hp-msg-who {
+  font-size: 13px;
+  color: var(--dc-muted);
+}
+.hp-msg-who strong {
+  color: var(--dc-ink);
+}
+.hp-msg-body {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.hp-msg-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0;
+  list-style: none;
+}
+.hp-msg-files a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--dc-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-link);
+}
+
+/* ---------- did we solve it? ---------- */
+
+.hp-yesno,
+.fc-talk-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hp-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--rg-field);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  cursor: pointer;
+}
+.hp-pick:hover {
+  border-color: var(--rg-field-hover);
+}
+.hp-pick.is-on {
+  border-color: var(--dc-ink);
+  background: var(--rg-pick);
+  box-shadow: inset 0 0 0 1px var(--dc-ink);
+}
+.hp-pick:has(input:focus-visible) {
+  outline: 2px solid var(--dc-link);
+  outline-offset: 2px;
+}
+.hp-survey-page .hp-survey {
+  margin-top: 20px;
+}
+.hp-survey-box {
+  min-height: 96px;
+}
+
+/* ---------- "Get help" on an error ---------- */
+
+.hp-gethelp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.pay-note .hp-gethelp {
+  background: #fff;
+}
+
+/* ---------- For clubs: talk to us ---------- */
+
+.fc-talk {
+  display: grid;
+  gap: 24px;
+  padding-top: 88px;
+  scroll-margin-top: 72px;
+}
+@media (min-width: 960px) {
+  .fc-talk {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 64px;
+    align-items: start;
+  }
+}
+.fc-talk-head h2 {
+  margin-top: 8px;
+  font-family: var(--dc-display);
+  font-size: clamp(36px, 5vw, 52px);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--dc-ink);
+}
+.fc-talk-head p:not(.dc-eyebrow) {
+  margin-top: 14px;
+  max-width: 46ch;
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.fc-talk-form {
+  display: grid;
+  gap: 20px;
+  padding: 24px 20px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+}
+@media (min-width: 600px) {
+  .fc-talk-form {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+    padding: 28px;
+  }
+  .fc-talk-wide {
+    grid-column: 1 / -1;
+  }
+}
+.fc-talk-done {
+  padding: 28px 22px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+}
+.fc-talk-done h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.fc-talk-done p {
+  margin: 8px 0 16px;
+  max-width: 50ch;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}

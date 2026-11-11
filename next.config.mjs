@@ -49,8 +49,8 @@ export const PRIVATE_LINK_HEADERS = [
 export const VERIFY_RESULT_HEADERS = PRIVATE_LINK_HEADERS;
 
 /**
- * A waiting list's claim link (/claim/{token}), and a request's status link
- * (/requests/{token}): the token is the offer's (the request's) only credential. Never kept by a browser or a cache, framed or indexed,
+ * A waiting list's claim link (/claim/{token}), a request's status link
+ * (/requests/{token}) and a support survey's (/help/survey/{token}): the token is the offer's (the request's) only credential. Never kept by a browser or a cache, framed or indexed,
  * and never passed on in a Referer: other sites (Razorpay's checkout among
  * them) are told only the site's origin, never the address.
  */
@@ -109,6 +109,8 @@ const nextConfig = {
       { source: "/claim/:token", headers: CLAIM_HEADERS },
       // A request for a place (registration approval): its address is the request's only credential too.
       { source: "/requests/:token", headers: CLAIM_HEADERS },
+      // "Did we solve it?" from a support email: the link's token is its only credential.
+      { source: "/help/survey/:token", headers: CLAIM_HEADERS },
     ];
   },
   async redirects() {

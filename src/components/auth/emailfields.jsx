@@ -3,6 +3,7 @@
 import { forwardRef, useId, useImperativeHandle, useRef, useState } from "react";
 import { CODE_LENGTH, PASSWORD_RULES, digitsOf } from "@/auth/email";
 import Icon from "../discover/icons";
+import { GetHelpLink } from "../help/gethelp";
 
 /**
  * The email forms' controls, in the registration form's look: a label over
@@ -242,6 +243,8 @@ export function FormNote({ problem, calm = false, children = null }) {
   return (
     <div key={problem.n} className={`ac-note ac-fnote${calm ? " ac-note--calm" : ""}`} role={calm ? "status" : "alert"}>
       <p>{problem.message}</p>
+      {/* A refusal that says "write to support@" (a suspended account, no password reset): ask on /help instead. */}
+      {problem.help ? <GetHelpLink help={problem.help} /> : null}
       {children}
     </div>
   );

@@ -171,13 +171,22 @@ const VERIFY_REFUSALS = {
     tone: "error",
     title: "That payment was for a different order",
     text: () => `We couldn't use it for this registration. If you were charged, write to ${CONTACT_EMAIL} before paying again and we'll sort it out.`,
+    help: true,
   },
   UNSUPPORTED_PAYMENT_METHOD: {
     tone: "error",
     title: "That payment method isn't accepted here",
     text: () => `Pay with UPI, a card, netbanking or a wallet. If money left your account, write to ${CONTACT_EMAIL} before paying again.`,
+    help: true,
   },
 };
+
+/**
+ * The refusals above that say "write to support@" also carry `help`: what a
+ * "Get help" button beside them sends to /help (utils/help.js), so the
+ * person can ask from the site with the error filled in.
+ */
+const helpFor = (error) => ({ topic: "payments", errorCode: error?.code || null, trackId: error?.trackId || null });
 
 /**
  * What a payment's outcome means, said once and calmly: {tone, title, text},
@@ -204,7 +213,7 @@ export function describePayment(outcome, error = null, { email = null, kept = "d
   if (outcome === "load") return { tone: "calm", title: "The payment window didn't open", text: "Check your connection, then try again. Nothing was charged." };
   if (outcome === "verify") {
     const known = VERIFY_REFUSALS[error?.code];
-    if (known) return { tone: known.tone, title: known.title, text: known.text(to) };
+    if (known) return { tone: known.tone, title: known.title, text: known.text(to), ...(known.help ? { help: helpFor(error) } : {}) };
     return {
       tone: "warn",
       title: "We couldn't confirm your payment yet",

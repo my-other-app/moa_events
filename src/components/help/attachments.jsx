@@ -81,7 +81,7 @@ export function Attachments({ files, onChange, disabled = false, id = "hp-files"
       ) : null}
       {left > 0 ? (
         <>
-          <input ref={input} id={id} className="dc-sr" type="file" accept={FILE_ACCEPT} multiple onChange={pick} disabled={disabled} />
+          <input ref={input} id={id} className="dc-sr" type="file" accept={FILE_ACCEPT} multiple onChange={pick} disabled={disabled} tabIndex={-1} aria-label="Choose screenshots" />
           <button type="button" className="dc-btn dc-btn--ghost dc-btn--sm" onClick={() => input.current?.click()} disabled={disabled} aria-controls={id}>
             <Icon name="upload" size={16} />
             {files.length ? "Add another" : "Add screenshots"}
