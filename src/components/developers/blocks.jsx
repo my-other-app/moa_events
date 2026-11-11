@@ -30,8 +30,10 @@ export function SmartLink({ href, children, className }) {
       </a>
     );
   }
+  // Only addresses that go somewhere safe: words from a document never become a script.
+  if (!/^(https?:|mailto:)/i.test(href)) return <span className={className}>{children}</span>;
   return (
-    <a className={className} href={href} {...(/^https?:/.test(href) ? { rel: "noopener" } : {})}>
+    <a className={className} href={href} {...(/^https?:/i.test(href) ? { rel: "noopener" } : {})}>
       {children}
     </a>
   );

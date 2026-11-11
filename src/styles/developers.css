@@ -343,6 +343,9 @@
 .dv-values {
   color: var(--dc-text);
 }
+.dv-or {
+  color: var(--dc-muted);
+}
 .dv-type a {
   color: var(--dc-link);
   font-weight: 600;

@@ -270,6 +270,27 @@ export function audienceOf(doc, operation) {
   return kinds.size === 1 && kinds.has("oauth2") ? "partner" : "all";
 }
 
+/**
+ * The leading segments every path shares ("/partner/v1" when the document
+ * names its paths in full under a bare origin), so the docs can show
+ * "/events" under ".../partner/v1". Never a whole path, never a {param}.
+ */
+export function pathPrefix(doc) {
+  const paths = Object.keys(isObj(doc?.paths) ? doc.paths : {}).map((p) => p.split("/").filter(Boolean));
+  if (!paths.length) return "";
+  const shortest = Math.min(...paths.map((p) => p.length));
+  const out = [];
+  for (let i = 0; i < shortest - 1; i += 1) {
+    const seg = paths[0][i];
+    if (seg.startsWith("{") || !paths.every((p) => p[i] === seg)) break;
+    out.push(seg);
+  }
+  return out.length ? `/${out.join("/")}` : "";
+}
+
+/** Ids to show in a path when the document gives no example, by the parameter's name. */
+const SAMPLE_IDS = { event_id: "8812", registration_id: "120394", checkin_id: "90211", job_id: "cj_7731", number: "MOA-CERT-2026-0004812", endpoint_id: "4b7e2c1a-9f3d-4e6b-8a52-0c1d2e3f4a5b", delivery_id: "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d", code: "MOA-7K2P-QX9D" };
+
 /** "createEvent", or one made from the method and path ("post-events-event_id-publish"), safe as an id. */
 const slugOf = (s) => String(s).replace(/[^A-Za-z0-9_-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-+|-+$/g, "");
 
@@ -309,22 +330,26 @@ function responsesOf(doc, operation) {
   return out.sort((a, b) => a.status.localeCompare(b.status));
 }
 
-function operationOf(doc, { path, method, pathItem, operation, kind }) {
+function operationOf(doc, { path, method, pathItem, operation, kind, prefix = "" }) {
   const media = jsonOf(deref(doc, operation.requestBody).content);
-  const id = slugOf(operation.operationId || `${method}-${path}`) || `${method}-op`;
+  const shown = prefix && path.startsWith(`${prefix}/`) ? path.slice(prefix.length) : path;
+  // Anchors come from the method and path, never a generator's operationId, so a link stays put whichever document is shown.
+  const id = slugOf(operation.operationId || `${method}-${shown}`) || `${method}-op`;
+  const params = parametersOf(doc, pathItem, operation).map((p) => (p.in === "path" && (p.example === undefined || p.example === null || p.example === "string") && SAMPLE_IDS[p.name] ? { ...p, example: SAMPLE_IDS[p.name] } : p));
   return {
     kind,
     id,
-    anchor: kind === "webhook" ? `wh-${slugOf(path).replace(/\./g, "-")}` : `op-${id}`,
+    anchor: kind === "webhook" ? `wh-${slugOf(path).replace(/\./g, "-")}` : `op-${slugOf(`${method}-${shown.replace(/[{}]/g, "")}`.toLowerCase())}`,
     method: method.toUpperCase(),
-    path,
+    path: shown,
+    fullPath: path,
     tag: Array.isArray(operation.tags) && operation.tags[0] ? String(operation.tags[0]) : kind === "webhook" ? "Webhooks" : "Other",
     summary: str(operation.summary) || `${method.toUpperCase()} ${path}`,
     description: str(operation.description),
     deprecated: Boolean(operation.deprecated),
     scopes: kind === "webhook" ? [] : scopesOf(doc, operation),
     audience: kind === "webhook" ? "webhook" : audienceOf(doc, operation),
-    parameters: parametersOf(doc, pathItem, operation),
+    parameters: params,
     requestBody: media
       ? {
           required: Boolean(deref(doc, operation.requestBody).required),
@@ -341,10 +366,11 @@ function operationOf(doc, { path, method, pathItem, operation, kind }) {
 /** Every operation in the document's paths, in its order: see operationOf for the shape. */
 export function listOperations(doc) {
   const out = [];
+  const prefix = pathPrefix(doc);
   for (const [path, raw] of Object.entries(isObj(doc?.paths) ? doc.paths : {})) {
     const pathItem = deref(doc, raw);
     for (const method of METHODS) {
-      if (isObj(pathItem[method])) out.push(operationOf(doc, { path, method, pathItem, operation: pathItem[method], kind: "operation" }));
+      if (isObj(pathItem[method])) out.push(operationOf(doc, { path, method, pathItem, operation: pathItem[method], kind: "operation", prefix }));
     }
   }
   return out;
@@ -365,14 +391,19 @@ export function listWebhooks(doc) {
   return out;
 }
 
-/** Operations grouped by their first tag, in the document's tag order (then any others): [{name, description, slug, operations}]. */
+/** How a tag is shown: the API's lowercase names in words ("checkins" → "Check-ins"); anything else as it is, capitalised. */
+const TAG_LABELS = { auth: "Account", club: "Club", clubs: "Partner apps", events: "Events", registrations: "Registrations", checkins: "Check-ins", certificates: "Certificates", webhooks: "Webhook endpoints", "webhook endpoints": "Webhook endpoints" };
+export const tagLabel = (name) => TAG_LABELS[String(name).toLowerCase()] || String(name).charAt(0).toUpperCase() + String(name).slice(1);
+
+/** Operations grouped by their first tag, in the document's tag order (then any others): [{name, label, description, slug, operations}]. */
 export function groupByTag(doc, operations) {
   const declared = Array.isArray(doc?.tags) ? doc.tags.filter((t) => isObj(t) && str(t.name)) : [];
   const names = [...declared.map((t) => t.name), ...operations.map((o) => o.tag)].filter((n, i, all) => all.indexOf(n) === i);
   return names
     .map((name) => ({
       name,
-      slug: `tag-${slugOf(name.toLowerCase())}`,
+      label: tagLabel(name),
+      slug: `tag-${slugOf(tagLabel(name).toLowerCase())}`,
       description: str(declared.find((t) => t.name === name)?.description),
       operations: operations.filter((o) => o.tag === name),
     }))
@@ -434,8 +465,10 @@ export function scopeList(doc, operations = listOperations(doc)) {
  * the token URL).
  */
 export function apiContext(doc) {
-  const server = str(doc?.servers?.[0]?.url);
-  const baseUrl = /^https:\/\//.test(server) ? server.replace(/\/+$/, "") : server.startsWith("/") ? `${API_ORIGIN}${server.replace(/\/+$/, "")}` : DEFAULT_BASE_URL;
+  const server = str(doc?.servers?.[0]?.url).replace(/\/+$/, "");
+  const prefix = pathPrefix(doc);
+  const origin = /^https:\/\//.test(server) ? server : server.startsWith("/") ? `${API_ORIGIN}${server}` : server ? null : prefix ? API_ORIGIN : null;
+  const baseUrl = origin ? `${origin}${prefix}` : DEFAULT_BASE_URL;
   const schemes = Object.values(isObj(doc?.components?.securitySchemes) ? doc.components.securitySchemes : {});
   const oauth = schemes.find((s) => s?.type === "oauth2") || {};
   const code = oauth.flows?.authorizationCode || {};
@@ -447,7 +480,7 @@ export function apiContext(doc) {
     authorizeUrl: str(code.authorizationUrl) || `${baseUrl}/oauth/authorize`,
     tokenUrl,
     refreshUrl: str(code.refreshUrl) || tokenUrl,
-    revokeUrl: str(oauth["x-revocationUrl"]) || tokenUrl.replace(/\/token$/, "/revoke"),
+    revokeUrl: str(doc?.info?.["x-oauth"]?.revocation_endpoint) || str(oauth["x-revocationUrl"]) || tokenUrl.replace(/\/token$/, "/revoke"),
     clientCredentials: Boolean(client),
     openapiUrl: `${baseUrl}/openapi.json`,
   };

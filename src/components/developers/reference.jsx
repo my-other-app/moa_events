@@ -19,14 +19,36 @@ const AUDIENCE = {
 
 const STATUS_WORDS = { 200: "OK", 201: "Created", 202: "Accepted", 204: "No Content", "2XX": "Success" };
 
-/** Paragraphs of an OpenAPI description (plain text: a generated one may carry Markdown, shown as it is). */
+/** An operation's description without the "Needs one of: …" a generator adds (the Scope row says it). */
+const withoutScopeLine = (text) => String(text || "").replace(/\s*Needs one of: [^\n]*\s*$/, "");
+
+/** Paragraphs of an OpenAPI description, with its `code`, **bold** and links; lines inside a paragraph run together. */
 function Description({ text }) {
   if (!text) return null;
-  return text
+  return withoutScopeLine(text)
     .split(/\n\s*\n/)
-    .map((p) => p.trim())
+    .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
     .filter(Boolean)
-    .map((p, i) => <p key={i}>{p}</p>);
+    .map((p, i) => (
+      <p key={i}>
+        <Inline text={p} />
+      </p>
+    ));
+}
+
+/** Words that name error codes (ALREADY_EXISTS…), each linked to the Errors page. */
+function CodedWords({ text }) {
+  return String(text || "")
+    .split(/(\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|\b(?:VALIDATION|CONFLICT|FORBIDDEN|INTERNAL|UNAUTHENTICATED)\b)/)
+    .map((part, i) =>
+      i % 2 ? (
+        <SmartLink key={i} href="/developers/errors#codes">
+          <code>{part}</code>
+        </SmartLink>
+      ) : (
+        <Fragment key={i}>{part}</Fragment>
+      )
+    );
 }
 
 export function MethodBadge({ method }) {
@@ -152,6 +174,7 @@ function ErrorTable({ responses, caption }) {
     else rows.push({ status: r.status, code: null, when: r.description });
   }
   if (!rows.length) return null;
+  const coded = rows.some((r) => r.code);
   return (
     <div className="dv-table" role="region" aria-label={caption} tabIndex={0}>
       <table className="dv-fields dv-errors">
@@ -159,7 +182,7 @@ function ErrorTable({ responses, caption }) {
         <thead>
           <tr>
             <th scope="col">Status</th>
-            <th scope="col">Code</th>
+            {coded ? <th scope="col">Code</th> : null}
             <th scope="col">When</th>
           </tr>
         </thead>
@@ -167,8 +190,10 @@ function ErrorTable({ responses, caption }) {
           {rows.map((row, i) => (
             <tr key={i}>
               <th scope="row">{row.status}</th>
-              <td>{row.code ? <SmartLink href="/developers/errors#codes">{<code>{row.code}</code>}</SmartLink> : "—"}</td>
-              <td>{row.when}</td>
+              {coded ? <td>{row.code ? <SmartLink href="/developers/errors#codes">{<code>{row.code}</code>}</SmartLink> : "—"}</td> : null}
+              <td>
+                <CodedWords text={row.when} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -204,14 +229,14 @@ export function Operation({ op, doc, api, objects }) {
       <Description text={op.description} />
       <dl className="dv-op-meta">
         <div>
-          <dt>Scopes</dt>
+          <dt>{op.scopes && op.scopes.length > 1 ? "Scopes (any one)" : "Scope"}</dt>
           <dd>
             {op.scopes === null ? (
               "None"
             ) : op.scopes.length ? (
               op.scopes.map((s, i) => (
                 <Fragment key={s}>
-                  {i ? " " : null}
+                  {i ? <span className="dv-or"> or </span> : null}
                   <SmartLink className="dv-scope" href={`/developers/scopes#${scopeAnchor(s)}`}>
                     <code>{s}</code>
                   </SmartLink>
@@ -247,14 +272,14 @@ export function Operation({ op, doc, api, objects }) {
       <h4>Example request</h4>
       <CodeBlock lang="bash" code={curlFor(op, { baseUrl: api.baseUrl })} title="curl" />
 
-      {successes.map((r) => (
+      {successes.map((r, i) => (
         <Fragment key={r.status}>
           <h4>
             Response <code>{r.status}</code> {STATUS_WORDS[r.status] || ""}
             {r.schemaName ? <> · <ObjectRef name={r.schemaName} objects={objects} /></> : null}
           </h4>
           {r.description ? <p className="dv-op-resp">{r.description}</p> : null}
-          {r.example !== undefined && r.status !== "204" ? <CodeBlock lang="json" code={pretty(r.example)} title={`${r.status} response`} /> : null}
+          {r.example !== undefined && r.status !== "204" && !(i > 0 && pretty(r.example) === pretty(successes[0].example)) ? <CodeBlock lang="json" code={pretty(r.example)} title={`${r.status} response`} /> : null}
         </Fragment>
       ))}
 
@@ -319,7 +344,7 @@ function ObjectSection({ obj, doc, objects }) {
 /** The table of contents the left-hand menu shows for the reference: each tag, the webhooks and the objects. */
 export function referenceToc(doc) {
   const groups = groupByTag(doc, listOperations(doc));
-  return [...groups.map((g) => ({ id: g.slug, heading: g.name })), ...(listWebhooks(doc).length ? [{ id: "webhook-payloads", heading: "Webhooks" }] : []), { id: "objects", heading: "Objects" }];
+  return [...groups.map((g) => ({ id: g.slug, heading: g.label })), ...(listWebhooks(doc).length ? [{ id: "webhook-payloads", heading: "Webhooks" }] : []), { id: "objects", heading: "Objects" }];
 }
 
 export function Reference({ doc, source }) {
@@ -333,7 +358,7 @@ export function Reference({ doc, source }) {
     <div className="dv-ref" data-source={source} data-operations={operations.length}>
       {groups.map((g) => (
         <section key={g.slug} id={g.slug} className="dv-ref-group" aria-labelledby={`${g.slug}-title`}>
-          <h2 id={`${g.slug}-title`}>{g.name}</h2>
+          <h2 id={`${g.slug}-title`}>{g.label}</h2>
           {g.description ? <p className="dv-ref-lede">{g.description}</p> : null}
           {g.operations.map((op) => (
             <Operation key={op.anchor} op={op} doc={doc} api={api} objects={objects} />

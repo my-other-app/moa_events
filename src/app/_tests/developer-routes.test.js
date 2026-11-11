@@ -117,9 +117,10 @@ describe("the pages' content", () => {
     const { out } = await render(DOCS_PAGES.find((p) => p.slug === "authentication"));
     const text = unescape(out.replace(/<[^>]+>/g, ""));
     for (const words of [
-      "https://api.myotherapp.in/partner/v1/oauth/authorize",
-      "https://api.myotherapp.in/partner/v1/oauth/token",
-      "https://api.myotherapp.in/partner/v1/oauth/revoke",
+      "https://api.myotherapp.in/partner/oauth/authorize",
+      "https://api.myotherapp.in/partner/oauth/token",
+      "https://api.myotherapp.in/partner/oauth/revoke",
+      "mode=test",
       "code_challenge_method=S256",
       "grant_type=authorization_code",
       "grant_type=refresh_token",
@@ -135,7 +136,7 @@ describe("the pages' content", () => {
     const { out } = await render(DOCS_PAGES.find((p) => p.slug === "scopes"));
     for (const scope of ["club:read", "club:write", "events:read", "events:write", "events:publish", "registrations:read", "registrations:write", "attendees:read", "checkins:write", "certificates:read", "certificates:write", "webhooks:manage", "clubs:create"])
       expect(out).toContain(`<code>${scope}</code>`);
-    expect(out).toContain('href="/developers/reference#op-publishEvent"');
+    expect(out).toContain('href="/developers/reference#op-post-events-event_id-publish"');
     expect(out).toContain('id="scope-events-publish"');
   });
 
@@ -144,7 +145,7 @@ describe("the pages' content", () => {
     const text = unescape(out.replace(/<[^>]+>/g, ""));
     for (const h of listWebhooks(COPY)) expect(out).toContain(`href="/developers/reference#${h.anchor}"`);
     for (const id of ["verify-node", "verify-python", "verify-php", "signature-example", "retries", "replay", "ordering", "duplicates"]) expect(out).toContain(`id="${id}"`);
-    for (const words of ["export function verifyMoaSignature", "def verify_moa_signature", "function verify_moa_signature", "1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours", "t=1794458702,v1=2dd9f1c3"]) expect(text).toContain(words);
+    for (const words of ["export function verifyMoaSignature", "def verify_moa_signature", "function verify_moa_signature", "1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours", "t=1794458702,v1=f9908e9d"]) expect(text).toContain(words);
   });
 
   it("syncing: the sequence diagram as a picture with its steps in words", async () => {
@@ -198,16 +199,15 @@ describe("the API reference", () => {
   it("is made from the API's own document once the API serves one, addresses and all", async () => {
     const live = structuredClone(COPY);
     live.info.version = "1.1.0";
-    live.servers = [{ url: "https://api.myotherapp.in/partner/v1" }];
-    live.paths["/events/{event_id}/waitlist"] = { get: { operationId: "getWaitlist", tags: ["Events"], summary: "Get the waiting list", security: [{ apiKey: ["events:read"] }], parameters: [{ $ref: "#/components/parameters/event_id" }], responses: { 200: { description: "The list." } } } };
-    live.components.securitySchemes.partnerOAuth.flows.authorizationCode.authorizationUrl = "https://api.myotherapp.in/partner/oauth/authorize";
+    live.paths["/partner/v1/events/{event_id}/waitlist"] = { get: { operationId: "get_waitlist_partner_v1_events__event_id__waitlist_get", tags: ["events"], summary: "Get the waiting list", "x-scopes": ["events:read"], parameters: [{ name: "event_id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "The list." } } } };
+    live.components.securitySchemes.partnerOAuth.flows.authorizationCode.authorizationUrl = "https://api.myotherapp.in/partner/oauth2/authorize";
     serve({ [OPENAPI]: { body: live } });
     const ref = (await render(DOCS_PAGES.find((p) => p.slug === "reference"))).out;
     expect(ref).toContain('data-source="api"');
-    expect(ref).toContain('id="op-getWaitlist"');
+    expect(ref).toContain('id="op-get-events-event_id-waitlist"');
     expect(unescape(ref.replace(/<[^>]+>/g, ""))).toContain("OpenAPI 3.1 · version 1.1.0");
     const auth = (await render(DOCS_PAGES.find((p) => p.slug === "authentication"))).out;
-    expect(unescape(auth)).toContain("https://api.myotherapp.in/partner/oauth/authorize");
+    expect(unescape(auth)).toContain("https://api.myotherapp.in/partner/oauth2/authorize");
     expect(fetch.calls[0].url).toBe("https://api.myotherapp.in/partner/v1/openapi.json");
   });
 
@@ -216,7 +216,7 @@ describe("the API reference", () => {
       serve({ [OPENAPI]: answer });
       const { out } = await render(DOCS_PAGES.find((p) => p.slug === "reference"));
       expect(out).toContain('data-source="copy"');
-      expect(out).toContain('id="op-createEvent"');
+      expect(out).toContain('id="op-post-events"');
     }
   });
 

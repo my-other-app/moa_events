@@ -36,15 +36,17 @@ function refs(node, out = []) {
 describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
   const ops = listOperations(COPY);
   const hooks = listWebhooks(COPY);
+  const documented = new Map(ERROR_CODES.map(([code, status]) => [code, String(status)]));
 
   it("is OpenAPI 3.1, marked as written from the contract, for the partner surface", () => {
     expect(COPY.openapi).toBe("3.1.0");
     expect(isOpenApi(COPY)).toBe(true);
     expect(COPY.info["x-generated-from"]).toBe("contract");
-    expect(COPY.servers[0].url).toBe("https://api.myotherapp.in/partner/v1");
+    expect(COPY.info["x-generated-note"]).toContain("https://api.myotherapp.in/partner/v1/openapi.json");
+    expect(Object.keys(COPY.paths).every((p) => p.startsWith("/partner/v1/"))).toBe(true);
   });
 
-  it("has every resource of the contract", () => {
+  it("has every resource of the contract, and the webhook endpoints", () => {
     const have = ops.map((o) => `${o.method} ${o.path}`);
     for (const want of [
       "GET /me",
@@ -81,13 +83,12 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
       "GET /webhook-endpoints/{endpoint_id}/deliveries",
       "GET /webhook-deliveries/{delivery_id}",
       "POST /webhook-deliveries/{delivery_id}/retry",
-      "GET /openapi.json",
     ])
       expect(have).toContain(want);
-    expect(ops).toHaveLength(35);
+    expect(ops).toHaveLength(34);
   });
 
-  it("has the contract's 15 webhook types, each with a signed example body", () => {
+  it("has the contract's 15 webhook types, each with a signed example body whose object is its GET's shape", () => {
     expect(hooks.map((h) => h.path)).toEqual([
       "event.created",
       "event.updated",
@@ -108,69 +109,75 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
     for (const h of hooks) {
       expect(h.requestBody.example).toMatchObject({ type: h.path, club_id: "311", origin: { type: expect.any(String) }, data: { object: expect.any(Object) } });
       expect(h.parameters.map((p) => p.name)).toEqual(["MOA-Signature", "MOA-Event-Id"]);
+      expect(lookup(COPY, `#/components/schemas/${h.object}`)).toBeTruthy();
+      // Every field the example's object has is one its schema names (the GET's shape).
+      const props = Object.keys(deref(COPY, { $ref: `#/components/schemas/${h.object}` }).properties);
+      for (const key of Object.keys(h.requestBody.example.data.object)) expect([h.path, key, props.includes(key)]).toEqual([h.path, key, true]);
     }
   });
 
-  it("resolves every $ref, declares every path parameter, and has unique operation ids", () => {
+  it("resolves every $ref, declares every path parameter, and has unique operation ids and anchors", () => {
     for (const ref of refs(COPY)) expect([ref, lookup(COPY, ref)]).toEqual([ref, expect.anything()]);
-    const ids = ops.map((o) => o.id);
-    expect(new Set(ids).size).toBe(ids.length);
+    for (const key of ["id", "anchor"]) {
+      const all = ops.map((o) => o[key]);
+      expect(new Set(all).size).toBe(all.length);
+    }
     for (const op of ops) {
       for (const [, name] of op.path.matchAll(/\{([^}]+)\}/g)) expect(op.parameters.some((p) => p.in === "path" && p.name === name)).toBe(true);
     }
   });
 
-  it("names a known scope on every call but /me and the document itself, and an Idempotency-Key on every POST and DELETE", () => {
+  it("names a known scope on every call but /me and GET /clubs, and an Idempotency-Key on every POST and DELETE", () => {
     const known = scopeList(COPY).map((s) => s.name);
     expect(known).toEqual(expect.arrayContaining(["club:read", "events:publish", "attendees:read", "webhooks:manage", "clubs:create"]));
     expect(known).toHaveLength(13);
     for (const op of ops) {
-      if (op.path === "/openapi.json") expect(op.scopes).toBeNull();
-      else if (op.path === "/me" || (op.method === "GET" && op.path === "/clubs")) expect(op.scopes).toEqual([]);
+      if (op.path === "/me" || (op.method === "GET" && op.path === "/clubs")) expect(op.scopes).toEqual([]);
       else {
         expect(op.scopes.length).toBeGreaterThan(0);
         for (const s of op.scopes) expect(known).toContain(s);
       }
-      const takesKey = op.parameters.some((p) => p.name === "Idempotency-Key");
-      if (op.method === "POST" || op.method === "DELETE") expect([op.id, takesKey]).toEqual([op.id, true]);
-      if (op.method === "PATCH") expect(op.parameters.some((p) => p.name === "If-Match") || op.path.startsWith("/webhook-endpoints")).toBe(true);
+      if (op.method === "POST" || op.method === "DELETE") expect([op.path, op.parameters.some((p) => p.name === "Idempotency-Key")]).toEqual([op.path, true]);
+      if (op.method === "PATCH" && !op.path.startsWith("/webhook-endpoints")) expect(op.parameters.some((p) => p.name === "If-Match")).toBe(true);
     }
+    const scopes = (m, path) => ops.find((o) => o.method === m && o.path === path).scopes;
+    // A write scope reads too; cancelling is publishing's.
+    expect(scopes("GET", "/events")).toEqual(["events:read", "events:write"]);
+    expect(scopes("POST", "/events/{event_id}/cancel")).toEqual(["events:publish"]);
   });
 
-  it("uses only the error codes the Errors page explains, and shows each of them somewhere", () => {
-    const documented = ERROR_CODES.map(([code]) => code);
-    const used = new Set();
-    for (const op of ops) for (const r of op.responses) for (const e of r.errors) used.add(e.code);
-    for (const code of used) expect(documented).toContain(code);
-    expect([...used].sort()).toEqual([...documented].sort());
-    // And the status each is sent with is the one the Errors page gives.
-    for (const op of ops) for (const r of op.responses) for (const e of r.errors) expect([e.code, r.status]).toEqual([e.code, String(ERROR_CODES.find(([c]) => c === e.code)[1])]);
+  it("names only error codes the Errors page explains, with the status it gives them", () => {
+    const named = new Set();
+    for (const op of ops) {
+      for (const r of op.responses) {
+        for (const e of r.errors) {
+          named.add(e.code);
+          expect([e.code, r.status]).toEqual([e.code, documented.get(e.code)]);
+        }
+        for (const code of /^[45]/.test(r.status) ? r.description.match(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/g) || [] : []) {
+          named.add(code);
+          expect([code, documented.has(code)]).toEqual([code, true]);
+        }
+      }
+    }
+    expect(named.size).toBeGreaterThan(15);
   });
 
-  it("is for partner apps only where the contract says (GET and POST /clubs)", () => {
-    const partner = ops.filter((o) => o.audience === "partner").map((o) => `${o.method} ${o.path}`);
-    expect(partner).toEqual(["GET /clubs", "POST /clubs"]);
-    expect(ops.find((o) => o.path === "/openapi.json").audience).toBe("public");
-    expect(ops.find((o) => o.path === "/events" && o.method === "POST").audience).toBe("all");
+  it("keeps money in paise and payments outside MyOtherApp as their own kind", () => {
+    expect(deref(COPY, COPY.components.schemas.Money.properties.currency).const).toBe("INR");
+    expect(deref(COPY, COPY.components.schemas.ExternalPayment.properties.status).const).toBe("paid_externally");
+    const body = listOperations(COPY).find((o) => o.method === "POST" && o.path === "/events/{event_id}/registrations").requestBody;
+    expect(body.schemaName).toBe("RegistrationCreate");
+    expect(fieldRows(COPY, body.schema, { open: true }).map((r) => r.name)).toEqual(expect.arrayContaining(["payment", "payment.status", "payment.amount", "send_confirmation"]));
   });
 
-  it("keeps money in paise and refuses paid registrations with the checkout address", () => {
-    expect(COPY.components.schemas.Money.properties.currency.const).toBe("INR");
-    const reg = ops.find((o) => o.id === "createRegistration");
-    const conflict = reg.responses.find((r) => r.status === "409");
-    expect(conflict.errors.map((e) => e.code)).toEqual(["PAYMENT_REQUIRED", "EVENT_FULL", "REGISTRATION_CLOSED", "ALREADY_EXISTS"]);
-    const example = COPY.paths["/events/{event_id}/registrations"].post.responses["409"].content["application/json"].examples.PAYMENT_REQUIRED.value;
-    expect(example.error.details.checkout_url).toMatch(/^https:\/\/myotherapp\.in\/events\//);
-    expect(COPY.components.schemas.ExternalPayment.properties.status.const).toBe("paid_externally");
-  });
-
-  it("gives the guides their addresses", () => {
+  it("gives the guides their addresses: /partner/v1 under the API, OAuth beside it", () => {
     expect(apiContext(COPY)).toMatchObject({
       baseUrl: "https://api.myotherapp.in/partner/v1",
       version: "1.0.0",
-      authorizeUrl: "https://api.myotherapp.in/partner/v1/oauth/authorize",
-      tokenUrl: "https://api.myotherapp.in/partner/v1/oauth/token",
-      revokeUrl: "https://api.myotherapp.in/partner/v1/oauth/revoke",
+      authorizeUrl: "https://api.myotherapp.in/partner/oauth/authorize",
+      tokenUrl: "https://api.myotherapp.in/partner/oauth/token",
+      revokeUrl: "https://api.myotherapp.in/partner/oauth/revoke",
       openapiUrl: "https://api.myotherapp.in/partner/v1/openapi.json",
       clientCredentials: true,
     });
@@ -240,9 +247,9 @@ describe("reading any OpenAPI document", () => {
     expect(typeLabel(GENERATED, p.parent)).toBe("Thing or null");
     expect(typeLabel(GENERATED, p.tags)).toBe("array of string");
     expect(typeLabel(GENERATED, p.place.properties.city)).toBe("string or null");
-    expect(typeLabel(COPY, COPY.components.schemas.Event.properties.price)).toBe("Money or null");
-    expect(typeLabel(COPY, COPY.components.schemas.Event.properties.object)).toBe('"event"');
-    expect(typeLabel(COPY, COPY.components.schemas.Event.properties.ticket_types)).toBe("array of TicketType");
+    expect(typeLabel(COPY, COPY.components.schemas.EventOut.properties.object)).toBe('"event"');
+    expect(typeLabel(COPY, COPY.components.schemas.EventOut.properties.ticket_types)).toBe("array of TicketTypeOut");
+    expect(typeLabel(COPY, COPY.components.schemas.EventCreate.properties.price)).toBe("Money or null");
   });
 
   it("lists a schema's fields, opening inline objects but not named ones, and allOf merged", () => {
@@ -255,9 +262,10 @@ describe("reading any OpenAPI document", () => {
       ["note", false],
       ["name", true],
     ]);
-    const event = fieldRows(COPY, { $ref: "#/components/schemas/Registration" }).map((r) => r.name);
-    expect(event).toEqual(expect.arrayContaining(["approval", "approval.status", "approval.request_id", "ticket.code", "ticket.url", "person", "payment"]));
-    expect(event).not.toContain("person.email"); // Person is its own object
+    const reg = fieldRows(COPY, { $ref: "#/components/schemas/RegistrationOut" }).map((r) => r.name);
+    expect(reg).toEqual(expect.arrayContaining(["status", "ticket", "payment", "person", "external_id"]));
+    expect(reg).not.toContain("ticket.qr_url"); // TicketOut is its own object
+    expect(fieldRows(COPY, { $ref: "#/components/schemas/RegistrationOut" }, { open: true }).map((r) => r.name)).toContain("ticket.qr_url");
   });
 
   it("makes an example where the document has none", () => {
@@ -269,7 +277,7 @@ describe("reading any OpenAPI document", () => {
   it("lists a generated document's operations, with path-level parameters, its tags and objects", () => {
     const ops = listOperations(GENERATED);
     expect(ops.map((o) => [o.method, o.path, o.anchor])).toEqual([
-      ["GET", "/things/{thing_id}", "op-get_thing_things__thing_id__get"],
+      ["GET", "/things/{thing_id}", "op-get-things-thing_id"],
       ["POST", "/things", "op-post-things"],
     ]);
     expect(ops[0].parameters).toEqual([expect.objectContaining({ name: "thing_id", in: "path", required: true })]);
@@ -297,19 +305,23 @@ describe("reading any OpenAPI document", () => {
 
 describe("curl for an operation", () => {
   it("fills the path, sends the key, an Idempotency-Key and the example body, quoting it for the shell", () => {
-    const op = listOperations(COPY).find((o) => o.id === "createRegistration");
-    const curl = curlFor(op, { baseUrl: "https://api.myotherapp.in/partner/v1" });
-    expect(curl.split(" \\\n  ")).toEqual([
+    const op = listOperations(COPY).find((o) => o.method === "POST" && o.path === "/events/{event_id}/registrations");
+    const curl = curlFor(op, { baseUrl: apiContext(COPY).baseUrl });
+    const SEP = " \\\n  ";
+    expect(curl.split(SEP).slice(0, 4)).toEqual([
       "curl -X POST https://api.myotherapp.in/partner/v1/events/8812/registrations",
       '-H "Authorization: Bearer $MOA_KEY"',
       '-H "Idempotency-Key: $(uuidgen)"',
       '-H "Content-Type: application/json"',
-      expect.stringMatching(/^-d '\{\n {2}"person"/),
     ]);
+    const data = curl.split(SEP)[4];
+    expect(data.startsWith("-d '{\n")).toBe(true);
+    expect(JSON.parse(data.slice(4, -1)).person.email).toMatch(/@/);
     const withQuote = { ...op, requestBody: { example: { name: "Asha's club" } } };
     expect(curlFor(withQuote)).toContain(`-d '{\n  "name": "Asha'\\''s club"\n}'`);
-    const doc = listOperations(COPY).find((o) => o.path === "/openapi.json");
-    expect(curlFor(doc)).toBe("curl https://api.myotherapp.in/partner/v1/openapi.json");
+    const me = listOperations(COPY).find((o) => o.path === "/me");
+    expect(curlFor(me, { baseUrl: apiContext(COPY).baseUrl })).toBe(`curl https://api.myotherapp.in/partner/v1/me${SEP}-H "Authorization: Bearer $MOA_KEY"`);
+    expect(curlFor({ ...me, audience: "public" })).toBe("curl https://api.myotherapp.in/partner/v1/me");
   });
 });
 
@@ -322,17 +334,17 @@ describe("the Postman collection", () => {
     expect(c.variable.find((v) => v.key === "baseUrl").value).toBe("https://api.myotherapp.in/partner/v1");
     const requests = c.item.flatMap((f) => f.item);
     expect(requests).toHaveLength(listOperations(COPY).length);
-    expect(c.item.map((f) => f.name)).toEqual(["Account", "Club", "Events", "Registrations", "Check-ins", "Certificates", "Webhook endpoints", "Partner apps", "Meta"]);
+    expect(c.item.map((f) => f.name)).toEqual(["Account", "Club", "Partner apps", "Events", "Registrations", "Check-ins", "Certificates", "Webhook endpoints"]);
     const reg = requests.find((r) => r.name === "Register someone");
     expect(reg.request.method).toBe("POST");
     expect(reg.request.url.path).toEqual(["events", ":event_id", "registrations"]);
-    expect(reg.request.url.variable).toEqual([{ key: "event_id", value: "8812", description: "The event's id." }]);
+    expect(reg.request.url.variable).toEqual([expect.objectContaining({ key: "event_id", value: "8812" })]);
     expect(reg.request.header).toEqual(expect.arrayContaining([expect.objectContaining({ key: "Idempotency-Key", value: "{{$guid}}" }), { key: "Content-Type", value: "application/json" }]));
-    expect(JSON.parse(reg.request.body.raw).person.name).toBe("Asha Rao");
-    expect(reg.request.description).toContain("https://myotherapp.in/developers/reference#op-createRegistration");
+    expect(JSON.parse(reg.request.body.raw).person.email).toMatch(/@/);
+    expect(reg.request.description).toContain("https://myotherapp.in/developers/reference#op-post-events-event_id-registrations");
     const list = requests.find((r) => r.name === "List events");
     expect(list.request.url.query.every((q) => q.disabled)).toBe(true);
-    expect(requests.find((r) => r.name === "This document").request.auth).toEqual({ type: "noauth" });
+    expect(list.request.url.raw.startsWith("{{baseUrl}}/events?")).toBe(true);
     // JSON all the way down.
     expect(JSON.parse(JSON.stringify(c))).toEqual(c);
   });

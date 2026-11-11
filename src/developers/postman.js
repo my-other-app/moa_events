@@ -60,7 +60,7 @@ export function postmanCollection(doc, { docUrl = "https://myotherapp.in/develop
       { key: "moaKey", value: "moa_test_your_key_here", type: "string" },
     ],
     item: groupByTag(doc, operations).map((group) => ({
-      name: group.name,
+      name: group.label,
       ...(group.description ? { description: group.description } : {}),
       item: group.operations.map((op) => requestOf(op, docUrl)),
     })),

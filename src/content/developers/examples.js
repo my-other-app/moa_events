@@ -9,8 +9,8 @@
 export const SIGNATURE_VECTOR = {
   secret: "whsec_5mJqT2vX8kLr4nYc7HdW1pZa",
   timestamp: 1794458702,
-  body: '{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"object":"checkin","id":"90211","registration_id":"120394","event_id":"8812","checked_in_at":"2026-11-12T10:15:01+05:30","scanned_at":"2026-11-12T10:15:01+05:30","via":"app","gate":"Main gate","device":null,"deleted":false,"livemode":false}}}',
-  signature: "2dd9f1c3e0f5db29d6f8a98da3f3d04382ae9056e05a3c0da3db41f5f892bfd5",
+  body: '{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"id":"90211","object":"checkin","registration_id":"120394","event_id":"8812","checked_in_at":"2026-11-12T10:15:01+05:30","scanned_at":"2026-11-12T10:15:01+05:30","gate":"Main gate","via":"app","duplicate":false,"livemode":false,"updated_at":"2026-11-12T10:15:01+05:30"}}}',
+  signature: "f9908e9dab715c61435d1b2f0b7a70989a9190cc05d18fc5a25e50b985c26bf2",
 };
 export const SIGNATURE_HEADER = `t=${SIGNATURE_VECTOR.timestamp},v1=${SIGNATURE_VECTOR.signature}`;
 
@@ -250,9 +250,9 @@ export MOA_API=${base}`,
   "slug": "hack-night-04",
   "status": "draft",
   "price": null,
-  "free": true,
+  "registrations_count": 0,
   "livemode": false,
-  "public_url": "https://myotherapp.in/events/hack-night-04",
+  "public_url": null,
   "updated_at": "2026-11-12T10:02:11+05:30",
   ...
 }`,
@@ -273,8 +273,8 @@ export MOA_API=${base}`,
   "id": "120394",
   "event_id": "8812",
   "status": "confirmed",
-  "ticket": { "code": "MOA-7K2P-QX9D", "status": "valid", "url": "https://myotherapp.in/tickets/MOA-7K2P-QX9D" },
-  "payment": { "status": "free", "amount_due": 0, "amount_paid": 0, "currency": "INR" },
+  "ticket": { "code": "MOA-7K2P-QX9D", "qr_url": "https://api.myotherapp.in/partner/v1/tickets/MOA-7K2P-QX9D/qr.png?sig=…", "status": "valid" },
+  "payment": { "status": "not_required", "amount": 0, "currency": "INR" },
   "checked_in_at": null,
   "external_id": "erp-reg-55102",
   "livemode": false,
@@ -286,15 +286,15 @@ export MOA_API=${base}`,
   -H "Idempotency-Key: $(uuidgen)" \\
   -d '{ "ticket_code": "MOA-7K2P-QX9D", "gate": "Main gate" }'`,
     checkinAnswer: `{
-  "object": "checkin",
   "id": "90211",
+  "object": "checkin",
   "registration_id": "120394",
   "event_id": "8812",
   "checked_in_at": "2026-12-05T18:04:31+05:30",
-  "via": "api",
   "gate": "Main gate",
-  "livemode": false,
+  "via": "api",
   "duplicate": false,
+  "livemode": false,
   ...
 }`,
     endpoint: `curl -X POST $MOA_API/webhook-endpoints \\
@@ -328,9 +328,9 @@ MOA-Event-Id: evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7
 MOA-Event-Type: checkin.created
 MOA-Delivery-Id: 9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d
 MOA-Delivery-Attempt: 1
-MOA-Signature: t=1794458702,v1=2dd9f1c3e0f5db29d6f8a98da3f3d04382ae9056e05a3c0da3db41f5f892bfd5
+MOA-Signature: t=1794458702,v1=f9908e9dab715c61435d1b2f0b7a70989a9190cc05d18fc5a25e50b985c26bf2
 
-{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"object":"checkin",...}}}`,
+{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"id":"90211","object":"checkin",...}}}`,
   };
 }
 
@@ -429,13 +429,13 @@ X-Request-Id: req_7f3a9c1e5b2d4f60
 export const RATE_LIMIT_EXAMPLE = `HTTP/1.1 200 OK
 X-RateLimit-Limit: 120
 X-RateLimit-Remaining: 117
-X-RateLimit-Reset: 41
+X-RateLimit-Reset: 1794458760
 
 HTTP/1.1 429 Too Many Requests
 Retry-After: 12
 X-RateLimit-Limit: 120
 X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 12
+X-RateLimit-Reset: 1794458760
 
 { "error": { "code": "RATE_LIMITED", "message": "Too many write requests this minute. Try again in 12 seconds.", "request_id": "req_..." } }`;
 
