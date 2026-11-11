@@ -52,7 +52,11 @@ export const ERROR_CODES = [
   ["EVENT_FULL", 409, "No places left (or none of that ticket type).", "Tell the person. Places can free up when others cancel."],
   ["REGISTRATION_CLOSED", 409, "Registration isn't open: before `opens_at`, after `closes_at`, or the event is a draft, cancelled or over.", "Check the event's registration dates and status."],
   ["ALREADY_CHECKED_IN", 409, "The person is already checked in, so this can't be done (cancelling their registration, say).", "If the check-in was a mistake, undo it first (`DELETE /checkins/{id}`)."],
+  ["LIMIT_REACHED", 409, "The club has as many webhook endpoints as it may have.", "Remove one you no longer use."],
+  ["ENDPOINT_DISABLED", 409, "The webhook endpoint is turned off, so nothing can be sent to it.", "Turn it on again (`PATCH` with `enabled: true`), then send the delivery again."],
+  ["PARTNER_MANAGED", 403, "The webhook endpoint belongs to a connected partner app: only that app manages it.", "Leave it to the app, or disconnect the app in the dashboard."],
   ["RATE_LIMITED", 429, "Too many requests this minute.", "Wait `Retry-After` seconds, then send it again. See [Rate limits](/developers/rate-limits)."],
+  ["WEBHOOKS_UNAVAILABLE", 503, "Webhooks aren't set up on our side yet.", `Write to ${mail}; nothing is wrong with your request.`],
 ];
 
 /** Every page's intro and sections, by slug ("" is the overview). */
@@ -292,9 +296,10 @@ export function developerDocs(api) {
             ["code", "bash", qs.endpoint],
             ["code", "json", qs.endpointAnswer],
             ["warn", "The `secret` is shown only now. Keep it with your server's secrets: it is how you know a webhook came from us."],
-            ["p", "Send a test webhook to it:"],
+            ["p", "Send a test webhook to it. It is sent at once, and the answer says how your endpoint answered:"],
             ["code", "bash", qs.test],
-            ["p", "Your endpoint receives a POST like this:"],
+            ["code", "json", qs.testAnswer],
+            ["p", "From then on, each change your endpoint asked for arrives as a POST like this:"],
             ["code", "http", qs.received],
             ["p", "Check the `MOA-Signature` header with the secret before you trust the body (code for Node, Python and PHP is in [Webhooks](/developers/webhooks#verifying-signatures)), answer `200` within 10 seconds, and you're done."],
           ],
@@ -446,7 +451,7 @@ export function developerDocs(api) {
               [
                 "`events:publish` is apart from `events:write`, so a system can prepare drafts that a person checks and publishes.",
                 "`registrations:read` shows registrations without who they are: status, ticket, payment status, check-in. Add `attendees:read` for names, email addresses, phone numbers and answers.",
-                "Webhooks follow the same rule: an endpoint's webhooks have contact fields only when its owner has `attendees:read`.",
+                "Webhooks follow the same rule: contact fields reach an endpoint only when it may have them (see [Webhooks](/developers/webhooks#sharing)).",
                 "`clubs:create` is for partner apps only, and only when the MyOtherApp team grants it.",
               ],
             ],
@@ -500,11 +505,18 @@ export function developerDocs(api) {
             [
               "ul",
               [
-                "`url`: https, on the public internet. We refuse private and local addresses.",
-                "`events`: the types you want, or `[\"*\"]` for all of them, including types we add later.",
+                "`url`: https, and its host on the public internet. We refuse private and local addresses.",
+                "`events`: the types you want, or `[\"*\"]` for all of them, including types we add later (all, if you leave it out). `GET /webhook-event-types` lists them.",
                 "`include_own_changes`: off unless you turn it on. See [no echo](/developers/sync#no-echo).",
+                "An endpoint is live or test, and gets only the changes of its own mode. One added with a key takes the key's mode.",
                 "The answer has the endpoint's signing `secret` (`whsec_…`), shown only this once. Lost it? Rotate it: `POST /webhook-endpoints/{id}/rotate-secret`.",
+                "A club can have a limited number of endpoints (`409 LIMIT_REACHED` past it).",
               ],
+            ],
+            ["h3", "Names and contact details in webhooks", "sharing"],
+            [
+              "p",
+              "Registrations and certificates carry people's names, contact details and answers only when the endpoint may have them. A club key's endpoint: add it with `share_attendee_details: true` and `dpdp_confirmed: true` (the club confirms its registration form tells people their details are shared with that system), from a key with `attendees:read`. A partner app's endpoints: when its connection to the club has `attendees:read`. Otherwise those fields are left out.",
             ],
           ],
         },
@@ -523,7 +535,8 @@ export function developerDocs(api) {
                 "`origin`: where the change came from: `dashboard`, `app`, `website`, `api_key`, `partner_app` or `system`, with the key's or app's `client_id` for the two API ones.",
                 "`data.object`: the object as it is now, in exactly the shape its GET returns.",
                 "`data.previous`: for an `*.updated` type, the fields that changed, as they were.",
-                "Names, contact details and answers only when the endpoint's owner has `attendees:read`. `payment.*` webhooks carry amounts and status only.",
+                "Names, contact details and answers only when the endpoint may have them ([see above](#sharing)). `payment.*` webhooks carry amounts and status only.",
+                "`data.object.external_id` is your own id for the object, when the endpoint is yours: each key or app sees its own.",
               ],
             ],
             ["h3", "Headers"],
@@ -534,6 +547,9 @@ export function developerDocs(api) {
                 ["`Content-Type`", "`application/json`"],
                 ["`MOA-Signature`", "`t=<unix seconds>,v1=<signature>`: see below."],
                 ["`MOA-Event-Id`", "The webhook's id (`evt_…`), the same as the body's `id`."],
+                ["`MOA-Event-Type`", "The webhook's type, the same as the body's `type`."],
+                ["`MOA-Delivery-Id`", "This delivery, as the delivery log names it."],
+                ["`MOA-Delivery-Attempt`", "Which try this is: 1 the first time."],
               ],
             ],
           ],
@@ -596,7 +612,8 @@ export function developerDocs(api) {
           id: "retries",
           heading: "Retries",
           blocks: [
-            ["p", "A failed delivery is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours."],
+            ["p", "A failed delivery is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours. After the eighth try it has failed; you can still send it again by hand (below)."],
+            ["p", "In the delivery log, a delivery is `pending` (not tried yet), `retrying` (failed, to be tried again at `next_attempt_at`), `succeeded` or `failed`."],
             [
               "p",
               "An endpoint that keeps failing for 3 days in a row is disabled, and we email the club's owner (or, for a partner app's endpoint, the partner). Turn it on again in the dashboard or with `PATCH /webhook-endpoints/{id}` and `{\"status\": \"enabled\"}`, then replay what it missed.",
@@ -620,7 +637,7 @@ export function developerDocs(api) {
           blocks: [
             [
               "p",
-              "We send each object's webhooks in order as far as we can, but a retry can bring an old one after a newer one. Don't trust the order they arrive in: compare `data.object.updated_at` with the copy you have, and ignore one that is older. When in doubt, read the object again with its GET.",
+              "We send each object's webhooks in order as far as we can: a webhook waits a few seconds while an older change to the same object is still on its way to you. But a retry can still bring an old one after a newer one. Don't trust the order they arrive in: compare `data.object.updated_at` with the copy you have, and ignore one that is older. When in doubt, read the object again with its GET.",
             ],
           ],
         },
@@ -641,7 +658,7 @@ export function developerDocs(api) {
             [
               "ul",
               [
-                "`POST /webhook-endpoints/{id}/test` sends a signed test webhook (`livemode: false`) at once.",
+                "`POST /webhook-endpoints/{id}/test` sends a signed `webhook.test` at once and answers with how your endpoint answered (`ok`, and the delivery). A test never counts towards turning an endpoint off.",
                 "Changes made with a test key send webhooks with `livemode: false`: check `livemode` before you touch real records.",
                 "Your endpoint must be on the public internet. To test on your own machine, use a tunnel.",
               ],
@@ -654,7 +671,7 @@ export function developerDocs(api) {
           blocks: [
             [
               "p",
-              "`POST /webhook-endpoints/{id}/rotate-secret` (or the dashboard) gives a new secret, shown once, and webhooks are signed with it from then on: put it in place straight away. The code above accepts any matching `v1`, so it keeps working if a header ever carries more than one.",
+              "`POST /webhook-endpoints/{id}/rotate-secret` (or the dashboard) gives a new secret, shown once. For a while the old one signs too: for 24 hours unless you send `keep_previous_hours` (0 to 72), every `MOA-Signature` carries two `v1` values, one for each secret. The code above accepts any matching `v1`, so put the new secret in place whenever you are ready within that time.",
             ],
           ],
         },
@@ -945,7 +962,7 @@ export function developerDocs(api) {
                 "Test events are hidden from the public: not on myotherapp.in, not in search, lists or sitemaps.",
                 "Nobody gets an email, a WhatsApp message or a push notification about them.",
                 "No payments: a paid test event never opens a checkout.",
-                "Webhooks are sent for them as for live objects, with `livemode: false`.",
+                "Webhooks are sent for them as for live objects, with `livemode: false`, to test endpoints: an endpoint added with a test key is one.",
                 "Otherwise they behave like live ones: capacity, questions, approvals, check-ins, errors and rate limits all apply, so your tests mean something.",
               ],
             ],

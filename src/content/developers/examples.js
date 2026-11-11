@@ -9,8 +9,8 @@
 export const SIGNATURE_VECTOR = {
   secret: "whsec_5mJqT2vX8kLr4nYc7HdW1pZa",
   timestamp: 1794458702,
-  body: '{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"id":"90211","registration_id":"120394","event_id":"8812","checked_in_at":"2026-11-12T10:15:01+05:30","gate":"Main gate","device":null,"duplicate":false}}}',
-  signature: "ee8a613e64408acbf4d5cb8fe0c8e43c1c2dc2da05607fc3b9aa5b20e7e50167",
+  body: '{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"object":"checkin","id":"90211","registration_id":"120394","event_id":"8812","checked_in_at":"2026-11-12T10:15:01+05:30","scanned_at":"2026-11-12T10:15:01+05:30","via":"app","gate":"Main gate","device":null,"deleted":false,"livemode":false}}}',
+  signature: "2dd9f1c3e0f5db29d6f8a98da3f3d04382ae9056e05a3c0da3db41f5f892bfd5",
 };
 export const SIGNATURE_HEADER = `t=${SIGNATURE_VECTOR.timestamp},v1=${SIGNATURE_VECTOR.signature}`;
 
@@ -240,14 +240,17 @@ export MOA_API=${base}`,
     "ends_at": "2026-12-06T06:00:00+05:30",
     "venue": { "name": "Maker Village", "city": "Kochi" },
     "capacity": 120,
-    "price": "free",
     "external_id": "erp-ev-2026-114"
   }'`,
     createEventAnswer: `{
+  "object": "event",
   "id": "8812",
+  "club_id": "311",
   "name": "Hack Night 04",
   "slug": "hack-night-04",
   "status": "draft",
+  "price": null,
+  "free": true,
   "livemode": false,
   "public_url": "https://myotherapp.in/events/hack-night-04",
   "updated_at": "2026-11-12T10:02:11+05:30",
@@ -266,10 +269,12 @@ export MOA_API=${base}`,
     "external_id": "erp-reg-55102"
   }'`,
     registerAnswer: `{
+  "object": "registration",
   "id": "120394",
   "event_id": "8812",
   "status": "confirmed",
-  "ticket": { "code": "MOA-7K2P-QX9D", "qr_url": "https://api.myotherapp.in/...", "status": "valid" },
+  "ticket": { "code": "MOA-7K2P-QX9D", "status": "valid", "url": "https://myotherapp.in/tickets/MOA-7K2P-QX9D" },
+  "payment": { "status": "free", "amount_due": 0, "amount_paid": 0, "currency": "INR" },
   "checked_in_at": null,
   "external_id": "erp-reg-55102",
   "livemode": false,
@@ -281,13 +286,16 @@ export MOA_API=${base}`,
   -H "Idempotency-Key: $(uuidgen)" \\
   -d '{ "ticket_code": "MOA-7K2P-QX9D", "gate": "Main gate" }'`,
     checkinAnswer: `{
+  "object": "checkin",
   "id": "90211",
   "registration_id": "120394",
   "event_id": "8812",
   "checked_in_at": "2026-12-05T18:04:31+05:30",
+  "via": "api",
   "gate": "Main gate",
-  "device": null,
-  "duplicate": false
+  "livemode": false,
+  "duplicate": false,
+  ...
 }`,
     endpoint: `curl -X POST $MOA_API/webhook-endpoints \\
   -H "Authorization: Bearer $MOA_KEY" \\
@@ -298,23 +306,31 @@ export MOA_API=${base}`,
     "events": ["registration.created", "registration.cancelled", "checkin.created"]
   }'`,
     endpointAnswer: `{
-  "id": "we_402",
+  "id": "4b7e2c1a-9f3d-4e6b-8a52-0c1d2e3f4a5b",
   "url": "https://your-app.example.com/hooks/myotherapp",
   "events": ["registration.created", "registration.cancelled", "checkin.created"],
   "include_own_changes": false,
-  "status": "enabled",
+  "livemode": false,
+  "enabled": true,
   "secret": "whsec_5mJqT2vX8kLr4nYc7HdW1pZa",
   ...
 }`,
-    test: `curl -X POST $MOA_API/webhook-endpoints/we_402/test \\
+    test: `curl -X POST $MOA_API/webhook-endpoints/4b7e2c1a-9f3d-4e6b-8a52-0c1d2e3f4a5b/test \\
   -H "Authorization: Bearer $MOA_KEY" \\
   -H "Idempotency-Key: $(uuidgen)"`,
+    testAnswer: `{
+  "ok": true,
+  "delivery": { "event_type": "webhook.test", "status": "succeeded", "response_status": 200, ... }
+}`,
     received: `POST /hooks/myotherapp HTTP/1.1
 Content-Type: application/json
 MOA-Event-Id: evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7
-MOA-Signature: t=1794458702,v1=ee8a613e64408acbf4d5cb8fe0c8e43c1c2dc2da05607fc3b9aa5b20e7e50167
+MOA-Event-Type: checkin.created
+MOA-Delivery-Id: 9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d
+MOA-Delivery-Attempt: 1
+MOA-Signature: t=1794458702,v1=2dd9f1c3e0f5db29d6f8a98da3f3d04382ae9056e05a3c0da3db41f5f892bfd5
 
-{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{...}}}`,
+{"id":"evt_01JD3K7Q2M8V4XQ9T6B1N5R2C7","type":"checkin.created","created_at":"2026-11-12T10:15:02+05:30","livemode":false,"club_id":"311","origin":{"type":"app"},"data":{"object":{"object":"checkin",...}}}`,
   };
 }
 
@@ -445,6 +461,7 @@ export const WEBHOOK_BODY = `{
   "origin": { "type": "dashboard" },
   "data": {
     "object": {
+      "object": "event",
       "id": "8812",
       "name": "Hack Night 04",
       "capacity": 150,

@@ -108,7 +108,7 @@ describe("the pages' content", () => {
   it("quick start: every call of the five steps, with a copy button on each block", async () => {
     const { out } = await render(DOCS_PAGES.find((p) => p.slug === "quick-start"));
     const text = unescape(out.replace(/<[^>]+>/g, ""));
-    for (const call of ["curl $MOA_API/me", "curl -X POST $MOA_API/events", "$MOA_API/events/8812/publish", "$MOA_API/events/8812/registrations", "$MOA_API/checkins", "$MOA_API/webhook-endpoints", "/webhook-endpoints/we_402/test"]) expect(text).toContain(call);
+    for (const call of ["curl $MOA_API/me", "curl -X POST $MOA_API/events", "$MOA_API/events/8812/publish", "$MOA_API/events/8812/registrations", "$MOA_API/checkins", "$MOA_API/webhook-endpoints", "/webhook-endpoints/4b7e2c1a-9f3d-4e6b-8a52-0c1d2e3f4a5b/test"]) expect(text).toContain(call);
     expect(out.match(/class="dv-copy"/g).length).toBe(out.match(/<figure class="dv-code">/g).length);
     expect(text).toContain("export MOA_API=https://api.myotherapp.in/partner/v1");
   });
@@ -144,7 +144,7 @@ describe("the pages' content", () => {
     const text = unescape(out.replace(/<[^>]+>/g, ""));
     for (const h of listWebhooks(COPY)) expect(out).toContain(`href="/developers/reference#${h.anchor}"`);
     for (const id of ["verify-node", "verify-python", "verify-php", "signature-example", "retries", "replay", "ordering", "duplicates"]) expect(out).toContain(`id="${id}"`);
-    for (const words of ["export function verifyMoaSignature", "def verify_moa_signature", "function verify_moa_signature", "1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours", "t=1794458702,v1=ee8a613e"]) expect(text).toContain(words);
+    for (const words of ["export function verifyMoaSignature", "def verify_moa_signature", "function verify_moa_signature", "1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours and 24 hours", "t=1794458702,v1=2dd9f1c3"]) expect(text).toContain(words);
   });
 
   it("syncing: the sequence diagram as a picture with its steps in words", async () => {

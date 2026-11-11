@@ -70,18 +70,21 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
       "POST /events/{event_id}/certificates",
       "GET /certificate-jobs/{job_id}",
       "GET /certificates/{number}",
+      "GET /webhook-event-types",
       "GET /webhook-endpoints",
       "POST /webhook-endpoints",
+      "GET /webhook-endpoints/{endpoint_id}",
       "PATCH /webhook-endpoints/{endpoint_id}",
       "DELETE /webhook-endpoints/{endpoint_id}",
       "POST /webhook-endpoints/{endpoint_id}/rotate-secret",
       "POST /webhook-endpoints/{endpoint_id}/test",
       "GET /webhook-endpoints/{endpoint_id}/deliveries",
+      "GET /webhook-deliveries/{delivery_id}",
       "POST /webhook-deliveries/{delivery_id}/retry",
       "GET /openapi.json",
     ])
       expect(have).toContain(want);
-    expect(ops).toHaveLength(32);
+    expect(ops).toHaveLength(35);
   });
 
   it("has the contract's 15 webhook types, each with a signed example body", () => {
@@ -237,8 +240,8 @@ describe("reading any OpenAPI document", () => {
     expect(typeLabel(GENERATED, p.parent)).toBe("Thing or null");
     expect(typeLabel(GENERATED, p.tags)).toBe("array of string");
     expect(typeLabel(GENERATED, p.place.properties.city)).toBe("string or null");
-    expect(typeLabel(COPY, COPY.components.schemas.Event.properties.price)).toBe('Price');
-    expect(typeLabel(COPY, COPY.components.schemas.Price)).toBe('Money or "free"');
+    expect(typeLabel(COPY, COPY.components.schemas.Event.properties.price)).toBe("Money or null");
+    expect(typeLabel(COPY, COPY.components.schemas.Event.properties.object)).toBe('"event"');
     expect(typeLabel(COPY, COPY.components.schemas.Event.properties.ticket_types)).toBe("array of TicketType");
   });
 
@@ -253,7 +256,7 @@ describe("reading any OpenAPI document", () => {
       ["name", true],
     ]);
     const event = fieldRows(COPY, { $ref: "#/components/schemas/Registration" }).map((r) => r.name);
-    expect(event).toEqual(expect.arrayContaining(["approval", "approval.state", "ticket.code", "person", "payment"]));
+    expect(event).toEqual(expect.arrayContaining(["approval", "approval.status", "approval.request_id", "ticket.code", "ticket.url", "person", "payment"]));
     expect(event).not.toContain("person.email"); // Person is its own object
   });
 
