@@ -291,3 +291,36 @@
   font-size: 14px;
   text-decoration: underline;
 }
+
+/* ---------- /tickets/cancel: giving a ticket back (components/ticketcancel.jsx) ---------- */
+
+.tc .rg-layout {
+  margin-top: 16px;
+}
+.tc-ask {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--dc-line);
+}
+.dc-scope .tc-reason {
+  min-height: 96px;
+}
+.tc-warn {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--dc-ink);
+}
+.tc-problem {
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  font-size: 14px;
+  color: var(--dc-ink);
+}
+.tc-refused .dc-btn {
+  overflow-wrap: anywhere;
+}
