@@ -109,6 +109,8 @@ const nextConfig = {
       { source: "/claim/:token", headers: CLAIM_HEADERS },
       // A request for a place (registration approval): its address is the request's only credential too.
       { source: "/requests/:token", headers: CLAIM_HEADERS },
+      // A speaker's invite to claim their profile: the link's token is the invite's credential.
+      { source: "/speakers/claim/:token", headers: CLAIM_HEADERS },
     ];
   },
   async redirects() {

@@ -24,6 +24,8 @@ export const eventRefOf = (event) => (event?.slug ? String(event.slug) : event?.
 
 export const eventPagePath = (event, sub = "") => `/events/${enc(eventRefOf(event))}${sub ? `/${sub}` : ""}`;
 export const clubPagePath = (club) => `/clubs/${enc(club.slug)}`;
+/** A speaker's page (feature-register/speakers-contract.md). */
+export const speakerPagePath = (slug) => `/speakers/${enc(slug)}`;
 /** A topic's page (`interest`: one of its interests, the same page filtered). */
 export const topicPagePath = (topic, interest = null) => `/topics/${enc(topic.slug)}${interest ? `?interest=${enc(interest)}` : ""}`;
 
@@ -44,6 +46,8 @@ export const media = {
   clubTeam: (slug, index) => `/media/clubs/${enc(slug)}/team/${index}/photo`,
   clubPartner: (slug, index) => `/media/clubs/${enc(slug)}/partners/${index}/logo`,
   threadImage: (id, size = "medium") => sized(`/media/threads/${enc(id)}/image`, size),
+  /** A speaker profile's photo ("thumbnail" or "medium"). */
+  speakerPhoto: (slug, size = "medium") => sized(`/media/speakers/${enc(slug)}/photo`, size),
 };
 
 /** The share pictures (1200×630), made by src/app/og/.../route.jsx. `v` changes when what they show does. */

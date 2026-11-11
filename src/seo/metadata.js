@@ -9,7 +9,7 @@ import { SITE_URL } from "@/config";
 import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
 import { hostNames, hostsOf } from "@/utils/hosts";
-import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, topicPagePath } from "./urls";
+import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, speakerPagePath, topicPagePath } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
 export const TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -95,6 +95,36 @@ export function clubMetadata(data) {
     image: { url: absoluteUrl(ogImage.club(club.slug, clubOgVersion(data))), width: 1200, height: 630, alt: club.name },
     rss: { url: feeds.club(club.slug), title: `Upcoming events from ${club.name}` },
   });
+}
+
+/* ---------- speakers ---------- */
+
+/** What a speaker's page says about them in a sentence: their bio, else their headline, talks and city. */
+export function speakerDescription(page) {
+  if (page.bio) return summary(page.bio);
+  const talks = page.upcoming.length + page.past.length;
+  const bits = [page.headline, page.city].filter(Boolean).join(", ");
+  return summary(
+    `${page.name}${bits ? `, ${bits}` : ""}: ${talks ? `${talks} ${talks === 1 ? "talk" : "talks"} at events on ${SITE_NAME}` : `a speaker on ${SITE_NAME}`}. See their upcoming and past talks.`,
+  );
+}
+
+/**
+ * A speaker's page: canonical /speakers/{slug}, their photo as the preview's
+ * picture (else the site's), a profile in Open Graph's terms. `page` is the
+ * raw parsed page (src/utils/speakers.js).
+ */
+export function speakerMetadata(page) {
+  const image = page.photo ? { url: absoluteUrl(media.speakerPhoto(page.slug, "medium")), alt: page.name } : OG_IMAGE;
+  const meta = pageMetadata({
+    title: page.headline ? `${page.name}, ${page.headline}` : `${page.name}, speaker`,
+    description: speakerDescription(page),
+    path: speakerPagePath(page.slug),
+    image,
+    type: "profile",
+  });
+  // A square photo reads better as the small card than cut to a banner.
+  return page.photo ? { ...meta, twitter: { ...meta.twitter, card: "summary" } } : meta;
 }
 
 /* ---------- topics ---------- */

@@ -18,6 +18,7 @@ const TITLES = {
   vote: "Sign in to vote",
   comment: "Sign in to comment",
   register: "Sign in to register",
+  speaker: "Sign in to your speaker profile",
 };
 
 /** How long after Google's window closes a sign-in still counts as on its way. */
