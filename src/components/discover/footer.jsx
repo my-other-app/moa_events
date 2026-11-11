@@ -72,9 +72,6 @@ export function SiteFooter() {
                 <Link to="/verify">Verify a certificate</Link>
               </li>
               <li>
-                <Link to="/help">Help</Link>
-              </li>
-              <li>
                 <a href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
               </li>
             </ul>
@@ -106,6 +103,9 @@ export function SiteFooter() {
           <nav aria-label="Help and legal">
             <h2>Help &amp; legal</h2>
             <ul>
+              <li>
+                <Link to="/help">Help</Link>
+              </li>
               <li>
                 <Link to="/support">Support</Link>
               </li>
