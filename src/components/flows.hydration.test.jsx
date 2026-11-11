@@ -23,6 +23,7 @@ vi.mock("@/api/live", () => ({
   errorLine: (e, f) => f,
   liveApi: { fetchFeed: vi.fn(() => new Promise(() => {})), playState: vi.fn(() => new Promise(() => {})), fetchSurvey: vi.fn(() => new Promise(() => {})) },
 }));
+vi.mock("@/api/ticketcancel", () => ({ ticketCancelApi: { info: vi.fn(() => new Promise(() => {})), cancel: vi.fn() } }));
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn(() => new Promise(() => {})), me: vi.fn(() => new Promise(() => {})) } }));
 const get = vi.fn();
 vi.mock("@/api/client", () => ({ default: { get, post: vi.fn(), delete: vi.fn(() => Promise.resolve({ data: {} })) } }));
@@ -41,6 +42,7 @@ const Claim = (await import("./claim.jsx")).default;
 const RequestStatus = (await import("./request.jsx")).default;
 const Answers = (await import("./answers.jsx")).default;
 const { default: Certificate, OldCertificateAddress } = await import("./certificate.jsx");
+const TicketCancel = (await import("./ticketcancel.jsx")).default;
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
 const page = parseEventPage(fullEvent());
@@ -123,6 +125,9 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     ["/play/123", () => <Play eventId="123" />, null],
     ["/feedback/123/reg-1?k=tok", () => <Feedback eventId="123" registrationId="reg-1" k="tok" />, null],
     ["/tickets/MOA-1", () => <Ticket ticketid="MOA-1" />, "Loading ticket details"],
+    // Giving a ticket back: the link is read in the browser; a missing token is said at once.
+    ["/tickets/cancel?t=eyJyIjoxMjN9.c2lnbmF0dXJlLXZhbHVl", () => <TicketCancel token="eyJyIjoxMjN9.c2lnbmF0dXJlLXZhbHVl" />, "Loading your ticket"],
+    ["/tickets/cancel", () => <TicketCancel token={null} />, "This link isn"],
     // A certificate's page, as the server checked it; and an older address, read in the browser.
     [
       "/certificates/q7Hb2_kLm9Zx-41PwT0aReXy",

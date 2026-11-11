@@ -94,6 +94,8 @@ export const BROWSER_PATHS = [
   ["/media/*", "Pictures"],
   ["/for-clubs", "For clubs"],
   ["/pricing", "Pricing"],
+  // "Give your ticket back" from the ticket emails: the site's page (the app has none), under the claimed /tickets/*.
+  ["/tickets/cancel", "Giving a ticket back"],
 ];
 
 /** /.well-known/apple-app-site-association: the iOS app opens APP_PATHS, less BROWSER_PATHS. */

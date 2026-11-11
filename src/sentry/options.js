@@ -40,7 +40,10 @@ const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
 // waiting list's claim link, /claim/{token}, and the API's
 // /waitlist/offers/{token}, are its only credential; so are a request's
 // status link, /requests/{token}, and the API's /registration-requests/{token}).
-const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests)\/(?!\[)[^/?#\s"'<>]+/g;
+const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests)\/(?!\[|cancel(?![\w-]))[^/?#\s"'<>]+/g;
+// "Give your ticket back": the site's /tickets/cancel?t={token} and the API's
+// /tickets/cancel/{token}. The token is the link's only credential.
+const CANCEL = /\/tickets\/cancel(\/|\?(?:[^#\s"'<>]*?&)?t=)(?!\[)[^&#/?\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
 // A missing-answers link names the person: the site's /answers/{eventId}/{ref}
 // and the API's /events/{eventId}/answers/{ref} (a registration's UUID, or "q" and a request's).
@@ -51,6 +54,7 @@ export function maskText(text) {
   // The answers link first: its UUID's digits must not be read as a phone number.
   return text
     .replace(ANSWERS, "/answers/$1[code]")
+    .replace(CANCEL, "/tickets/cancel$1[code]")
     .replace(EMAIL, "[email]")
     .replace(MOBILE, "$1[phone]")
     .replace(INTL, "$1[phone]")
