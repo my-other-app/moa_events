@@ -6,6 +6,8 @@
  *   /sitemaps/topics.xml       /topics and every topic's page (only when the API has topics)
  *   /sitemaps/cities.xml       the city pages worth indexing (/events/in/{city}, /clubs/in/{city}, the hub;
  *                              only while there are some)
+ *   /sitemaps/speakers.xml     speakers' pages (/speakers/{slug}) from GET /speakers/sitemap: active
+ *                              profiles with a published talk (only while there are some)
  *   /sitemaps/events-{n}.xml   public events, page n
  *   /sitemaps/clubs-{n}.xml    public clubs, page n
  *
@@ -34,14 +36,18 @@ export const STATIC_PAGES = [
   ["/verify", "monthly", "0.5"],
   // Help: the App Store's Support URL, and Google Play's account-deletion page (/support#delete-account).
   ["/support", "monthly", "0.4"],
+  // Help: the answers, and the form to ask the support team.
+  ["/help", "monthly", "0.5"],
   ["/privacy", "yearly", "0.3"],
+  // What we keep from a club's social accounts and how it is deleted (Meta's required data deletion page).
+  ["/data-deletion", "yearly", "0.2"],
   ["/terms", "yearly", "0.3"],
 ];
 
 export const xml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
-const PREFIX = { events: "/events", clubs: "/clubs" };
-const PRIORITY = { events: "0.7", clubs: "0.6" };
+const PREFIX = { events: "/events", clubs: "/clubs", speakers: "/speakers" };
+const PRIORITY = { events: "0.7", clubs: "0.6", speakers: "0.5" };
 
 /** The addresses for rows of {slug, updated_at}: each slug once, bad ones and those `skip` says (demo content) left out. */
 export function entriesFor(kind, rows, { siteUrl = SITE_URL, skip = () => false } = {}) {
@@ -107,10 +113,11 @@ const newest = (rows) => rows.map((r) => r?.updated_at).filter(Boolean).sort().p
  * indexing), then every page of events and clubs. Null source (the API
  * is down): the fixed pages (and the topics) only.
  */
-export function indexEntries(source, { siteUrl = SITE_URL, topics = false, cities = false } = {}) {
+export function indexEntries(source, { siteUrl = SITE_URL, topics = false, cities = false, speakers = false } = {}) {
   const out = [{ loc: `${siteUrl}/sitemaps/pages.xml` }];
   if (topics) out.push({ loc: `${siteUrl}/sitemaps/topics.xml` });
   if (cities) out.push({ loc: `${siteUrl}/sitemaps/cities.xml` });
+  if (speakers) out.push({ loc: `${siteUrl}/sitemaps/speakers.xml` });
   if (!source) return out;
   if (source.paged) {
     for (const p of source.pages) {
@@ -125,12 +132,13 @@ export function indexEntries(source, { siteUrl = SITE_URL, topics = false, citie
   return out;
 }
 
-/** "events-3.xml" → {kind: "events", page: 3}; "pages.xml", "topics.xml", "cities.xml" → {kind}; anything else → null. */
+/** "events-3.xml" → {kind: "events", page: 3}; "pages.xml", "topics.xml", "cities.xml", "speakers.xml" → {kind}; anything else → null. */
 export function parseSitemapName(name) {
   const s = decodeURIComponent(String(name || ""));
   if (s === "pages.xml") return { kind: "pages", page: 1 };
   if (s === "topics.xml") return { kind: "topics", page: 1 };
   if (s === "cities.xml") return { kind: "cities", page: 1 };
+  if (s === "speakers.xml") return { kind: "speakers", page: 1 };
   const m = /^(events|clubs)-([1-9]\d{0,5})\.xml$/.exec(s);
   return m ? { kind: m[1], page: Number(m[2]) } : null;
 }

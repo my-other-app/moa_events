@@ -764,9 +764,14 @@ export function parseEventDetail(e) {
       postal_code: (v) => (typeof v === "string" || typeof v === "number" ? str(String(v)) : null),
       // Only on a cancelled event: why, and when (src/utils/cancelled.js).
       cancellation: (v, all) => (all.status === "cancelled" ? parseCancellation(v) || { reason: null, cancelled_at: null } : null),
+      // The link-preview picture (feature-register/social-posting-contract.md): an https address, or nothing.
+      share_image_url: (v) => (typeof v === "string" && /^https:\/\/[^\s]+$/i.test(v.trim()) ? v.trim() : null),
     }),
   };
 }
+
+/** A speaker profile's address (/speakers/{slug}): a slug, or nothing (feature-register/speakers-contract.md). */
+const profileSlug = (v) => (typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(v.trim()) ? v.trim() : null);
 
 const parseSpeaker = (s) => {
   const o = obj(s);
@@ -778,6 +783,8 @@ const parseSpeaker = (s) => {
     photo: o.photo || null,
     bio: textOf(o.bio),
     link: str(o.link),
+    // Newer APIs: the speaker's own page (null while the profile is hidden) and the talk at this event.
+    ...optional(o, { profile_slug: profileSlug, talk_title: (v) => (str(v) ? v.trim() : null) }),
   };
 };
 

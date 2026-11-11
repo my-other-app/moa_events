@@ -9,7 +9,8 @@ import { SITE_URL } from "@/config";
 import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
 import { hostNames, hostsOf } from "@/utils/hosts";
-import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, topicPagePath } from "./urls";
+import { previewImage } from "@/utils/share";
+import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, speakerPagePath, topicPagePath } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
 export const TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -65,17 +66,23 @@ export function eventFactsLine(event, club, cohosts = []) {
   return `${facts}${club ? `. Hosted by ${hostNames(hostsOf(club, cohosts))} on ${SITE_NAME}.` : `. On ${SITE_NAME}.`}`;
 }
 
-/** An event's page: its canonical /events/{slug}, its own share picture, and its club's feed. `page` is the raw parsed page. */
+/**
+ * An event's page: its canonical /events/{slug}, its share picture, and its
+ * club's feed. `page` is the raw parsed page. The picture is the 1200 × 630
+ * one the API makes for link previews (`share_image_url`, a lasting public
+ * address) when it has one; else the site's own card (/og/events/{slug}).
+ */
 export function eventMetadata(page) {
   const { event, club } = page;
   const description = summary(event.about) || summary(eventFactsLine(event, club, page.cohosts));
   const when = whenLine(event.starts_at);
+  const made = previewImage(event.share_image_url, imageUrl(event.poster, "original"));
   return pageMetadata({
     title: event.name,
     description,
     path: eventPagePath(event),
     image: {
-      url: absoluteUrl(ogImage.event(event.slug || event.id, eventOgVersion(page))),
+      url: made || absoluteUrl(ogImage.event(event.slug || event.id, eventOgVersion(page))),
       width: 1200,
       height: 630,
       alt: [event.name, when ? `${when} IST` : null, event.is_online ? "Online" : event.location_name].filter(Boolean).join(" · "),
@@ -95,6 +102,36 @@ export function clubMetadata(data) {
     image: { url: absoluteUrl(ogImage.club(club.slug, clubOgVersion(data))), width: 1200, height: 630, alt: club.name },
     rss: { url: feeds.club(club.slug), title: `Upcoming events from ${club.name}` },
   });
+}
+
+/* ---------- speakers ---------- */
+
+/** What a speaker's page says about them in a sentence: their bio, else their headline, talks and city. */
+export function speakerDescription(page) {
+  if (page.bio) return summary(page.bio);
+  const talks = page.upcoming.length + page.past.length;
+  const bits = [page.headline, page.city].filter(Boolean).join(", ");
+  return summary(
+    `${page.name}${bits ? `, ${bits}` : ""}: ${talks ? `${talks} ${talks === 1 ? "talk" : "talks"} at events on ${SITE_NAME}` : `a speaker on ${SITE_NAME}`}. See their upcoming and past talks.`,
+  );
+}
+
+/**
+ * A speaker's page: canonical /speakers/{slug}, their photo as the preview's
+ * picture (else the site's), a profile in Open Graph's terms. `page` is the
+ * raw parsed page (src/utils/speakers.js).
+ */
+export function speakerMetadata(page) {
+  const image = page.photo ? { url: absoluteUrl(media.speakerPhoto(page.slug, "medium")), alt: page.name } : OG_IMAGE;
+  const meta = pageMetadata({
+    title: page.headline ? `${page.name}, ${page.headline}` : `${page.name}, speaker`,
+    description: speakerDescription(page),
+    path: speakerPagePath(page.slug),
+    image,
+    type: "profile",
+  });
+  // A square photo reads better as the small card than cut to a banner.
+  return page.photo ? { ...meta, twitter: { ...meta.twitter, card: "summary" } } : meta;
 }
 
 /* ---------- topics ---------- */

@@ -162,11 +162,12 @@ const organization = ({ name, url = null, logo = null }) => ({ "@type": "Organiz
  *   cohosts                 [{name, url, logo}] (url, logo absolute or null): the clubs co-hosting it
  *   description             plain text
  *   speakerImage(s, i)      an absolute photo address for a speaker, or null
+ *   speakerUrl(s)           an absolute address for a speaker's own page, or null
  *   topics                  [{name, url}]: what it is about (its topics' pages, absolute)
  *
  * Its organizer is the club; with co-hosts, every host, the club first.
  */
-export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, cohosts = [], description = null, speakerImage = () => null, topics = [] }) {
+export function eventJsonLd({ event, club = null, speakers = [], url, images = [], image = null, clubUrl = null, clubLogo = null, cohosts = [], description = null, speakerImage = () => null, speakerUrl = () => null, topics = [] }) {
   if (!event) return null;
   const host = club ? organization({ name: club.name, url: clubUrl, logo: clubLogo }) : null;
   const others = host ? cohosts.filter((c) => c && c.name).map(organization) : [];
@@ -199,6 +200,8 @@ export function eventJsonLd({ event, club = null, speakers = [], url, images = [
         jobTitle: s.designation || null,
         description: s.bio ? String(s.bio).slice(0, 300) : null,
         image: speakerImage(s, i),
+        // Their own page on the site, once they have a profile (speakerUrl), and the link the club gave.
+        url: speakerUrl(s),
         sameAs: isHttp(s.link) ? [s.link] : null,
       })),
     offers: offer(event, url),

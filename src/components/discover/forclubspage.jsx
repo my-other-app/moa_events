@@ -7,6 +7,7 @@ import { ClubFaq, ClubsCta } from "./clubsparts";
 import { HeroFan, PhaseArt } from "./forclubsart";
 import { Pricing } from "./pricing";
 import Icon from "./icons";
+import { TalkToUs } from "./talktous";
 
 /** The facts under the buttons, from the plans themselves: the free trial, the lowest price, a free plan after. */
 function PlanFacts({ data }) {
@@ -200,8 +201,9 @@ export function ForClubsView({ plans = null, home = null }) {
           <Pricing data={plans} compare="link" />
         </section>
 
+        <TalkToUs />
         <ClubFaq yearlyMonthsFree={plans?.yearlyMonthsFree ?? null} />
-        <ClubsCta />
+        <ClubsCta talkHref="#talk-to-us" />
       </div>
     </>
   );

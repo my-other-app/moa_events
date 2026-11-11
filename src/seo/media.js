@@ -59,6 +59,10 @@ export function mediaTarget(segments) {
     return null;
   }
   if (kind === "threads" && n === 3 && a === "image") return { source: "thread", ref, what: "image", pick: (t, size) => imageUrl(t?.image, sizeOf(size, "medium")) };
+  // A speaker's profile photo (/speakers/{slug}): thumbnail or medium, the two the API sends.
+  if (kind === "speakers" && n === 3 && a === "photo") {
+    return { source: "speaker", ref, what: "photo", pick: (p, size) => (p && !p.redirect ? imageUrl(p.photo, sizeOf(size, "medium") === "thumbnail" ? "thumbnail" : "medium") : null) };
+  }
   return null;
 }
 

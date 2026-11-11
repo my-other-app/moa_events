@@ -39,8 +39,10 @@ const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
 // The last segment of these addresses is a code that opens the page (a
 // waiting list's claim link, /claim/{token}, and the API's
 // /waitlist/offers/{token}, are its only credential; so are a request's
-// status link, /requests/{token}, and the API's /registration-requests/{token}).
-const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests)\/(?!\[|cancel(?![\w-]))[^/?#\s"'<>]+/g;
+// status link, /requests/{token}, and the API's /registration-requests/{token};
+// and a support survey's, the site's /help/survey/{token} and the API's
+// /support/survey/{token}).
+const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests|survey)\/(?!\[|cancel(?![\w-]))[^/?#\s"'<>]+/g;
 // "Give your ticket back": the site's /tickets/cancel?t={token} and the API's
 // /tickets/cancel/{token}. The token is the link's only credential.
 const CANCEL = /\/tickets\/cancel(\/|\?(?:[^#\s"'<>]*?&)?t=)(?!\[)[^&#/?\s"'<>]+/g;

@@ -60,6 +60,7 @@ import { CalendarButton, EpIcon } from "../discover/eventparts";
 import Icon from "../discover/icons";
 import { CheckField, QuestionField, TextField } from "./fields";
 import { PayNote, Spinner, useFinishPayment } from "./finishpayment";
+import { GetHelpLink } from "../help/gethelp";
 import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
 import Requested from "./requested";
@@ -248,6 +249,8 @@ function Problem({ problem, event, club = null, signedIn, onRetry, onChangeEmail
     tone = problem.tone;
     title = problem.title;
     text = problem.text;
+    // A refusal that says "write to support@": ask on /help, with the error filled in.
+    actions = problem.help ? <GetHelpLink help={{ ...problem.help, eventId: event?.id ?? null }} /> : null;
   } else if (problem.kind === "duplicate") {
     tone = "info";
     title = "You're already registered";

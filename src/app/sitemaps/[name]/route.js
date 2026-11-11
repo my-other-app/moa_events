@@ -5,10 +5,11 @@ import { ApiError } from "@/server/api";
 import { getCitySummaries } from "@/server/cities";
 import { getDemoEventSlugs } from "@/server/demo";
 import { getSitemapPage, getSitemapSource } from "@/server/discover";
+import { getSpeakerSitemap } from "@/server/speakers";
 import { getTopics } from "@/server/topics";
 
 /*
- * GET /sitemaps/pages.xml | topics.xml | cities.xml | events-{n}.xml | clubs-{n}.xml:
+ * GET /sitemaps/pages.xml | topics.xml | cities.xml | speakers.xml | events-{n}.xml | clubs-{n}.xml:
  * one sitemap of the index, at most 5,000 addresses. Pages come from the
  * API's paged sitemap when it has one; from its single list (page 1 only)
  * when not. topics.xml is /topics and each topic's page; 404 while the API
@@ -35,6 +36,11 @@ export async function GET(request, { params }) {
     if (which.kind === "topics") {
       const found = await getTopics();
       return found ? answer(urlsetXml(topicEntries(found.topics))) : missing();
+    }
+    // Speakers' pages (GET /speakers/sitemap: active profiles with a published talk); 404 while the API has none.
+    if (which.kind === "speakers") {
+      const rows = await getSpeakerSitemap();
+      return rows?.length ? answer(urlsetXml(entriesFor("speakers", rows).slice(0, PAGE_SIZE))) : missing();
     }
     const settings = demoSettings();
     const [source, eventSlugs] = await Promise.all([getSitemapSource(), which.kind === "events" ? getDemoEventSlugs(settings) : new Set()]);

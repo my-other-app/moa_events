@@ -75,6 +75,21 @@ export function stableEventPage(page) {
   };
 }
 
+/**
+ * parseSpeakerPage's result (src/utils/speakers.js), with the photo and each
+ * talk's poster on a stable address (a talk's poster is its event's).
+ */
+export function stableSpeakerPage(page) {
+  if (!page || page.redirect) return page;
+  const talk = (t) => ({ ...t, poster: t.poster && (t.slug || t.eventId !== null) ? media.eventPoster(t.slug || String(t.eventId), "medium") : null });
+  return {
+    ...page,
+    photo: page.photo ? { thumbnail: media.speakerPhoto(page.slug, "thumbnail"), medium: media.speakerPhoto(page.slug, "medium") } : null,
+    upcoming: page.upcoming.map(talk),
+    past: page.past.map(talk),
+  };
+}
+
 /** parseClubPage's result, with every image on a stable address. */
 export function stableClubPage(data) {
   if (!data) return data;

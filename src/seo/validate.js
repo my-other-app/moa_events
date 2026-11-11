@@ -132,6 +132,32 @@ export function validateBreadcrumbs(ld) {
   return r;
 }
 
+/**
+ * A ProfilePage whose mainEntity is a Person (a speaker's page), as Google's
+ * profile-page rich result reads it: a name is required; an image, a
+ * description and sameAs links are recommended.
+ * https://developers.google.com/search/docs/appearance/structured-data/profile-page
+ */
+export function validateProfilePage(ld) {
+  const r = result();
+  if (ld?.["@type"] !== "ProfilePage") r.err('@type must be "ProfilePage"');
+  const p = ld?.mainEntity;
+  if (!p || (p["@type"] !== "Person" && p["@type"] !== "Organization")) r.err("mainEntity must be a Person or an Organization");
+  else {
+    if (!p.name) r.err("mainEntity.name is required");
+    if (p.url && !ABS.test(p.url)) r.err("mainEntity.url must be absolute");
+    if (!p.image) r.warn("mainEntity.image is recommended");
+    else if (!ABS.test(p.image)) r.err("mainEntity.image must be absolute");
+    if (!p.description) r.warn("mainEntity.description is recommended");
+    for (const u of asList(p.sameAs)) if (!ABS.test(u)) r.err(`sameAs ${u} must be absolute`);
+    asList(p.performerIn).forEach((e, i) => {
+      if (!e.name) r.err(`performerIn ${i + 1} needs a name`);
+      if (!ABS.test(e.url || "")) r.err(`performerIn ${i + 1} needs an absolute url`);
+    });
+  }
+  return r;
+}
+
 /** An Organization (a club, or the site), with its events if it lists them. */
 export function validateOrganization(ld) {
   const r = result();

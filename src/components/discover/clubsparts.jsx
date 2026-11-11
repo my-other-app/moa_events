@@ -1,6 +1,6 @@
 import { CLUBS_URL, CONTACT_EMAIL } from "@/config";
 import { clubFaq } from "@/content/forclubs";
-import { contactUrl, loginUrl, signupUrl } from "@/utils/pricing";
+import { loginUrl, signupUrl } from "@/utils/pricing";
 import { Inline } from "./legalpage";
 import Icon from "./icons";
 
@@ -44,8 +44,13 @@ export function ClubFaq({ yearlyMonthsFree = null }) {
   );
 }
 
-/** The last word on both pages: start free, talk to us, or log in. */
-export function ClubsCta() {
+/**
+ * The last word on both pages: start free, talk to us, or log in. "Talk to
+ * us" goes to the form on the For-clubs page (`talkHref`: "#talk-to-us"
+ * there), which sends a lead to the sales team, or an email while the API
+ * has no route for it (talktous.jsx).
+ */
+export function ClubsCta({ talkHref = "/for-clubs#talk-to-us" }) {
   return (
     <section className="fc-cta" aria-labelledby="fc-cta-title">
       <div className="fc-cta-copy">
@@ -59,7 +64,7 @@ export function ClubsCta() {
           <a className="dc-btn dc-btn--accent fc-btn-lg" href={START_FREE_URL}>
             Start free <Icon name="arrowRight" size={18} />
           </a>
-          <a className="dc-btn fc-btn-ondark fc-btn-lg" href={contactUrl(CONTACT_EMAIL)}>
+          <a className="dc-btn fc-btn-ondark fc-btn-lg" href={talkHref}>
             Talk to us
           </a>
         </div>

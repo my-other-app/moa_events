@@ -5,6 +5,7 @@ import { isStale, mediaTarget, redirectTtl } from "@/seo/media";
 import { media } from "@/seo/urls";
 import { ApiError } from "@/server/api";
 import { getClubPage, getClubPageFresh, getEventPage, getEventPageFresh, getThread } from "@/server/discover";
+import { getSpeakerPage, getSpeakerPageFresh } from "@/server/speakers";
 
 /**
  * GET /media/... — a stable address for an image the API only hands out as
@@ -22,6 +23,7 @@ const LOADERS = {
   event: (ref, fresh) => (fresh ? getEventPageFresh(ref) : getEventPage(ref)),
   club: (slug, fresh) => (fresh ? getClubPageFresh(slug) : getClubPage(slug)),
   thread: (id, fresh) => getThread(id, { fresh }),
+  speaker: (slug, fresh) => (fresh ? getSpeakerPageFresh(slug) : getSpeakerPage(slug)),
 };
 
 const status = (code, text, cache) => new Response(text, { status: code, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": cache } });

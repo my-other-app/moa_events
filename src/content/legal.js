@@ -20,7 +20,7 @@ export const PRIVACY = {
   key: "privacy",
   path: "/privacy",
   title: "Privacy Policy",
-  updated: "2026-10-18",
+  updated: "2026-11-11",
   description:
     "How MyOtherApp collects, uses, shares and protects your data, how long we keep it, how to delete your account, and the controls you have over it.",
   intro: [
@@ -51,6 +51,7 @@ export const PRIVACY = {
             "**Website visits:** when you open an event page, we record the visit with your IP address, your browser and, if you're signed in, your account. Visits through a club's tracking link, and visits to a club's website, are counted using a one-way hash of your IP address and browser, along with the page you came from. In those cases we don't keep the IP address itself.",
             "**Messages to us:** what you send us by email, such as reports and requests.",
             "**If you run a club:** your club's details; the names and email addresses of your team members; your plan and billing history; and, if you connect your club's own Razorpay account, its API keys, which we store encrypted.",
+            "**If your club connects a social account:** for a Facebook Page, Instagram account, LinkedIn profile or Page, or X account your club connects, the account's id, name, handle and picture, the access tokens the platform gives us (stored encrypted), and the posts we publish for your club. [Section 7](#social-accounts) has the details.",
           ],
         ],
       ],
@@ -196,9 +197,31 @@ export const PRIVACY = {
         ],
       ],
     },
+    // Added 11 Nov 2026 with social posting (feature-register/social-posting-contract.md), for the owner to approve in its PR.
+    {
+      id: "social-accounts",
+      heading: "7. Social Accounts Clubs Connect",
+      blocks: [
+        [
+          "p",
+          "A club can connect its Facebook Page, Instagram business or creator account, LinkedIn profile or Page, and X account, so that MyOtherApp posts the club's events there when the club schedules or approves a post. Only a club's owners and admins can connect or disconnect an account.",
+        ],
+        [
+          "ul",
+          [
+            "**What we keep:** the platform's id for the account, its name, handle and profile picture; the access tokens the platform gives us, stored encrypted and never shown, logged or sent to a browser; for Facebook and Instagram, the id Facebook gives us for the person who connected the account; and, for each post we publish, the platform's id and link for it, when it went out and whether it worked.",
+            "**What we don't:** we ask each platform only for permission to publish and to read the account's name and picture. We don't read or keep its messages, followers or comments.",
+            "**What we use it for:** only to publish the posts the club scheduled or approved, to show the club how they went, and to tell the club when an account needs connecting again. We never post anything the club didn't schedule or approve.",
+            "**Who sees it:** the club's team sees which accounts are connected and how its posts went. The post itself goes to the platform, under that platform's own terms and privacy policy.",
+            "**How long:** until the club disconnects the account. Disconnecting deletes the access tokens at once and revokes them where the platform allows; so does deleting the club, or removing the team member who connected it. Posts already published stay on the platform, and the record that they went out stays with the event.",
+            "**Facebook data deletion:** if you remove MyOtherApp from your Facebook account and ask for your data to be deleted, we delete it as soon as Facebook tells us. Our [data deletion page](/data-deletion) explains what is deleted and shows the status of your request.",
+          ],
+        ],
+      ],
+    },
     {
       id: "data-storage-and-security",
-      heading: "7. Data Storage & Security",
+      heading: "8. Data Storage & Security",
       blocks: [
         [
           "p",
@@ -208,7 +231,7 @@ export const PRIVACY = {
     },
     {
       id: "cookies-and-tracking",
-      heading: "8. Cookies & Tracking",
+      heading: "9. Cookies & Tracking",
       blocks: [
         [
           "ul",
@@ -222,7 +245,7 @@ export const PRIVACY = {
     },
     {
       id: "children",
-      heading: "9. Children",
+      heading: "10. Children",
       blocks: [
         [
           "p",
@@ -232,7 +255,7 @@ export const PRIVACY = {
     },
     {
       id: "changes-to-this-policy",
-      heading: "10. Changes to This Policy",
+      heading: "11. Changes to This Policy",
       blocks: [
         [
           "p",
@@ -242,7 +265,7 @@ export const PRIVACY = {
     },
     {
       id: "contact-us",
-      heading: "11. Contact Us",
+      heading: "12. Contact Us",
       blocks: [
         ["p", "Got questions, a privacy concern, or a request about your data? Write to us:"],
         ["p", `**Email:** ${mail}`],
@@ -255,7 +278,7 @@ export const TERMS = {
   key: "terms",
   path: "/terms",
   title: "Terms and Conditions",
-  updated: "2026-10-18",
+  updated: "2026-11-11",
   description:
     "The terms for using MyOtherApp: your account, acceptable use, reporting and blocking, what clubs are responsible for, club plans, payments and refunds, and the limits of our liability.",
   intro: [
@@ -419,6 +442,27 @@ export const TERMS = {
           ],
         ],
         ["p", "We may remove an event, a post or a club, or suspend a club's account, if it breaks these Terms."],
+      ],
+    },
+    // Added 11 Nov 2026 with social posting (feature-register/social-posting-contract.md), for the owner to approve in its PR.
+    {
+      id: "social-posting",
+      heading: "Posting to Social Accounts",
+      blocks: [
+        [
+          "p",
+          "A club can connect its accounts on Facebook, Instagram, LinkedIn and X, and have MyOtherApp post its events there. If your club does:",
+        ],
+        [
+          "ul",
+          [
+            "**You must be allowed to:** connect only accounts your club owns or is allowed to post for, and follow each platform's own terms and rules.",
+            "**The club is responsible for what it posts:** its words, pictures and links, and when they go out. MyOtherApp posts only what the club schedules or approves, as the club wrote it, and the Acceptable Use rules apply to every post.",
+            "**Posts can fail:** a platform can refuse or delay a post, change its rules, or end our access. We tell the club when a post fails, but we can't promise that every post goes out, or goes out on time.",
+            "**We can switch it off:** if a club's posts break these Terms or a platform's rules, or someone reports misuse, we can pause or end its posting, and disconnect its accounts.",
+            "**Disconnecting:** a club's owner or admin can disconnect an account at any time; posts already published stay on the platform until the club deletes them there. See our [Privacy Policy](/privacy#social-accounts) and the [data deletion page](/data-deletion).",
+          ],
+        ],
       ],
     },
     {

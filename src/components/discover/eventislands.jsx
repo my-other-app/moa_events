@@ -40,6 +40,35 @@ async function copyText(text) {
   }
 }
 
+/** "Copy link" in the share row: the row's own tracking link for it, copied, and said so. */
+export function CopyLinkButton({ url }) {
+  const [said, setSaid] = useState({ line: "", on: false });
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = async () => {
+    const ok = await copyText(url);
+    setSaid({ line: ok ? "Link copied" : `Copy this link: ${url}`, on: true });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaid((x) => ({ ...x, on: false })), 2600);
+  };
+  return (
+    <span className="ep-actionwrap">
+      <button type="button" className="ep-sharebtn" onClick={copy}>
+        <EpIcon name="link" size={17} />
+        <span>Copy link</span>
+      </button>
+      <span className={`ep-toast${said.on ? " is-on" : ""}`} role="status" aria-live="polite">
+        {said.line ? (
+          <>
+            <EpIcon name="check" size={14} />
+            {said.line}
+          </>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
 /** Share through the phone's own sheet; where there is none, copy the link and say so. */
 export function ShareButton({ title, text, url }) {
   // The line stays while the toast fades away (styles/motion.css), then goes, so the next one is announced again.

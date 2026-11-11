@@ -192,6 +192,7 @@ describe("/support", () => {
     expect(within(policies).getByRole("link", { name: /Terms and Conditions/ })).toHaveAttribute("href", "/terms");
     const footer = within(screen.getByRole("contentinfo")).getByRole("navigation", { name: "Help and legal" });
     expect(within(footer).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Help", "/help"],
       ["Support", "/support"],
       ["Privacy", "/privacy"],
       ["Terms", "/terms"],

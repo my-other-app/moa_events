@@ -88,7 +88,12 @@ export function userFromSession(session) {
  */
 export const SIGN_IN_REFUSALS = {
   // An account an admin has suspended: refused at the door, and on every request after.
-  ACCOUNT_SUSPENDED: { kind: "refused", message: `This account has been suspended. If you think that's a mistake, write to ${CONTACT_EMAIL}.` },
+  // `help`: a "Get help" button beside it opens /help with this filled in (components/help/gethelp.jsx).
+  ACCOUNT_SUSPENDED: {
+    kind: "refused",
+    message: `This account has been suspended. If you think that's a mistake, write to ${CONTACT_EMAIL}.`,
+    help: { topic: "account", errorCode: "ACCOUNT_SUSPENDED" },
+  },
   // Google's token was malformed, expired or not for this site.
   INVALID_GOOGLE_TOKEN: { kind: "rejected", message: "Google's sign-in didn't go through — it may have timed out. Try again." },
   // A Google account whose own address Google hasn't verified.

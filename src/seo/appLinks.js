@@ -96,6 +96,10 @@ export const BROWSER_PATHS = [
   ["/pricing", "Pricing"],
   // "Give your ticket back" from the ticket emails: the site's page (the app has none), under the claimed /tickets/*.
   ["/tickets/cancel", "Giving a ticket back"],
+  // Speakers' pages aren't claimed yet (the app's Speaker screen ships later); claiming and editing a
+  // profile stay in the browser even then (signing in and claiming are the site's).
+  ["/speakers/claim/*", "Claiming a speaker profile"],
+  ["/speakers/me", "Editing a speaker profile"],
 ];
 
 /** /.well-known/apple-app-site-association: the iOS app opens APP_PATHS, less BROWSER_PATHS. */

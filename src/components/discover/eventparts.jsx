@@ -7,6 +7,7 @@ import { approvalNote, nobodyGoingLine } from "@/utils/requests";
 import { Img } from "./img";
 import { LogoImg, PosterImg } from "./picture";
 import { coverFields } from "@/utils/cover";
+import { speakerPagePath } from "@/seo/urls";
 import { EventCover } from "./cover";
 import Icon from "./icons";
 import { EpIcon } from "./eventbits";
@@ -22,6 +23,7 @@ import { RegisterGo } from "../register/registercta";
  * the registration flow's own, in register/registercta.jsx.
  */
 export { About, CalendarButton, LiveStrips, SectionNav, ShareButton } from "./eventislands";
+import { CopyLinkButton } from "./eventislands";
 export { EpIcon, RichText } from "./eventbits";
 
 /** "Ananya Iyer" → "AI". */
@@ -211,8 +213,18 @@ export function Speakers({ speakers }) {
               <div className="ep-speaker-body">
                 <div className="ep-speaker-head">
                   <div>
-                    <h3 className="ep-speaker-name">{s.name}</h3>
+                    {/* With a profile (feature-register/speakers-contract.md), the name opens the speaker's own page. */}
+                    <h3 className="ep-speaker-name">
+                      {s.profile_slug ? (
+                        <Link className="ep-speaker-link" to={speakerPagePath(s.profile_slug)}>
+                          {s.name}
+                        </Link>
+                      ) : (
+                        s.name
+                      )}
+                    </h3>
                     {s.designation ? <p className="ep-speaker-role">{s.designation}</p> : null}
+                    {s.talk_title ? <p className="ep-speaker-talk">&ldquo;{s.talk_title}&rdquo;</p> : null}
                   </div>
                   {link && !link.startsWith("mailto:") ? (
                     <a className="ep-iconlink" href={link} target="_blank" rel="noopener noreferrer" aria-label={`${s.name} on ${label}`}>
@@ -413,5 +425,38 @@ export function Contact({ contact }) {
         </div>
       </div>
     </EpSection>
+  );
+}
+
+/**
+ * "Share this event": the attendees' share row (X, LinkedIn, Facebook,
+ * WhatsApp, Copy link), each with the club's words and its own tracking
+ * link (src/utils/share.js; read on the server with the page,
+ * src/server/share.js). Each opens the platform's own share page in a new
+ * tab; Copy link copies that link. Nothing at all without a row (an API
+ * without it, or a cancelled event).
+ */
+export function ShareRow({ row }) {
+  if (!row || !row.length) return null;
+  return (
+    <section className="ep-share" aria-labelledby="ep-share-title">
+      <h2 id="ep-share-title" className="ep-share-title">
+        Share this event
+      </h2>
+      <ul className="ep-share-list">
+        {row.map((r) => (
+          <li key={r.platform}>
+            {r.platform === "copy" ? (
+              <CopyLinkButton url={r.url} />
+            ) : (
+              <a className="ep-sharebtn" href={r.href} target="_blank" rel="noopener noreferrer" aria-label={`Share on ${r.label} (opens in a new tab)`} data-platform={r.platform}>
+                <Icon name={r.platform} size={17} />
+                <span>{r.label}</span>
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

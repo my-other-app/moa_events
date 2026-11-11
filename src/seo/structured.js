@@ -7,9 +7,9 @@ import { SITE_URL } from "@/config";
 import { eventUrl, summary } from "@/utils/eventpage";
 import { eventHosts, isCohosted, sameClub } from "@/utils/hosts";
 import { demoSettings, isDemoCard, isDemoClub, isDemoThread, withoutDemo } from "./demo";
-import { breadcrumbJsonLd, clubJsonLd, collectionPageJsonLd, discussionPostingJsonLd, eventJsonLd, itemListJsonLd } from "./jsonld";
-import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
-import { absoluteUrl, clubPagePath, eventPagePath, eventRefOf, media, ogImage, topicPagePath } from "./urls";
+import { breadcrumbJsonLd, clean, clubJsonLd, collectionPageJsonLd, discussionPostingJsonLd, eventJsonLd, itemListJsonLd } from "./jsonld";
+import { TOPICS_TITLE, clubOgVersion, eventFactsLine, eventOgVersion, speakerDescription, threadHeadline, topicDescription, topicOgVersion, topicsMetadata } from "./metadata";
+import { absoluteUrl, clubPagePath, eventPagePath, eventRefOf, media, ogImage, speakerPagePath, topicPagePath } from "./urls";
 
 /** The shapes Google asks of an event's pictures (src/og/layouts.jsx's EVENT_FRAMES). */
 export const EVENT_IMAGE_RATIOS = ["16x9", "4x3", "1x1"];
@@ -52,6 +52,7 @@ export function eventStructuredData(page) {
     })),
     description: summary(event.about, 500) || eventFactsLine(event, club, page.cohosts),
     speakerImage: (s, i) => (s.photo ? absoluteUrl(media.eventSpeaker(ref, s.id ?? `i${i}`)) : null),
+    speakerUrl: (s) => (s.profile_slug ? absoluteUrl(speakerPagePath(s.profile_slug)) : null),
     topics,
   });
   const crumbs = breadcrumbJsonLd([["Home", `${SITE_URL}/`], topics.length ? [topics[0].name, topics[0].url] : ["Events", `${SITE_URL}/events`], [event.name, url]]);
@@ -201,5 +202,49 @@ export function threadStructuredData(thread, comments = []) {
     ["Threads", `${SITE_URL}/threads`],
     [threadHeadline(thread), url],
   ]);
+  return [ld, crumbs];
+}
+
+/**
+ * [ProfilePage (its mainEntity a Person), BreadcrumbList] for a speaker's
+ * page (Google's profile-page structured data). The Person carries what the
+ * page shows: name, headline as jobTitle, bio, photo, links (sameAs), city,
+ * topics (knowsAbout), and the events they speak at (performerIn), each by
+ * its page. `page` is the raw parsed page (src/utils/speakers.js).
+ */
+export function speakerStructuredData(page) {
+  const url = absoluteUrl(speakerPagePath(page.slug));
+  const event = (t) =>
+    t.slug || t.eventId !== null
+      ? {
+          "@type": "Event",
+          name: t.name,
+          startDate: t.date,
+          url: absoluteUrl(eventPagePath({ slug: t.slug, id: t.eventId })),
+          organizer: t.club ? { "@type": "Organization", name: t.club.name, url: t.club.slug ? absoluteUrl(clubPagePath(t.club)) : null } : null,
+        }
+      : null;
+  const person = {
+    "@type": "Person",
+    "@id": `${url}#person`,
+    name: page.name,
+    jobTitle: page.headline || null,
+    description: page.bio ? summary(page.bio, 600) : speakerDescription(page),
+    image: page.photo ? absoluteUrl(media.speakerPhoto(page.slug, "medium")) : null,
+    url,
+    sameAs: page.links.map((l) => l.url),
+    homeLocation: page.city ? { "@type": "Place", name: page.city, address: { "@type": "PostalAddress", addressLocality: page.city, addressCountry: "IN" } } : null,
+    knowsAbout: page.topics.map((t) => t.name),
+    performerIn: [...page.upcoming, ...page.past].slice(0, 20).map(event).filter(Boolean),
+  };
+  const ld = clean({
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    url,
+    inLanguage: "en-IN",
+    dateModified: page.updatedAt || null,
+    mainEntity: person,
+  });
+  const crumbs = breadcrumbJsonLd([["Home", `${SITE_URL}/`], [page.name, url]]);
   return [ld, crumbs];
 }
