@@ -81,6 +81,12 @@ export const isDemoClubPage = (data, settings = demoSettings()) => Boolean(data 
 /** A club's post (its club ref inside). */
 export const isDemoThread = (thread, settings = demoSettings()) => Boolean(thread && isDemoClub(thread.club, settings));
 
+/** A speaker whose every talk is at a demo club's event (src/utils/speakers.js's page): made up with them. */
+export const isDemoSpeakerPage = (page, settings = demoSettings()) => {
+  const talks = [...(page?.upcoming || []), ...(page?.past || [])];
+  return Boolean(settings.on && talks.length && talks.every((t) => t.club && isDemoClub(t.club, settings)));
+};
+
 /** A list without its demo items; `is` is one of the above. */
 export const withoutDemo = (items, is, settings = demoSettings()) => (settings.on ? (items || []).filter((x) => !is(x, settings)) : items || []);
 

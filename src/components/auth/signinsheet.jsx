@@ -19,6 +19,7 @@ const TITLES = {
   vote: "Sign in to vote",
   comment: "Sign in to comment",
   register: "Sign in to register",
+  speaker: "Sign in to your speaker profile",
   help: "Sign in to see your requests",
 };
 
