@@ -58,6 +58,19 @@ describe("the share row on an event's page", { timeout: 30000 }, () => {
     }
   });
 
+  it("doesn't hold the page up more than about 3 seconds when the row never comes", async () => {
+    vi.resetModules();
+    const answer = fakeFetch((u) => (u.pathname === "/api/v1/discover/events/hack-night-04" ? { body: fullEvent() } : { status: 404, body: {} }));
+    // A fetch that never answers, and ignores its abort signal too.
+    vi.stubGlobal("fetch", (url, init) => (String(url).endsWith("/api/v1/events/123/share") ? new Promise(() => {}) : answer(url, init)));
+    const route = await import("../events/[slug]/page.jsx");
+    const started = Date.now();
+    const out = html(await route.default({ params: params({ slug: "hack-night-04" }) }), "/events/hack-night-04");
+    expect(Date.now() - started).toBeLessThan(6000);
+    expect(out).toContain("Hack Night 04");
+    expect(out).not.toContain("Share this event");
+  });
+
   it("isn't asked for, or shown, on a cancelled event", async () => {
     const { route, fetch } = await eventRoute({ body: ROW }, { event: { ...fullEvent().event, status: "cancelled", cancellation: { reason: "Rain", cancelled_at: "2026-11-01T10:00:00Z" } } });
     const out = html(await route.default({ params: params({ slug: "hack-night-04" }) }), "/events/hack-night-04");

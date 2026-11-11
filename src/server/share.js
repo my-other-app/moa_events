@@ -16,13 +16,23 @@ import { TAGS } from "./discover";
  */
 const EVENT_ID = /^\d{1,12}$/;
 
+/** The longest the page waits for the row (the read's own timeout, and a timer of its own in case a fetch ignores it). */
+export const SHARE_WAIT_MS = 3000;
+
 export const getShareRow = cache(async (eventId, ref = null) => {
   if (!EVENT_ID.test(String(eventId ?? ""))) return null;
+  let timer;
   try {
-    const { data } = await apiGet(`/api/v1/events/${eventId}/share`, { revalidate: 60, tags: [TAGS.event(ref || String(eventId))], timeoutMs: 3000 });
+    const read = apiGet(`/api/v1/events/${eventId}/share`, { revalidate: 60, tags: [TAGS.event(ref || String(eventId))], timeoutMs: SHARE_WAIT_MS });
+    const late = new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ data: null }), SHARE_WAIT_MS + 250);
+    });
+    const { data } = await Promise.race([read, late]);
     const row = data ? parseShareRow(data) : null;
     return row && row.length ? row : null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 });
