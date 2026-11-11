@@ -7126,7 +7126,7 @@
       "get": {
         "operationId": "listWebhookEventTypes",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "List webhook event types",
         "description": "Every type a webhook can carry, what its data.object is, and what it means. One page: next_cursor is always empty.",
@@ -7194,7 +7194,7 @@
       "get": {
         "operationId": "listWebhookEndpoints",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "List webhook endpoints",
         "description": "The endpoints you manage: a club key sees the club's own (those added in the dashboard too); a partner app sees its own for the club it is acting for. One page: next_cursor is always empty.",
@@ -7293,7 +7293,7 @@
       "post": {
         "operationId": "createWebhookEndpoint",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Add a webhook endpoint",
         "description": "We check the address is https and that its host is on the public internet. The answer has the signing secret: it is shown only this once. An endpoint added with a key gets that key's mode (live or test), and its changes are not sent back to it unless include_own_changes.",
@@ -7444,7 +7444,7 @@
       "get": {
         "operationId": "getWebhookEndpoint",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Get a webhook endpoint",
         "description": "One endpoint (never its secret).",
@@ -7543,7 +7543,7 @@
       "patch": {
         "operationId": "updateWebhookEndpoint",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Change a webhook endpoint",
         "description": "Change its address, event types, description or sharing, or turn it off and on (enabled). Turning it on again starts its deliveries again; send what it missed again from its delivery log.",
@@ -7658,7 +7658,7 @@
       "delete": {
         "operationId": "deleteWebhookEndpoint",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Remove a webhook endpoint",
         "description": "Removes it and its delivery log. Nothing more is sent to it.",
@@ -7720,7 +7720,7 @@
       "post": {
         "operationId": "rotateWebhookSecret",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Rotate the signing secret",
         "description": "A new secret for the endpoint, shown only this once. For keep_previous_hours (24 unless you say), the old secret signs too: the MOA-Signature header carries a v1 for each, so receivers keep working while you swap.",
@@ -7844,7 +7844,7 @@
       "post": {
         "operationId": "testWebhookEndpoint",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Send a test webhook",
         "description": "Sends a signed webhook.test to the endpoint now, and answers with how it went (ok, and the delivery). A test never counts towards turning an endpoint off.",
@@ -7936,7 +7936,7 @@
       "get": {
         "operationId": "listWebhookDeliveries",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "List an endpoint's deliveries",
         "description": "What was sent to the endpoint in the last 30 days, newest first, and how it answered.",
@@ -8056,7 +8056,7 @@
       "get": {
         "operationId": "getWebhookDelivery",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Get a delivery",
         "description": "One delivery, with the body as it is sent to the endpoint.",
@@ -8140,7 +8140,7 @@
       "post": {
         "operationId": "retryWebhookDelivery",
         "tags": [
-          "webhook endpoints"
+          "webhooks"
         ],
         "summary": "Send a delivery again",
         "description": "Sends the same webhook again now (same id and body, a new signature), and answers with how it went: for one that failed, or to replay one you lost. The endpoint must be on.",
@@ -12119,10 +12119,6 @@
     {
       "name": "webhooks",
       "description": "Webhook endpoints: being told of changes."
-    },
-    {
-      "name": "webhook endpoints",
-      "description": "Where webhooks go, and what was sent."
     }
   ],
   "security": [

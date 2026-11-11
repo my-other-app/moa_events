@@ -370,6 +370,9 @@ export function oauthExamples(api) {
   -u "YOUR_CLIENT_ID:YOUR_CLIENT_SECRET" \\
   -d grant_type=client_credentials \\
   -d scope=clubs:create`,
+    appTokenForClub: `curl ${api.baseUrl}/events \\
+  -H "Authorization: Bearer $MOA_APP_TOKEN" \\
+  -H "MOA-Club-Id: 311"`,
   };
 }
 

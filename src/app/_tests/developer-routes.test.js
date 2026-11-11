@@ -121,6 +121,8 @@ describe("the pages' content", () => {
       "https://api.myotherapp.in/partner/oauth/token",
       "https://api.myotherapp.in/partner/oauth/revoke",
       "mode=test",
+      'MOA-Club-Id: 311',
+      "NOT_CONNECTED",
       "code_challenge_method=S256",
       "grant_type=authorization_code",
       "grant_type=refresh_token",
