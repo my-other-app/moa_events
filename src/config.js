@@ -21,6 +21,9 @@ export const CLUBS_URL = "https://club-dashboard.myotherapp.in";
 
 export const CONTACT_EMAIL = "support@myotherapp.in";
 
+/** Where a platform asks for API access (the public /developers page). */
+export const DEVELOPERS_EMAIL = "developers@myotherapp.in";
+
 /**
  * MyOtherApp's own profiles elsewhere (Instagram, LinkedIn, X, YouTube, …),
  * absolute links. They go into the site's Organization structured data

@@ -1,20 +1,18 @@
-import { DeveloperPage } from "@/components/developers/docspage";
+import { PublicDevelopers } from "@/components/developers/publicpage";
 import { docsMetadata } from "@/developers/seo";
-import { getOpenApi } from "@/server/openapi";
 
 /*
- * /developers: the Integrations API's developer docs, the overview
- * (feature-register/integrations-api-contract.md). SERVER-RENDERED and
- * static, regenerated at most once an hour: the addresses it quotes come
- * from the API's OpenAPI document when the API serves one, else from the
- * copy checked in with the site (src/server/openapi.js), so it never fails
- * for the API being down.
+ * /developers: the developer docs' one public page (decision 1 of
+ * feature-register/private-dev-docs-contract.md): what the Integrations API
+ * does and how to ask for access. Static, indexed, in the sitemap and the
+ * footer. It reads nothing (no OpenAPI document, no cookie), so it is made
+ * once at build; every other address under /developers is private
+ * (src/developers/gate.js).
  */
-export const revalidate = 3600;
+export const dynamic = "force-static";
 
 export const metadata = docsMetadata("");
 
-export default async function Developers() {
-  const { doc, source } = await getOpenApi();
-  return <DeveloperPage slug="" doc={doc} source={source} />;
+export default function Developers() {
+  return <PublicDevelopers />;
 }

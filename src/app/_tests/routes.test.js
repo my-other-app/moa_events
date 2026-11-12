@@ -96,12 +96,15 @@ describe("which file answers which address", () => {
     ["/speakers/claim/Sp3abcdefghijklmnopqrstuv", "speakers/claim/[token]/page.jsx"],
     ["/sitemaps/speakers.xml", "sitemaps/[name]/route.js"],
     ["/help", "help/page.jsx"],
-    // The developer docs: the overview, its pages, and the two downloads (files of their own, never a page).
+    // The developer docs: the one public page, the private pages and the two downloads (files of their own,
+    // never a page; src/proxy.js and each file check the docs cookie), the docs link, and signing out.
     ["/developers", "developers/page.jsx"],
     ["/developers/webhooks", "developers/[page]/page.jsx"],
     ["/developers/reference", "developers/[page]/page.jsx"],
     ["/developers/openapi.json", "developers/openapi.json/route.js"],
     ["/developers/postman_collection.json", "developers/postman_collection.json/route.js"],
+    ["/developers/access?t=moa_docs_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", "developers/access/route.js"],
+    ["/developers/sign-out", "developers/sign-out/route.js"],
     ["/help/requests/1042", "help/requests/[id]/page.jsx"],
     ["/help/survey/tok-abcdefghijklmnop", "help/survey/[token]/page.jsx"],
     ["/me/tickets", "me/tickets/page.jsx"],
@@ -200,8 +203,8 @@ describe("what link-preview bots get", () => {
       "/support",
       "/for-clubs",
       "/pricing",
+      // The developer docs' one public page (the rest is private: a bot gets their 404).
       "/developers",
-      "/developers/webhooks",
     ]) {
       const page = await resolve(url);
       expect(page.file || page.redirect).toBeTruthy();

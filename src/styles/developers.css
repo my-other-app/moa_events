@@ -662,3 +662,57 @@
   display: block;
   margin-bottom: 8px;
 }
+
+/* ---------- signing out (the foot of the private docs' menu) ---------- */
+
+.dv-signout {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--dc-line);
+}
+.dv-signout a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--dc-muted);
+  transition: var(--motion-colors);
+}
+.dv-signout a:hover {
+  color: var(--dc-ink);
+}
+
+/* ---------- the public overview (/developers) and the private 404 ---------- */
+
+.dv-public .dv-main {
+  max-width: 780px;
+  padding-top: 14px;
+}
+@media (min-width: 960px) {
+  .dv-public .dv-main {
+    padding-top: 24px;
+  }
+}
+.dv-prose .dv-card--plain:hover {
+  border-color: var(--dc-line);
+  background: none;
+}
+.dv-prose .dv-card--plain {
+  padding-right: 16px;
+}
+.dv-callout {
+  margin-top: 32px;
+  padding: 18px 18px 6px;
+  border-radius: 12px;
+  background: var(--dc-link-soft);
+  color: var(--dc-ink);
+}
+.dv-prose .dv-callout h2 {
+  margin-top: 0;
+}
+.dv-prose .dv-callout .dc-btn {
+  font-weight: 400;
+  text-decoration: none;
+}

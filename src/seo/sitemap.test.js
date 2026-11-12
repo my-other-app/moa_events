@@ -20,15 +20,16 @@ describe("the sitemap's parts", () => {
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/events/x?a=1&b=2");
     expect(xml).toContain("<loc>https://myotherapp.in/events/x?a=1&amp;b=2</loc>");
     expect(texts(doc, "loc").slice(0, 3)).toEqual(["https://myotherapp.in/", "https://myotherapp.in/events", "https://myotherapp.in/clubs"]);
-    // The fixed pages (/verify, /support, /help and /data-deletion among them), the 14 developer docs pages, and the one added.
-    expect(texts(doc, "url")).toHaveLength(28);
+    // The fixed pages (/verify, /support, /help and /data-deletion among them), the developer docs' one public page, and the one added.
+    expect(texts(doc, "url")).toHaveLength(15);
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/data-deletion");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/verify");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/support");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/help");
     expect(texts(doc, "loc")).toContain("https://myotherapp.in/developers");
-    for (const page of DOCS_PAGES) expect(texts(doc, "loc")).toContain(`https://myotherapp.in${page.path}`);
-    // The downloads are files, not pages: never listed.
+    // The private docs pages, and the downloads, are never listed.
+    for (const page of DOCS_PAGES.filter((p) => p.slug)) expect(texts(doc, "loc")).not.toContain(`https://myotherapp.in${page.path}`);
+    expect(texts(doc, "loc").filter((l) => l.startsWith("https://myotherapp.in/developers/"))).toEqual([]);
     expect(texts(doc, "loc").filter((l) => l.endsWith(".json"))).toEqual([]);
   });
 
