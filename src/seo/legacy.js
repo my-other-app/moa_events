@@ -7,7 +7,7 @@
  *   /{ref}/compete           → /events/{slug}/compete
  *   /register/{ref}          → /events/{slug}/register
  *   /events/{id}             → /events/{slug}            (next.config rewrites it to /{id})
- *   /events/{old slug}[/sub] → /events/{slug}[/sub]
+ *   /events/{old slug}[/sub] → /events/{slug}[/sub]     (the page itself without a query; src/proxy.js with one: ./slugRedirect.js)
  *
  * each a 308 that keeps the query (?ref=, utm_*); the browser keeps the
  * #fragment. The site's own words always win over an old /{ref} (they have

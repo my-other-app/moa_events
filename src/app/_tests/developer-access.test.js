@@ -70,7 +70,7 @@ async function expectPrivate404(res) {
 describe("src/proxy.js: before anything under /developers/ is rendered", () => {
   it("runs on /developers/ and below only; /developers itself, the link and signing out are open", async () => {
     const { proxy, config } = await fresh("../../proxy.js");
-    expect(config.matcher).toEqual(["/developers/:path+"]);
+    expect(config.matcher).toContain("/developers/:path+");
     for (const path of ["/developers", "/developers/access?t=nope", "/developers/sign-out", "/events"]) expect(passes(await proxy(request(path)))).toBe(true);
     expect(checks()).toBe(0);
     const { isGatedDocsPath } = await import("@/developers/gate");
