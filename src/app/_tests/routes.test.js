@@ -96,6 +96,12 @@ describe("which file answers which address", () => {
     ["/speakers/claim/Sp3abcdefghijklmnopqrstuv", "speakers/claim/[token]/page.jsx"],
     ["/sitemaps/speakers.xml", "sitemaps/[name]/route.js"],
     ["/help", "help/page.jsx"],
+    // The developer docs: the overview, its pages, and the two downloads (files of their own, never a page).
+    ["/developers", "developers/page.jsx"],
+    ["/developers/webhooks", "developers/[page]/page.jsx"],
+    ["/developers/reference", "developers/[page]/page.jsx"],
+    ["/developers/openapi.json", "developers/openapi.json/route.js"],
+    ["/developers/postman_collection.json", "developers/postman_collection.json/route.js"],
     ["/help/requests/1042", "help/requests/[id]/page.jsx"],
     ["/help/survey/tok-abcdefghijklmnop", "help/survey/[token]/page.jsx"],
     ["/me/tickets", "me/tickets/page.jsx"],
@@ -144,7 +150,7 @@ describe("which file answers which address", () => {
   });
 
   it("never takes the site's own words for an old event address", async () => {
-    for (const word of ["/events", "/clubs", "/topics", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms", "/support", "/data-deletion", "/help"]) {
+    for (const word of ["/events", "/clubs", "/topics", "/threads", "/about", "/for-clubs", "/pricing", "/privacy", "/terms", "/support", "/data-deletion", "/help", "/developers"]) {
       expect((await resolve(word)).file).not.toMatch(/^\[ref\]/);
     }
   });
@@ -194,6 +200,8 @@ describe("what link-preview bots get", () => {
       "/support",
       "/for-clubs",
       "/pricing",
+      "/developers",
+      "/developers/webhooks",
     ]) {
       const page = await resolve(url);
       expect(page.file || page.redirect).toBeTruthy();
