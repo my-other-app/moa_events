@@ -12,7 +12,14 @@ import { apiGet } from "./api";
  * contract). So a build never depends on production: a 404 (an API without
  * the partner surface yet), an error, a timeout or a document that doesn't
  * read all give the copy. After a failure, the copy is used without asking
- * again for a minute, so a build's many pages don't each wait on a down API.
+ * again for a minute, so many pages don't each wait on a down API.
+ *
+ * The API's document is private (decision 6 of
+ * feature-register/private-dev-docs-contract.md): the read goes with the
+ * site's server credential, X-Site-Token: <API_SITE_TOKEN> (apiGet sends
+ * it on every server read). Without it the API answers 401, and the copy is
+ * used. Both are private too: only the gated docs pages and downloads
+ * (src/developers/gate.js) ever call this, on request, never at build.
  *
  *   getOpenApi() → {doc, source: "api" | "copy"}
  */

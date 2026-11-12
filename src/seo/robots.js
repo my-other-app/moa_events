@@ -3,6 +3,8 @@
  * the server's functions and the steps of the event flows (registration,
  * the live room, the competition), which have nothing to index and point
  * at the event's page anyway. The feeds and the share pictures are open.
+ * The developer docs are private but for /developers itself: "/developers/"
+ * keeps every page under it out, and leaves the bare /developers open.
  */
 import { SITE_URL } from "@/config";
 
@@ -23,6 +25,7 @@ export const DISALLOW = [
   "/claim/",
   "/requests/",
   "/answers/",
+  "/developers/",
 ];
 
 export const ALLOW = ["/", "/events/rss.xml", "/clubs/*/rss.xml", "/media/", "/og/"];

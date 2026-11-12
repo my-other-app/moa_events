@@ -12,7 +12,7 @@
  *   ["downloads"]  ["diagram", "sync"]  ["scopes"]  ["webhook-types"]
  * Inside a text: `code`, **bold** and [label](href).
  */
-import { CONTACT_EMAIL } from "@/config";
+import { CONTACT_EMAIL, DEVELOPERS_EMAIL } from "@/config";
 import {
   ERROR_EXAMPLE,
   PKCE_NODE,
@@ -36,6 +36,7 @@ import {
 } from "./examples";
 
 const mail = `[${CONTACT_EMAIL}](mailto:${CONTACT_EMAIL})`;
+const developersMail = `[${DEVELOPERS_EMAIL}](mailto:${DEVELOPERS_EMAIL})`;
 
 /** The error codes: [code, HTTP status, what it means, what to do]. */
 export const ERROR_CODES = [
@@ -81,98 +82,15 @@ export const ERROR_CODES = [
   ["WEBHOOKS_UNAVAILABLE", 503, "Webhooks aren't set up on our side yet.", `Write to ${mail}; nothing is wrong with your request.`],
 ];
 
-/** Every page's intro and sections, by slug ("" is the overview). */
+/**
+ * Every private page's intro and sections, by slug. The overview
+ * (/developers) is the one public page, with words of its own and none of
+ * these (src/components/developers/publicpage.jsx).
+ */
 export function developerDocs(api) {
   const qs = quickStart(api.baseUrl);
   const oauth = oauthExamples(api);
   return {
-    "": {
-      intro: [
-        [
-          "p",
-          "The Integrations API connects MyOtherApp to the systems clubs already use (a club's own website or ERP, another event tool, a college system) both ways. Publish an event, register someone, check them in or issue a certificate through the API, and it happens on MyOtherApp too. When it happens on MyOtherApp, we tell your system with a webhook, so it can do the same on its side.",
-        ],
-        ["downloads"],
-      ],
-      sections: [
-        {
-          id: "what-you-can-do",
-          heading: "What you can do",
-          blocks: [
-            [
-              "cards",
-              [
-                { title: "Events", text: "Create events as drafts, change them, publish them, cancel them.", href: "/developers/reference#tag-events" },
-                { title: "Registrations", text: "Register people, change their answers, cancel registrations.", href: "/developers/reference#tag-registrations" },
-                { title: "Check-ins", text: "Check people in at the door by ticket code, and undo a mistake.", href: "/developers/reference#tag-check-ins" },
-                { title: "Certificates", text: "Issue certificates to everyone checked in, and read them back.", href: "/developers/reference#tag-certificates" },
-                { title: "Webhooks", text: "Be told of every change, wherever it was made: dashboard, app, website or API.", href: "/developers/webhooks" },
-                { title: "Partner apps", text: "One app for many clubs: each club connects it, and you can create clubs.", href: "/developers/authentication#partner-apps" },
-              ],
-            ],
-          ],
-        },
-        {
-          id: "two-ways-in",
-          heading: "Two ways in",
-          blocks: [
-            [
-              "ul",
-              [
-                "**Club API keys**, for a club's own systems. The club's owner or admin makes them in Club dashboard → Settings → Integrations, once API access is on for the club. A key belongs to one club and has its own scopes.",
-                "**Partner apps**, for a platform that works with many clubs. The MyOtherApp team registers your app; each club connects it with OAuth 2.0 and chooses what it may do.",
-              ],
-            ],
-            ["p", "Nothing is on by default: [Getting access](/developers/getting-access) explains how a club or a platform gets started. [Authentication](/developers/authentication) has the details of both."],
-          ],
-        },
-        {
-          id: "basics",
-          heading: "The basics",
-          blocks: [
-            [
-              "ul",
-              [
-                `Every address starts with \`${api.baseUrl}\`. HTTPS only.`,
-                "JSON in and out. Send `Authorization: Bearer <key or token>` with every call.",
-                "Ids are strings. Times are ISO 8601 with their offset (`2026-12-05T18:00:00+05:30`); a time without one is refused, and we answer in India's time.",
-                "Money is in paise, as a whole number, with `currency: \"INR\"`: ₹499 is `49900`.",
-                "Lists come as `{\"data\": [...], \"next_cursor\": \"...\"}`. Send `?cursor=` with the next_cursor for the next page, up to `limit=100` at a time (25 if you don't say). The last page's next_cursor is null.",
-                "Every answer has an `X-Request-Id` header. Quote it when you ask us about a call.",
-              ],
-            ],
-          ],
-        },
-        {
-          id: "versions",
-          heading: "Versions",
-          blocks: [
-            [
-              "p",
-              "This is v1, a separate surface made for other systems. The `/api/v1` our own apps use is not part of it, and may change any day: don't build on it.",
-            ],
-            [
-              "p",
-              "v1 only grows. We add endpoints, fields, webhook types, scopes and error codes; we never remove or rename one. So ignore fields you don't know, and treat an error code you don't know by its HTTP status. A change that would break your code comes as v2, and v1 keeps working for six months after v2 arrives. Every change is in the [changelog](/developers/changelog).",
-            ],
-          ],
-        },
-        {
-          id: "openapi",
-          heading: "OpenAPI and Postman",
-          blocks: [
-            ["p", `The API describes itself in an OpenAPI 3.1 document at \`${api.openapiUrl}\` (public: no key needed). The [API reference](/developers/reference) here is made from it. Download it, or a Postman collection made from it, to generate a client or try calls:`],
-            ["downloads"],
-          ],
-        },
-        {
-          id: "help",
-          heading: "Help",
-          blocks: [["p", `Write to us at ${mail}. For a call that went wrong, send its \`request_id\` (the \`X-Request-Id\` header): we can find exactly what happened.`]],
-        },
-      ],
-    },
-
     "getting-access": {
       intro: [["p", "Nothing is on by default. The MyOtherApp team turns the API on for each club, and registers each partner app. Here is how that works, and what to send us."]],
       sections: [
@@ -183,7 +101,7 @@ export function developerDocs(api) {
             [
               "ol",
               [
-                `Write to us at ${mail}, from the club owner's or an admin's email address: which club, what you want to connect (your website, an ERP, a college system), and what it will do.`,
+                `As the club's owner or an admin, open **Settings → Integrations** in the club dashboard and ask us from there through Help (or write to ${mail} from that email address): which club, what you want to connect (your website, an ERP, a college system), and what it will do.`,
                 "We turn on API access for the club, with a rate tier (standard: 600 reads and 120 writes a minute; high: five times that) and how many keys it may have (5, unless we agree more).",
                 "**Settings → Integrations** appears in the club's dashboard, for the owner and admins. Make a key there: give it a name, choose live or test, tick the scopes it needs and, if you like, an expiry date and the IP addresses it may be used from.",
                 "Copy the key when it is shown. We keep only a fingerprint of it, so we can never show it again; if it's lost, rotate it.",
@@ -200,7 +118,7 @@ export function developerDocs(api) {
             [
               "ol",
               [
-                "Write to us with your platform's name, logo and website, the redirect URIs your app will use (https), and the scopes you need, with a line on why for each.",
+                `Write to us at ${developersMail} with your platform's name, logo and website, the redirect URIs your app will use (https), and the scopes you need, with a line on why for each.`,
                 "We register the app and decide which scopes it may ever ask for (`clubs:create`, to create clubs, only when we agree it's needed). You get a **client id** and a **client secret**. The secret is shown once.",
                 "Each club connects your app: its owner or admin follows your \"Connect MyOtherApp\" link, signs in, chooses the club and the scopes, and allows it. A club can disconnect you at any time; your tokens for it stop working at once.",
               ],
@@ -518,7 +436,50 @@ export function developerDocs(api) {
         ["p", `Every endpoint, made from the API's OpenAPI document. Every address starts with \`${api.baseUrl}\`; every call sends \`Authorization: Bearer <key or token>\`. The objects the calls take and return are described [at the end](#objects).`],
         ["downloads"],
       ],
-      sections: [],
+      // What the public overview used to say to developers, kept here behind the docs link.
+      sections: [
+        {
+          id: "basics",
+          heading: "The basics",
+          blocks: [
+            [
+              "ul",
+              [
+                `Every address starts with \`${api.baseUrl}\`. HTTPS only.`,
+                "JSON in and out. Send `Authorization: Bearer <key or token>` with every call.",
+                "Ids are strings. Times are ISO 8601 with their offset (`2026-12-05T18:00:00+05:30`); a time without one is refused, and we answer in India's time.",
+                "Money is in paise, as a whole number, with `currency: \"INR\"`: ₹499 is `49900`.",
+                "Lists come as `{\"data\": [...], \"next_cursor\": \"...\"}`. Send `?cursor=` with the next_cursor for the next page, up to `limit=100` at a time (25 if you don't say). The last page's next_cursor is null.",
+                `Every answer has an \`X-Request-Id\` header. Quote it when you write to us at ${mail} about a call: we can find exactly what happened.`,
+              ],
+            ],
+          ],
+        },
+        {
+          id: "versions",
+          heading: "Versions",
+          blocks: [
+            [
+              "p",
+              "This is v1, a separate surface made for other systems. The `/api/v1` our own apps use is not part of it, and may change any day: don't build on it.",
+            ],
+            [
+              "p",
+              "v1 only grows. We add endpoints, fields, webhook types, scopes and error codes; we never remove or rename one. So ignore fields you don't know, and treat an error code you don't know by its HTTP status. A change that would break your code comes as v2, and v1 keeps working for six months after v2 arrives. Every change is in the [changelog](/developers/changelog).",
+            ],
+          ],
+        },
+        {
+          id: "openapi",
+          heading: "OpenAPI and Postman",
+          blocks: [
+            [
+              "p",
+              `The API describes itself in an OpenAPI 3.1 document, and this reference is made from it. The API serves it at \`${api.openapiUrl}\` to a call made with your key or token; the downloads above are the same document, and a Postman collection made from it, to generate a client or try calls.`,
+            ],
+          ],
+        },
+      ],
     },
 
     webhooks: {

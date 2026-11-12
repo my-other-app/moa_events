@@ -6,17 +6,20 @@ import { DOCS_GROUPS, DOCS_UPDATED, docsPage, neighbours } from "@/content/devel
 import { developerDocs } from "@/content/developers/pages";
 import COPY from "@/content/developers/openapi.json";
 import { apiContext, listWebhooks, scopeList } from "@/developers/openapi";
+import { SIGN_OUT_PATH } from "@/developers/gate";
 import { docsStructuredData, docsTrail } from "@/developers/seo";
 import { JsonLd } from "@/seo/JsonLd.jsx";
 import { Block } from "./blocks";
 import { Reference, ScopesTable, WebhookTypes, referenceToc } from "./reference";
 
 /*
- * A developer docs page (/developers/...): breadcrumbs, the docs' menu
- * (beside the page on a desk, a "Menu" that opens above it on a phone),
- * the page's title, its words (src/content/developers/pages.js) or the
- * API reference, and "Previous" / "Next". All of it on the server; the
- * copy buttons are the only islands.
+ * A private developer docs page (/developers/{page}, behind the docs link:
+ * src/developers/gate.js): breadcrumbs, the docs' menu (beside the page
+ * on a desk, a "Menu" that opens above it on a phone) with "Sign out of the
+ * docs" at its foot, the page's title, its words
+ * (src/content/developers/pages.js) or the API reference, and "Previous" /
+ * "Next". All of it on the server; the copy buttons are the only islands.
+ * The public overview (/developers) is src/components/developers/publicpage.jsx.
  */
 
 const updated = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date(`${DOCS_UPDATED}T00:00:00+05:30`));
@@ -52,6 +55,12 @@ function NavList({ current, toc, variant }) {
           </ul>
         </div>
       ))}
+      {/* A plain link, never prefetched: following it is what signs you out. */}
+      <p className="dv-signout">
+        <a href={SIGN_OUT_PATH} rel="nofollow">
+          <Icon name="logout" size={16} /> Sign out of the docs
+        </a>
+      </p>
     </div>
   );
 }
@@ -137,7 +146,8 @@ export function DeveloperPage({ slug, doc, source }) {
     scopes: <ScopesTable scopes={scopeList(doc)} />,
     webhookTypes: <WebhookTypes doc={listWebhooks(doc).length ? doc : COPY} />,
   };
-  const toc = isReference ? referenceToc(doc) : content.sections.map((s) => ({ id: s.id, heading: s.heading }));
+  const own = content.sections.map((s) => ({ id: s.id, heading: s.heading }));
+  const toc = isReference ? [...own, ...referenceToc(doc)] : own;
   return (
     <SitePage>
       <JsonLd data={docsStructuredData(page)} />

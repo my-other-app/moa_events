@@ -1,8 +1,10 @@
 /**
- * What search engines and link previews read off the developer docs: each
- * page's metadata (its canonical on https://myotherapp.in/developers/...)
- * and its structured data (a TechArticle about the API, and the
- * Home › Developers › page breadcrumbs). Pure.
+ * What search engines and link previews read off the developer docs. Only
+ * the overview (https://myotherapp.in/developers) is public and indexed,
+ * with its canonical and its structured data (a TechArticle about the API,
+ * and the Home › Developers breadcrumbs). Every other page is private
+ * (src/developers/gate.js): noindex, nofollow, no canonical, and a title
+ * that says nothing at all to anyone without the docs link. Pure.
  */
 import { SITE_NAME, SITE_URL } from "@/config";
 import { DOCS_PUBLISHED, DOCS_ROOT, DOCS_UPDATED, docsPage } from "@/content/developers/nav";
@@ -12,11 +14,18 @@ import { absoluteUrl } from "@/seo/urls";
 
 export const OVERVIEW_TITLE = "Integrations API for developers";
 
-/** A docs page's metadata; null for a slug that isn't one. */
+/** Never indexed, never followed: every private docs page, and the 404 they all give without access. */
+export const PRIVATE_ROBOTS = { index: false, follow: false };
+
+/** What a private address says without access: the same for every one, real or not. */
+export const PRIVATE_METADATA = { title: "Not found", robots: PRIVATE_ROBOTS };
+
+/** A docs page's metadata; null for a slug that isn't one. The private pages' is for people with access only. */
 export function docsMetadata(slug) {
   const page = docsPage(slug);
   if (!page) return null;
-  return pageMetadata({ title: page.slug ? `${page.title} · Developers` : OVERVIEW_TITLE, description: page.description, path: page.path, type: "article" });
+  if (!page.slug) return pageMetadata({ title: OVERVIEW_TITLE, description: page.description, path: page.path, type: "article" });
+  return { ...pageMetadata({ title: `${page.title} · Developers`, description: page.description, path: page.path, type: "article", canonical: false }), robots: PRIVATE_ROBOTS };
 }
 
 /** The trail the page shows and its BreadcrumbList says: [[name, path or null for here]]. */
