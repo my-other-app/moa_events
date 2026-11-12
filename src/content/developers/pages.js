@@ -71,6 +71,7 @@ export const ERROR_CODES = [
   ["CONFLICT", 409, "The request clashes with the object's state, for a reason with no code of its own (`message` says why).", "Read the object again and decide."],
   ["PRECONDITION_FAILED", 412, "`If-Match` didn't match: the object changed since you read it. Nothing was changed.", "Read it again, redo your change on the new version, and send it with the new ETag."],
   ["VALIDATION", 422, "A field is missing or wrong. `details.fields` names each one and why.", "Fix the request and send it again, with a new Idempotency-Key."],
+  ["FIELD_READ_ONLY", 422, "You sent a field the API only reads (`details.fields` names it): `external_payments_allowed` on an event, say. Nothing changed.", "Leave the field out. That setting is the club's, in its dashboard."],
   ["IDEMPOTENCY_MISMATCH", 422, "This Idempotency-Key was used in the last 24 hours for a different request.", "Make a new key for each new request."],
   ["TICKET_TYPE_REQUIRED", 422, "The event has ticket types: say which one with `ticket_type_id`.", "Send `ticket_type_id`."],
   ["TICKET_TYPE_NOT_FOUND", 422, "No such ticket type on sale for this event.", "Check `ticket_types` on the event."],
@@ -134,7 +135,7 @@ export function developerDocs(api) {
               [
                 `Every address starts with \`${api.baseUrl}\`. HTTPS only.`,
                 "JSON in and out. Send `Authorization: Bearer <key or token>` with every call.",
-                "Ids are strings. Times are ISO 8601 with their offset (`2026-12-05T18:00:00+05:30`).",
+                "Ids are strings. Times are ISO 8601 with their offset (`2026-12-05T18:00:00+05:30`); a time without one is refused, and we answer in India's time.",
                 "Money is in paise, as a whole number, with `currency: \"INR\"`: ₹499 is `49900`.",
                 "Lists come as `{\"data\": [...], \"next_cursor\": \"...\"}`. Send `?cursor=` with the next_cursor for the next page, up to `limit=100` at a time (25 if you don't say). The last page's next_cursor is null.",
                 "Every answer has an `X-Request-Id` header. Quote it when you ask us about a call.",
@@ -435,7 +436,7 @@ export function developerDocs(api) {
                   ["code", "bash", oauth.appToken],
                   [
                     "p",
-                    "The same app token can act for any club connected to your app: send the club's id in a `MOA-Club-Id` header, and the call has that connection's scopes. A club that hasn't connected you answers `403 NOT_CONNECTED`.",
+                    "The same app token can act for any club connected to your app: send the club's id in a `MOA-Club-Id` header, and the call has that connection's scopes. A club that hasn't connected you answers `403 NOT_CONNECTED`. Webhook endpoints always belong to a club: without `MOA-Club-Id`, the webhook routes answer `403 FORBIDDEN_SCOPE`. Ask for the app token with `mode=test` to act on test connections.",
                   ],
                   ["code", "bash", oauth.appTokenForClub],
                   ["p", "A club made with `POST /clubs` waits for the MyOtherApp team's approval. The answer names your app's connection to it (no tokens: act for it with your app token and `MOA-Club-Id`); until it is approved, calls for it get `403 CLUB_NOT_ACTIVE`."],
@@ -542,17 +543,34 @@ export function developerDocs(api) {
                 "`include_own_changes`: off unless you turn it on. See [no echo](/developers/sync#no-echo).",
                 "An endpoint is live or test, and gets only the changes of its own mode. One added with a key takes the key's mode.",
                 "The answer has the endpoint's signing `secret` (`whsec_…`), shown only this once. Lost it? Rotate it: `POST /webhook-endpoints/{id}/rotate-secret`.",
-                "A club can have a limited number of endpoints (`409 LIMIT_REACHED` past it).",
+                "A club can have 10 endpoints, and a partner app 5 for each club (`409 LIMIT_REACHED` past that).",
+                "A change goes to the endpoints of the club that hosts the event, not its co-hosts'.",
               ],
             ],
             ["h3", "Names and contact details in webhooks", "sharing"],
             [
               "p",
-              "Registrations and certificates carry people's names, contact details and answers only when the endpoint may have them. A club key's endpoint: add it with `share_attendee_details: true` and `dpdp_confirmed: true` (the club confirms its registration form tells people their details are shared with that system), from a key with `attendees:read`. A partner app's endpoints: when its connection to the club has `attendees:read`. Otherwise those fields are left out.",
+              "Registrations and certificates carry people's names, contact details and answers only when the endpoint may have them. A club key's endpoint: add it with `share_attendee_details: true` and `dpdp_confirmed: true` (the club confirms its registration form tells people their details are shared with that system), from a key with `attendees:read`; changing its address clears that. A partner app's endpoints: when its connection to the club has `attendees:read`. Otherwise those fields are left out, of `previous` too.",
+            ],
+            ["p", "A partner app's endpoint gets each kind of object only while its connection has that object's read scope: `events:read` for events, `registrations:read` for registrations, check-ins and payments, `certificates:read`, `club:read`."],
+          ],
+        },
+        {
+          id: "types",
+          heading: "Event types",
+          blocks: [
+            ["webhook-types"],
+            [
+              "ul",
+              [
+                "`event.cancelled` is also sent when an event is deleted before anyone registered: its object reads `status: \"cancelled\"` and `public_url: null`, and its GET answers 404 from then on.",
+                "A change of an event's status (unpublished, say) is `event.updated` with the old one in `previous.status`. An event that ends by the clock reads `ended` with no webhook.",
+                "`checkin.deleted` carries the check-in as it was, with `deleted: true`.",
+                "`webhook.test` is only ever sent by a test, to one endpoint.",
+              ],
             ],
           ],
         },
-        { id: "types", heading: "Event types", blocks: [["webhook-types"]] },
         {
           id: "payload",
           heading: "The payload",
@@ -669,7 +687,7 @@ export function developerDocs(api) {
           blocks: [
             [
               "p",
-              "We send each object's webhooks in order as far as we can: a webhook waits a few seconds while an older change to the same object is still on its way to you. But a retry can still bring an old one after a newer one. Don't trust the order they arrive in: compare `data.object.updated_at` with the copy you have, and ignore one that is older. When in doubt, read the object again with its GET.",
+              "We send each object's webhooks in order as far as we can: a webhook waits (up to half a minute) while an older change to the same object is still on its way to you. But a retry can still bring an old one after a newer one. Don't trust the order they arrive in: compare `data.object.updated_at` with the copy you have, and ignore one that is older. When in doubt, read the object again with its GET.",
             ],
           ],
         },
@@ -681,6 +699,21 @@ export function developerDocs(api) {
               "p",
               "Delivery is at least once: a webhook can come twice (when your 200 is lost on its way back, say). Keep the ids (`MOA-Event-Id`) you have handled for a few days, and skip one you have seen. A replay has the same id.",
             ],
+          ],
+        },
+        {
+          id: "not-sent",
+          heading: "What isn't sent (yet)",
+          blocks: [
+            [
+              "ul",
+              [
+                "Bulk rewrites with no single change to tell about: answers moved from an old question to a new one, admission numbers given out again, ticket types given to old registrations, contact details removed when they are kept no longer.",
+                "Settings outside an event's shape (the gate, kiosks, ID cards, the store, live Q&A) and counters (registrations, views).",
+                "A club's partners, team and approval status.",
+              ],
+            ],
+            ["p", "Catch up on those with `updated_since` (see [Syncing both ways](/developers/sync#updated-since))."],
           ],
         },
         {
@@ -727,11 +760,11 @@ export function developerDocs(api) {
           id: "external-ids",
           heading: "External ids",
           blocks: [
-            ["p", "Every object you can create takes an `external_id`: your own id for it, up to 128 characters, unique among your objects of that kind. So:"],
+            ["p", "Events, registrations and clubs take an `external_id`: your own id for the object, up to 128 characters, unique among your objects of that kind (each key or app has its own). So:"],
             [
               "ul",
               [
-                "Find an object by your id: `GET /events?external_id=erp-ev-2026-114`.",
+                "Find an object by your id: `GET /events?external_id=erp-ev-2026-114`. Check people in by it too: `POST /checkins` takes the registration's `external_id`.",
                 "Create safely: a POST with an `external_id` you already used answers `409 ALREADY_EXISTS`, with the existing object's id in `error.details.id`. No duplicate is made: treat it as done, and keep the id.",
                 "Webhooks carry it in `data.object.external_id`, so you can match a change to your record.",
               ],
@@ -748,6 +781,7 @@ export function developerDocs(api) {
             [
               "ul",
               [
+                "Lists with `updated_since` come oldest change first, so a page never skips one; an object that changes while you page can come twice.",
                 "Keep the newest `updated_at` you have seen, and start the next catch-up from there.",
                 "Overlap a little (a minute, say) and skip what you already have: two changes can share a second.",
                 "Run a catch-up on a timer (every 15 minutes, say) as well as taking webhooks. It finds anything a webhook didn't bring, such as while your endpoint was down.",
@@ -765,6 +799,7 @@ export function developerDocs(api) {
             ],
             ["code", "bash", etagExample(api.baseUrl)],
             ["p", "On a 412: read the object again, work your change out again on the new version (or ask a person), and send it with the new ETag. Without `If-Match`, the last change wins."],
+            ["p", "An ETag changes only when the object does: signed links in it (a ticket's `qr_url`, a `poster_url`) are left out of it, so re-reading one doesn't change it. A GET with `If-None-Match: <ETag>` answers `304 Not Modified` while nothing has changed."],
           ],
         },
         {
@@ -822,7 +857,7 @@ export function developerDocs(api) {
               [
                 "Send `Idempotency-Key: <a unique string>` with any POST or DELETE: up to 255 characters, and a random UUID is best.",
                 "We keep the key, and the first answer to it, for 24 hours, for your key or app. (Another key's identical string is a different key.)",
-                "Send the same request with the same key again and you get the first answer back: the same status and body. Nothing is done twice.",
+                "Send the same request with the same key again and you get the first answer back: the same status and body, with `Idempotent-Replayed: true`. Nothing is done twice.",
                 "Use the same key with a different request (another address or body) and you get `422 IDEMPOTENCY_MISMATCH`. Make a new key for each new request.",
                 "While the first request with a key is still being answered, the same key again gets `409 IDEMPOTENCY_IN_PROGRESS`: wait a moment and send it again.",
                 "GET and PATCH don't need a key: sending them twice does no harm.",
@@ -915,7 +950,7 @@ export function developerDocs(api) {
                 ["High", "3,000", "600"],
               ],
             ],
-            ["p", `Your limits are in \`GET /me\` (\`rate_limit\`). Need more? Write to ${mail}: the MyOtherApp team sets the tier.`],
+            ["p", `The limits count per key or app and club. A partner app's own token (no club) has the app's tier. Your limits are in \`GET /me\` (\`rate_limit\`). Need more? Write to ${mail}: the MyOtherApp team sets the tier.`],
           ],
         },
         {
@@ -996,7 +1031,7 @@ export function developerDocs(api) {
               [
                 "Test events are hidden from the public: not on myotherapp.in, not in search, lists or sitemaps.",
                 "Nobody gets an email, a WhatsApp message or a push notification about them.",
-                "No payments: a paid test event never opens a checkout.",
+                "No payments: a paid test event has no checkout (`checkout_url` is null) and never accepts payments made elsewhere, so registering for it answers `PAYMENT_REQUIRED`, or `EXTERNAL_PAYMENTS_OFF` with a `payment`. Try the paid-outside path live, on an event the club turned it on for.",
                 "Webhooks are sent for them as for live objects, with `livemode: false`, to test endpoints: an endpoint added with a test key is one.",
                 "Otherwise they behave like live ones: capacity, questions, approvals, check-ins, errors and rate limits all apply, so your tests mean something.",
               ],
@@ -1036,7 +1071,7 @@ export function developerDocs(api) {
               "ul",
               [
                 "**A paid event refuses registrations through the API** with `409 PAYMENT_REQUIRED` and the event's checkout address (`error.details.checkout_url`). Send the person there to register and pay.",
-                "**Unless the event accepts payments made elsewhere.** If people pay the club another way (at the college office, or through your own payment system), the club can turn on **\"Accept registrations paid outside MyOtherApp\"** for that event in its dashboard (a key with `events:write` can set the event's `external_payments_allowed` too). Then a registration may say what was paid; for an event without it, a `payment` gets `409 EXTERNAL_PAYMENTS_OFF`:",
+                "**Unless the event accepts payments made elsewhere.** If people pay the club another way (at the college office, or through your own payment system), the club can turn on **\"Accept registrations paid outside MyOtherApp\"** for that event, in its dashboard. Only the club can: the event's `external_payments_allowed` is read-only through the API (sending it gets `422 FIELD_READ_ONLY`). Then a registration may say what was paid; for an event without it, a `payment` gets `409 EXTERNAL_PAYMENTS_OFF`:",
               ],
             ],
             ["code", "bash", externalPaymentExample(api.baseUrl)],
@@ -1044,8 +1079,8 @@ export function developerDocs(api) {
               "ul",
               [
                 "It is recorded as paid outside MyOtherApp (`payment.status: \"paid_externally\"`): never part of MyOtherApp's payouts, nor of the club's income on MyOtherApp. Amounts are in paise, in INR.",
-                "**Cancelling** an event or a registration that has online payments is refused (`409 CANCEL_IN_DASHBOARD`): the club cancels it in its dashboard, where refunds are handled. Free ones, and ones paid outside MyOtherApp, can be cancelled through the API.",
-                "**Payment webhooks** (`payment.completed`, `payment.refunded`) carry amounts and status only: never card, UPI or bank details.",
+                "**Cancelling** an event that has online payments, or a registration paid online or at the door, is refused (`409 CANCEL_IN_DASHBOARD`): the club cancels it in its dashboard, where refunds are handled. Free registrations, and ones paid outside MyOtherApp, can be cancelled through the API (nothing is refunded by us: the money was never ours).",
+                "**Payment webhooks** (`payment.completed`, `payment.refunded`) carry amounts and status only (`amount`, `amount_refunded`, `status` captured, partially_refunded or refunded): never card, UPI or bank details.",
               ],
             ],
           ],
@@ -1064,6 +1099,7 @@ export function developerDocs(api) {
                 "**Contact details need their own scope.** Names, email addresses, phone numbers and answers need `attendees:read`. Without it they are left out of every answer and webhook.",
                 "**The club must tell people first.** A club can give `attendees:read` to a key or a partner app only after ticking **\"Our registration form tells people their details are shared with <name>\"**, so people know before they register that you will see their details.",
                 "**Every read is counted.** Each read of attendees' details through the API goes into the club's audit log (how many, never the details themselves), so the club can see who read what.",
+                "A club a partner app created never gives that app `attendees:read` by itself: its owner decides, later.",
                 "**Your part:** use the details only for what the club asked of you, keep them secure, don't pass them on, and delete them when the club asks.",
                 "People registered through the API are the club's registrations like any other: they get the club's confirmation email (unless you send `send_confirmation: false`), and MyOtherApp's [privacy policy](/privacy) applies to them.",
               ],

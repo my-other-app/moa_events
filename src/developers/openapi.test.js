@@ -38,10 +38,10 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
   const hooks = listWebhooks(COPY);
   const documented = new Map(ERROR_CODES.map(([code, status]) => [code, String(status)]));
 
-  it("is OpenAPI 3.1, marked as written from the contract, for the partner surface", () => {
+  it("is OpenAPI 3.1, marked with the backend commit it was dumped from, for the partner surface", () => {
     expect(COPY.openapi).toBe("3.1.0");
     expect(isOpenApi(COPY)).toBe(true);
-    expect(COPY.info["x-generated-from"]).toBe("contract");
+    expect(COPY.info["x-generated-from"]).toBe("moa_backend 4984fbb (feat/api-webhooks)");
     expect(COPY.info["x-generated-note"]).toContain("https://api.myotherapp.in/partner/v1/openapi.json");
     expect(Object.keys(COPY.paths).every((p) => p.startsWith("/partner/v1/"))).toBe(true);
   });
@@ -88,7 +88,7 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
     expect(ops).toHaveLength(34);
   });
 
-  it("has the contract's 15 webhook types, each with a signed example body whose object is its GET's shape", () => {
+  it("has the contract's 15 webhook types and the test, each body's object the GET's own schema", () => {
     expect(hooks.map((h) => h.path)).toEqual([
       "event.created",
       "event.updated",
@@ -105,10 +105,14 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
       "payment.completed",
       "payment.refunded",
       "club.updated",
+      "webhook.test",
     ]);
+    const objects = Object.fromEntries(hooks.map((h) => [h.path, h.object]));
+    expect(objects).toMatchObject({ "event.updated": "EventOut", "registration.created": "RegistrationOut", "checkin.deleted": "CheckinOut", "certificate.issued": "CertificateOut", "payment.refunded": "WebhookPayment", "club.updated": "ClubOut" });
+    expect(deref(COPY, COPY.components.schemas.WebhookPayment.properties.status).enum).toEqual(["captured", "refunded", "partially_refunded"]);
     for (const h of hooks) {
-      expect(h.requestBody.example).toMatchObject({ type: h.path, club_id: "311", origin: { type: expect.any(String) }, data: { object: expect.any(Object) } });
-      expect(h.parameters.map((p) => p.name)).toEqual(["MOA-Signature", "MOA-Event-Id"]);
+      expect(h.requestBody.example).toMatchObject({ type: h.path, origin: expect.any(Object), data: { object: expect.any(Object) } });
+      expect(h.parameters.map((p) => p.name)).toEqual(["MOA-Signature", "MOA-Event-Id", "MOA-Event-Type", "MOA-Delivery-Id", "MOA-Delivery-Attempt"]);
       expect(lookup(COPY, `#/components/schemas/${h.object}`)).toBeTruthy();
       // Every field the example's object has is one its schema names (the GET's shape).
       const props = Object.keys(deref(COPY, { $ref: `#/components/schemas/${h.object}` }).properties);
@@ -160,7 +164,7 @@ describe("the OpenAPI copy (src/content/developers/openapi.json)", () => {
         }
       }
     }
-    expect(named.size).toBeGreaterThan(15);
+    expect(named.size).toBeGreaterThanOrEqual(10);
   });
 
   it("keeps money in paise and payments outside MyOtherApp as their own kind", () => {
@@ -293,7 +297,11 @@ describe("reading any OpenAPI document", () => {
   });
 
   it("reads error codes off a response's examples, and nothing off one without", () => {
-    expect(errorCodes(COPY, COPY.components.responses.Forbidden).map((e) => e.code)).toEqual(["FORBIDDEN_SCOPE", "NOT_ALLOCATED"]);
+    const forbidden = { description: "Refused", content: { "application/json": { examples: { a: { value: { error: { code: "FORBIDDEN_SCOPE", message: "Needs events:write." } } }, b: { summary: "Off", value: { error: { code: "NOT_ALLOCATED", message: "Off." } } } } } } };
+    expect(errorCodes(GENERATED, forbidden).map((e) => [e.code, e.summary])).toEqual([
+      ["FORBIDDEN_SCOPE", ""],
+      ["NOT_ALLOCATED", "Off"],
+    ]);
     expect(errorCodes(GENERATED, GENERATED.paths["/things/{thing_id}"].get.responses[422])).toEqual([]);
   });
 

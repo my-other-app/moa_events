@@ -359,8 +359,20 @@ function operationOf(doc, { path, method, pathItem, operation, kind, prefix = ""
         }
       : null,
     responses: responsesOf(doc, operation),
-    object: str(operation["x-object"]) || null,
+    object: str(operation["x-object"]) || (kind === "webhook" ? webhookObjectOf(doc, media?.schema) : null),
   };
+}
+
+/** The named schema a webhook body's data.object is ("RegistrationOut"), or null. */
+function webhookObjectOf(doc, schema) {
+  if (!schema) return null;
+  const data = deref(doc, schemaOf(doc, schema).properties?.data);
+  const object = data.properties?.object;
+  if (!isObj(object)) return null;
+  const direct = refName(object.$ref);
+  if (direct) return direct;
+  for (const alt of [...(object.allOf || []), ...(object.anyOf || []), ...(object.oneOf || [])]) if (refName(alt?.$ref)) return refName(alt.$ref);
+  return null;
 }
 
 /** Every operation in the document's paths, in its order: see operationOf for the shape. */
@@ -378,6 +390,15 @@ export function listOperations(doc) {
 
 /** A webhook's description without its closing "data.object is a …" (the reference says that itself). */
 export const whenSent = (description) => String(description || "").replace(/\s*data\.object is an? [A-Za-z]+\.\s*$/, "");
+
+/** When a webhook is sent, in words: its summary when that says it (the API's), else its description. */
+export const sentWhen = (wh) => (wh.summary && wh.summary !== wh.path && !/^POST /.test(wh.summary) ? wh.summary : whenSent(wh.description));
+
+/** The description every webhook shares (the API's says how all of them are sent), or null when they differ. */
+export function sharedWebhookDescription(webhooks) {
+  const texts = webhooks.map((w) => w.description).filter(Boolean);
+  return webhooks.length > 1 && texts.length === webhooks.length && texts.every((t) => t === texts[0]) ? texts[0] : null;
+}
 
 /** Every webhook the document describes (OpenAPI 3.1 `webhooks`), by its name ("event.created"). */
 export function listWebhooks(doc) {
@@ -427,6 +448,8 @@ export function objectsOf(doc, operations) {
   };
   for (const op of operations) {
     if (op.object && isObj(doc?.components?.schemas?.[op.object])) visit({ $ref: `#/components/schemas/${op.object}` });
+    // A webhook's envelope is the same for every type: its object is what is worth listing.
+    if (op.kind === "webhook" && op.object) continue;
     if (op.requestBody?.schema) visit(op.requestBody.schema);
     for (const r of op.responses) if (r.schema) visit(r.schema);
   }

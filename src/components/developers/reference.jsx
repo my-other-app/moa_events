@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import { apiContext, curlFor, fieldRows, groupByTag, listOperations, listWebhooks, objectsOf, pretty, typeLabel, whenSent } from "@/developers/openapi";
+import { apiContext, curlFor, fieldRows, groupByTag, listOperations, listWebhooks, objectsOf, pretty, sentWhen, sharedWebhookDescription, typeLabel } from "@/developers/openapi";
 import { CodeBlock, Inline, SmartLink } from "./blocks";
 
 /*
@@ -293,7 +293,7 @@ export function Operation({ op, doc, api, objects }) {
   );
 }
 
-function Webhook({ wh, objects }) {
+function Webhook({ wh, objects, shared }) {
   const body = wh.requestBody;
   const title = `${wh.anchor}-title`;
   return (
@@ -301,10 +301,11 @@ function Webhook({ wh, objects }) {
       <h3 id={title} className="dv-op-title">
         <code>{wh.path}</code>
       </h3>
-      <Description text={wh.object ? whenSent(wh.description) : wh.description} />
+      <Description text={sentWhen(wh)} />
+      {wh.description && wh.description !== shared && sentWhen(wh) !== wh.description ? <Description text={wh.description} /> : null}
       {wh.object ? (
         <p className="dv-op-resp">
-          <code>data.object</code> is a <ObjectRef name={wh.object} objects={objects} />.
+          <code>data.object</code>: <ObjectRef name={wh.object} objects={objects} />
         </p>
       ) : null}
       {body?.example !== undefined ? (
@@ -371,8 +372,13 @@ export function Reference({ doc, source }) {
           <p className="dv-ref-lede">
             What we POST to your endpoints, signed: see <SmartLink href="/developers/webhooks">Webhooks</SmartLink> for the headers, signatures and retries.
           </p>
+          {sharedWebhookDescription(webhooks) ? (
+            <div className="dv-ref-lede">
+              <Description text={sharedWebhookDescription(webhooks)} />
+            </div>
+          ) : null}
           {webhooks.map((wh) => (
-            <Webhook key={wh.anchor} wh={wh} objects={objects} />
+            <Webhook key={wh.anchor} wh={wh} objects={objects} shared={sharedWebhookDescription(webhooks)} />
           ))}
         </section>
       ) : null}
@@ -412,7 +418,7 @@ export function WebhookTypes({ doc }) {
                   <code>{wh.path}</code>
                 </SmartLink>
               </th>
-              <td>{whenSent(wh.description)}</td>
+              <td>{sentWhen(wh)}</td>
               <td>{wh.object ? <SmartLink href={`/developers/reference#obj-${wh.object}`}>{wh.object}</SmartLink> : "—"}</td>
             </tr>
           ))}
