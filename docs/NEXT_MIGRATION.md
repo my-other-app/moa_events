@@ -80,9 +80,9 @@ All kept: they are on posters, QR codes printed on tickets, emails and the app's
 | `/{ref}/compete` | 308 → `/events/{slug}/compete` | `[ref]/compete/page.jsx` |
 | `/register/{ref}` | 308 → `/events/{slug}/register` | `register/[ref]/page.jsx` |
 | `/events/{id}` | 308 → `/events/{slug}` | next.config rewrites it to `/{id}` (so the query is kept) |
-| `/events/{old slug}` | 308 → `/events/{slug}` | `events/[slug]/page.jsx` (ISR: the query isn't kept) |
+| `/events/{old slug}` | 308 → `/events/{slug}` | `events/[slug]/page.jsx` (ISR); with a query, `src/proxy.js` first, query kept (`src/seo/slugRedirect.js`) |
 | `/events/{id or old slug}/register` (`/live`, `/compete`) | 308 → `/events/{slug}/…` | the sub-page, query kept |
-| `/clubs/{old slug}` | 308 → `/clubs/{slug}` | `clubs/[slug]/page.jsx` |
+| `/clubs/{old slug}` | 308 → `/clubs/{slug}` | `clubs/[slug]/page.jsx` (ISR); with a query, `src/proxy.js` first, query kept |
 | `/me` | 307 → `/me/tickets` | next.config |
 | `www.` and `events.myotherapp.in/*` | 308 → `https://myotherapp.in/*` | Vercel's domain settings (unchanged) |
 | `{club}.myotherapp.in` | the club's site | the Cloudflare Worker (infra/cloudflare/club-sites), not this project |
@@ -171,7 +171,7 @@ The root layout's read (`hasTopics`, at most 2.5 s, false on any failure) makes 
 
 - The whole stylesheet (157 KB, 29 KB gzipped) loads on every page, as it did before. Splitting it per route is safe once the client pages are ported.
 - Page weights (HTML, production data): home 90 KB (13 KB gzipped), /events 42 KB, /clubs 32 KB, /threads 24 KB, a post 27 KB, /about 40 KB, /privacy 30 KB, /terms 40 KB, /pricing 100 KB (12 KB gzipped; 35 KB of it the table's tick icons), /for-clubs 154 KB (25 KB gzipped; 68 KB of it the drawings). Event and club cards are client components (much markup, little data), so a list sends each card's data, not its markup twice.
-- `/events/{old slug}?query` loses its query in the 308 (the page is ISR). Ids and the old top-level addresses keep it.
+- An old slug (an admin changed the event's or the club's; the API answers the old one with the current) keeps its query: the ISR page can't see it, so `src/proxy.js` answers `/events/{old}?…` and `/clubs/{old}?…` itself, asking the API at most once a minute per slug in each process (`src/seo/slugRedirect.js`). The proxy now runs on every `/events/{slug}` and `/clubs/{slug}` request; one without a query is passed on at once.
 - The feeds read each event's page for its words only for cards without `summary` (an older API); with it, none.
 - Import `JsonLd` as `@/seo/JsonLd.jsx`: on a case-blind disk (macOS) vitest resolves `@/seo/JsonLd` to `jsonld.js`.
 - Later pages of a list ("Load more"), the calendar's month and the date picker's dots are read by the browser from the API directly, as before (on localhost that needs the browser's CORS checks off).
