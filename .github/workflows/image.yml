@@ -24,9 +24,9 @@ name: Image
 # repositories; in private ones since January 2026, against the plan's
 # minutes); the repository variable ARM64_RUNNER=qemu emulates it on x86.
 
+# The live server builds the website's image itself from the source, so
+# nothing pulls these any more. By hand only.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
