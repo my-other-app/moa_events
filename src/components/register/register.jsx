@@ -38,7 +38,7 @@ import { hasConditions, pruneHidden, visibleKeys, visibleQuestions } from "@/uti
 import { clubUpdatesText, offersClubUpdates } from "@/utils/clubupdates";
 import { CANCELLED_TITLE, REFUND_DETAIL, REFUND_NOTE, cancelledLine } from "@/utils/cancelled";
 import { ticketingApi } from "@/api/ticketing";
-import { approvalNote, clubName as clubLabel, parseApproval, payButton, payLine, requiresApproval, underReviewNote } from "@/utils/requests";
+import { approvalNote, clubName as clubLabel, lastRequestNote, parseApproval, payButton, payLine, requiresApproval, underReviewNote } from "@/utils/requests";
 import {
   anyPaid,
   defaultType,
@@ -49,6 +49,7 @@ import {
   ticketTypeName,
   typeById,
   typePrice,
+  viewerLastRequestOf,
   viewerRequestOf,
   waitlistTypes,
   withoutWaitlist,
@@ -108,8 +109,13 @@ import { DiscountCodeField, linkedTypeFrom, TicketPicker, useDiscountCode, useEv
  * goes in with the account's token and lands straight in the account. The
  * person's own registration comes first: one waiting for payment is paid as
  * it is (Finish payment: no form, past the deadline too, until the event
- * ends), and one already good shows its ticket. Signed out, a quiet line
- * offers signing in, and the guest path is exactly as it was.
+ * ends), and one already good shows its ticket. On an event that reviews
+ * registrations, one still open shows where it stands; once none is open,
+ * the last one (`ticketing.viewer_last_request`) is said: declined (or the
+ * event ended or was cancelled first) instead of the form, with the club's
+ * note and the registration's page; cancelled or expired, above the form,
+ * since they may register again. Signed out, a quiet line offers signing
+ * in, and the guest path is exactly as it was.
  */
 
 const DETAIL_KEYS = ["name", "email", "phone"];
@@ -225,7 +231,7 @@ function AwaitingActions({ eventId, onPaid }) {
 }
 
 /** What went wrong with the registration, said once and calmly, with the way forward. `extra`: more under it (the waiting list). */
-function Problem({ problem, event, club = null, signedIn, onRetry, onChangeEmail, onSignIn, onPaid, extra = null }) {
+function Problem({ problem, event, signedIn, onRetry, onChangeEmail, onSignIn, onPaid, extra = null }) {
   const box = useRef(null);
   // Said where the eye is: the checkout closes over the top of a long page.
   useEffect(() => {
@@ -279,10 +285,9 @@ function Problem({ problem, event, club = null, signedIn, onRetry, onChangeEmail
     title = "Your registration is waiting for payment";
     actions = <AwaitingActions eventId={String(event.id)} onPaid={onPaid} />;
   } else if (problem.kind === "declined") {
-    // The club reviews registrations, and declined this person's already: plainly, with the way back.
+    // The club reviews registrations, and declined this person's already: in the server's words, with the way back.
     tone = "calm";
     title = "You can't register again";
-    text = `${clubLabel(club)} couldn't confirm your registration for this event, so you can't register again with this email.`;
     actions = backToEvent;
   } else if (problem.kind === "approval") {
     tone = "calm";
@@ -578,6 +583,58 @@ function AskedPanel({ event, club, asked }) {
   );
 }
 
+/**
+ * Signed in, for an event that reviews registrations: the person's last
+ * registration (`ticketing.viewer_last_request`, none open) means they can't
+ * register for it again: the club declined them, or the event ended or was
+ * cancelled first. Why, the club's note, and the registration's page for the
+ * rest, rather than a form the server would refuse (REQUEST_DECLINED).
+ */
+function LastPanel({ event, club, last, note }) {
+  return (
+    <Panel
+      event={event}
+      club={club}
+      title={note.title}
+      actions={
+        <>
+          {last.path ? (
+            <Link className="dc-btn" href={last.path}>
+              See your registration
+            </Link>
+          ) : null}
+          <Link className={`dc-btn${last.path ? " dc-btn--ghost" : ""}`} href="/events">
+            Find other events
+          </Link>
+        </>
+      }
+    >
+      <p className="rg-closed-text">{note.text}</p>
+      {note.note ? (
+        <p className="rg-closed-text rg-cancel-reason rq-note">
+          <span>{clubLabel(club)} said:</span> {note.note}
+        </p>
+      ) : null}
+      {note.again ? <p className="rg-closed-text">{note.again}</p> : null}
+    </Panel>
+  );
+}
+
+/** Above the form: how the person's last registration ended (cancelled, expired), when they may register again. */
+function EarlierNote({ note }) {
+  return (
+    <div className="rg-problem rg-problem--calm rg-earlier" role="status">
+      <span className="rg-problem-icon" aria-hidden="true">
+        <span>i</span>
+      </span>
+      <div className="rg-problem-body">
+        <p className="rg-problem-title">{note.title}</p>
+        <p className="rg-problem-text">{note.text}</p>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- the questions, and the person's own registration ---------- */
 
 /**
@@ -641,7 +698,7 @@ function useFlowTicketing(eventId, info, linked) {
 
 /* ---------- the flow ---------- */
 
-function Flow({ event, club, info, onDone }) {
+function Flow({ event, club, info, onDone, earlier = null }) {
   const eventId = String(event.id);
   const router = useRouter();
   const pathname = usePathname();
@@ -1203,6 +1260,9 @@ function Flow({ event, club, info, onDone }) {
             <p className="rg-lede">{ledes[step.id]}</p>
           </header>
 
+          {/* Signed in, registered before and cancelled (or it expired): said once, on the first step. */}
+          {earlier && index === 0 ? <EarlierNote note={earlier} /> : null}
+
           {step.id === "ticket" ? (
             <div className="rg-fields">
               <TicketPicker
@@ -1461,7 +1521,6 @@ function Flow({ event, club, info, onDone }) {
             <Problem
               problem={problem}
               event={event}
-              club={confirmerClub}
               signedIn={Boolean(accountEmail)}
               onRetry={submit}
               onChangeEmail={changeEmail}
@@ -1568,6 +1627,9 @@ export default function Register({ event, club = null }) {
   const mine = signedIn && info.who === who ? myRegistration(info.data) : null;
   // Signed in, a registration still under review (or confirmed, not paid yet) on an event that reviews them.
   const asked = signedIn && info.who === who ? viewerRequestOf(info.data?.ticketing) : null;
+  // None open, but one before (`viewer_last_request`): declined (or the event ended first) is said instead of the form; cancelled or expired, above it.
+  const last = signedIn && info.who === who ? viewerLastRequestOf(info.data?.ticketing) : null;
+  const earlier = lastRequestNote(last, { club, eventName: event.name });
   // A full event's tickets (the public list, which counts no visit) say whether its waiting list can be joined.
   const { ticketing: closedTickets, reload: reloadClosed } = useEventTicketing(eventId, { enabled: !done && gate.kind === "full" });
 
@@ -1590,7 +1652,8 @@ export default function Register({ event, club = null }) {
     body = <FinishPanel event={event} club={club} registration={mine} onPaid={(r) => (mine.ticketId ? paidNow(r, mine.ticketId) : info.retry())} />;
   else if (mine?.state === "registered") body = <Registered event={event} club={club} ticketId={mine.ticketId} />;
   else if (asked && open) body = <AskedPanel event={event} club={club} asked={asked} />;
-  else if (open) body = <Flow key={eventId} event={event} club={club} info={info} onDone={finished} />;
+  else if (earlier?.blocks && open) body = <LastPanel event={event} club={club} last={last} note={earlier} />;
+  else if (open) body = <Flow key={eventId} event={event} club={club} info={info} onDone={finished} earlier={earlier} />;
   else body = <Closed event={event} club={club} gate={gate} ticketing={closedTickets} onTicketsChanged={reloadClosed} />;
 
   return (

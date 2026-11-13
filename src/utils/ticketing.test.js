@@ -12,6 +12,7 @@ import {
   needsPicker,
   onSale,
   parseOffer,
+  viewerLastRequestOf,
   viewerRequestOf,
   parseTicketing,
   priceRange,
@@ -105,6 +106,46 @@ describe("parseTicketing", () => {
     // From the raw object, whether it lists types or not.
     expect(viewerRequestOf({ viewer_request: { id: "r1", status: "pending", token: T } }).path).toBe(`/requests/${T}`);
     expect(viewerRequestOf(null)).toBeNull();
+  });
+
+  it("reads how the viewer's last request ended, once none is open, and nothing from an older server", () => {
+    const T = "Rq7abcdefghijklmnopqrstuvwxyz001";
+    const last = (over = {}) => ({
+      id: 41,
+      status: "declined",
+      token: null,
+      status_url: `https://myotherapp.in/requests/${T}`,
+      submitted_at: "2026-10-26T10:15:00+05:30",
+      decided_at: "2026-10-27T09:00:00+05:30",
+      decline_note: "  Full this time.  ",
+      closed_reason: "event_ended",
+      can_register_again: false,
+      ...over,
+    });
+    expect(parseTicketing(ticketing({ viewer_last_request: last() })).viewerLastRequest).toEqual({
+      id: "41",
+      status: "declined",
+      submittedAt: "2026-10-26T10:15:00+05:30",
+      token: T,
+      path: `/requests/${T}`,
+      decidedAt: "2026-10-27T09:00:00+05:30",
+      declineNote: "Full this time.",
+      closedReason: null,
+      canRegisterAgain: false,
+    });
+    const closed = viewerLastRequestOf({ viewer_last_request: last({ status: "closed", can_register_again: true }) });
+    expect(closed).toMatchObject({ status: "closed", declineNote: null, closedReason: "event_ended", canRegisterAgain: true });
+    // Without the API's word, only a declined one can't register again.
+    expect(viewerLastRequestOf({ viewer_last_request: last({ can_register_again: undefined }) }).canRegisterAgain).toBe(false);
+    expect(viewerLastRequestOf({ viewer_last_request: last({ status: "lapsed", can_register_again: undefined }) }).canRegisterAgain).toBe(true);
+    // An open one is what counts; an open status, or none, is no last one.
+    expect(viewerLastRequestOf({ viewer_request: { id: "r2", status: "pending", token: T }, viewer_last_request: last() })).toBeNull();
+    expect(viewerLastRequestOf({ viewer_last_request: last({ status: "pending" }) })).toBeNull();
+    expect(viewerLastRequestOf({ viewer_last_request: last({ status: undefined }) })).toBeNull();
+    expect(viewerLastRequestOf({ viewer_last_request: null })).toBeNull();
+    expect(viewerLastRequestOf({})).toBeNull();
+    expect(viewerLastRequestOf(null)).toBeNull();
+    expect(parseTicketing(ticketing()).viewerLastRequest).toBeNull();
   });
 });
 

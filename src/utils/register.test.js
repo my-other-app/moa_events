@@ -294,7 +294,9 @@ describe("the refusals the server names by code (backend#68), and the shapes bef
   });
 
   it("an event whose club reviews every registration: one declined before, and one sent without saying the form understands that", () => {
-    expect(describeRegisterError({ status: 409, data: envelope("Declined before.", "REQUEST_DECLINED") })).toEqual({
+    // In the server's own words; ours only when it sent none.
+    expect(describeRegisterError({ status: 409, data: envelope("Declined before.", "REQUEST_DECLINED") })).toEqual({ kind: "declined", message: "Declined before." });
+    expect(describeRegisterError({ status: 409, data: { error_code: "REQUEST_DECLINED" } })).toEqual({
       kind: "declined",
       message: "The club couldn't confirm your registration for this event, so you can't register again with this email.",
     });

@@ -44,6 +44,8 @@ const APPROVAL = {
 const TEE = { id: "tee", name: "Hack Night tee", description: null, photo_url: null, price: 450, left: null, variants: [{ id: "m", label: "M", left: 30 }] };
 // Never said on an event that reviews registrations.
 const OLD_WORDS = /request a place|confirms each place|your request|waiting list|send request/i;
+// The API's REQUEST_DECLINED message (409), as it says it.
+const DECLINED_SAID = "The organisers couldn't confirm your registration for this event, so you can't register again with this email.";
 
 function show(page, { info = {}, items = [] } = {}) {
   eventsApi.fetchEvent.mockResolvedValue({ id: page.event.id, additional_details: [], reg_fee: page.event.fee, ...info });
@@ -232,6 +234,150 @@ describe("signed in, with a registration open already", () => {
     show(reviewing(paid), { info: { requires_approval: true, ticketing: { types: [], viewer_request: { id: "r1", status: "declined", token: TOKEN } } } });
     expect(await heading(/Your details/)).toBeInTheDocument();
   });
+
+  it("one open is what it says, whatever an earlier one says", async () => {
+    show(reviewing(paid), {
+      info: { requires_approval: true, ticketing: { types: [], viewer_request: { id: "r2", status: "pending", token: TOKEN }, viewer_last_request: lastRequest("declined") } },
+    });
+    expect(await heading("Your registration is under review")).toBeInTheDocument();
+    expect(screen.queryByText(/wasn.t confirmed/)).toBeNull();
+  });
+});
+
+/* GET /events/info's `ticketing.viewer_last_request`: none open, and how the last one ended. */
+function lastRequest(status, over = {}) {
+  return {
+    id: "r1",
+    status,
+    token: TOKEN,
+    status_url: `https://myotherapp.in/requests/${TOKEN}`,
+    submitted_at: "2026-10-26T10:15:00+05:30",
+    decided_at: status === "withdrawn" ? null : "2026-10-27T09:00:00+05:30",
+    decline_note: null,
+    closed_reason: null,
+    can_register_again: status !== "declined",
+    ...over,
+  };
+}
+const withLast = (last) => ({ info: { requires_approval: true, ticketing: { types: [], viewer_request: null, viewer_last_request: last } } });
+const earlierNote = () => document.querySelector(".rg-earlier");
+
+describe("signed in, with an earlier registration and none open", () => {
+  beforeEach(() => {
+    enableSignIn();
+    signInAs();
+  });
+
+  it("declined: not confirmed, the club's note, no registering again, and its page instead of the form", async () => {
+    show(reviewing(paid), withLast(lastRequest("declined", { decline_note: "  We're full of returning members this time.  " })));
+    expect(await heading("Your registration wasn't confirmed")).toBeInTheDocument();
+    const main = document.querySelector(".rg-main");
+    expect(main).toHaveTextContent("Circuit Society couldn't confirm your registration for this event.");
+    expect(screen.getByText(/said:/).closest("p")).toHaveTextContent("Circuit Society said: We're full of returning members this time.");
+    expect(main).toHaveTextContent("You can't register for this event again.");
+    expect(screen.getByRole("link", { name: "See your registration" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+    expect(screen.getByRole("link", { name: "Find other events" })).toHaveAttribute("href", "/events");
+    expect(screen.queryByLabelText(/^Full name/)).toBeNull();
+    expect(screen.queryByLabelText(/^Phone number/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Register" })).toBeNull();
+    expect(main).not.toHaveTextContent(OLD_WORDS);
+    expect(eventsApi.registerForEvent).not.toHaveBeenCalled();
+  });
+
+  it("declined without a note: no note, the rest the same", async () => {
+    show(reviewing(free), withLast(lastRequest("declined")));
+    expect(await heading("Your registration wasn't confirmed")).toBeInTheDocument();
+    expect(screen.queryByText(/said:/)).toBeNull();
+    expect(document.querySelector(".rg-main")).toHaveTextContent("You can't register for this event again.");
+    expect(screen.getByRole("link", { name: "See your registration" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+  });
+
+  it("declined, from an answer without its link: no link, still no form", async () => {
+    show(reviewing(paid), withLast(lastRequest("declined", { token: null, status_url: null })));
+    expect(await heading("Your registration wasn't confirmed")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "See your registration" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Find other events" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Phone number/)).toBeNull();
+  });
+
+  it("withdrawn: says they cancelled, then the form, and registering goes through", async () => {
+    eventsApi.registerForEvent.mockResolvedValue(APPROVAL);
+    show(reviewing(paid), withLast(lastRequest("withdrawn")));
+    expect(await heading(/Your details/)).toBeInTheDocument();
+    expect(earlierNote()).toHaveTextContent("You cancelled your registration");
+    expect(earlierNote()).toHaveTextContent("If you've changed your mind, you can register again.");
+    expect(earlierNote()).not.toHaveTextContent(/can.t register/);
+    fireEvent.change(field(/^Phone number/), { target: { value: "98765 43210" } });
+    go();
+    await heading(/Review and register/);
+    // Said once, on the first step.
+    expect(earlierNote()).toBeNull();
+    go();
+    expect(await heading("You’re registered!")).toBeInTheDocument();
+    expect(eventsApi.registerForEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("lapsed: expired because it wasn't paid in time, then the form", async () => {
+    show(reviewing(paid), withLast(lastRequest("lapsed")));
+    expect(await heading(/Your details/)).toBeInTheDocument();
+    expect(earlierNote()).toHaveTextContent("Your registration expired: it wasn't paid in time");
+    expect(earlierNote()).toHaveTextContent("You can register again.");
+    expect(screen.getByLabelText(/^Phone number/)).toBeInTheDocument();
+  });
+
+  it("closed because the event was cancelled: says so, and no form", async () => {
+    show(reviewing(paid), withLast(lastRequest("closed", { closed_reason: "event_cancelled" })));
+    expect(await heading("This registration is closed")).toBeInTheDocument();
+    expect(document.querySelector(".rg-main")).toHaveTextContent("Hack Night 04 was cancelled.");
+    expect(screen.getByRole("link", { name: "See your registration" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+    expect(screen.queryByLabelText(/^Phone number/)).toBeNull();
+  });
+
+  it("closed because the event ended first: says so, and no form", async () => {
+    show(reviewing(paid), withLast(lastRequest("closed", { closed_reason: "event_ended" })));
+    expect(await heading("This registration is closed")).toBeInTheDocument();
+    expect(document.querySelector(".rg-main")).toHaveTextContent("Hack Night 04 ended before Circuit Society could confirm your registration.");
+    expect(screen.queryByLabelText(/^Phone number/)).toBeNull();
+  });
+
+  it("closed by a ticket got another way: a note, then the form", async () => {
+    show(reviewing(paid), withLast(lastRequest("closed", { closed_reason: "registered_directly" })));
+    expect(await heading(/Your details/)).toBeInTheDocument();
+    expect(earlierNote()).toHaveTextContent("Your earlier registration is closed");
+    expect(earlierNote()).toHaveTextContent("It closed when you got a ticket another way. You can register again.");
+  });
+
+  it("cancelled since, but declined for this event before (can_register_again: false): no form", async () => {
+    show(reviewing(paid), withLast(lastRequest("withdrawn", { can_register_again: false })));
+    expect(await heading("You cancelled your registration")).toBeInTheDocument();
+    const main = document.querySelector(".rg-main");
+    expect(main).toHaveTextContent("Circuit Society couldn't confirm an earlier registration of yours for this event.");
+    expect(main).toHaveTextContent("You can't register for this event again.");
+    expect(screen.getByRole("link", { name: "See your registration" })).toHaveAttribute("href", `/requests/${TOKEN}`);
+    expect(screen.queryByLabelText(/^Phone number/)).toBeNull();
+  });
+
+  it("an older server (no viewer_last_request): the form, and its REQUEST_DECLINED in the server's words", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(refuse(409, DECLINED_SAID, "REQUEST_DECLINED"));
+    show(reviewing(paid), { info: { requires_approval: true, ticketing: { types: [], viewer_request: null } } });
+    expect(await heading(/Your details/)).toBeInTheDocument();
+    expect(earlierNote()).toBeNull();
+    fireEvent.change(field(/^Phone number/), { target: { value: "98765 43210" } });
+    go();
+    await heading(/Review and register/);
+    go();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("You can't register again");
+    expect(alert).toHaveTextContent(DECLINED_SAID);
+    expect(alert).not.toHaveTextContent(/We couldn.t register you|Something broke/);
+  });
+
+  it("signed out, nothing earlier is read: the form", async () => {
+    resetAuth();
+    show(reviewing(paid), withLast(lastRequest("declined")));
+    expect(await heading(/Your details/)).toBeInTheDocument();
+    expect(screen.queryByText(/wasn.t confirmed/)).toBeNull();
+  });
 });
 
 describe("a free event whose club reviews every registration", () => {
@@ -265,13 +411,14 @@ describe("a free event whose club reviews every registration", () => {
 });
 
 describe("the club's refusals", () => {
-  it("one declined before is said plainly, with the way back", async () => {
-    eventsApi.registerForEvent.mockRejectedValue(refuse(409, "The organisers couldn't confirm your registration.", "REQUEST_DECLINED"));
+  it("one declined before is said plainly, in the server's words, with the way back", async () => {
+    eventsApi.registerForEvent.mockRejectedValue(refuse(409, DECLINED_SAID, "REQUEST_DECLINED"));
     await toReview(reviewing(paid));
     go();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("You can't register again");
-    expect(alert).toHaveTextContent("Circuit Society couldn't confirm your registration for this event, so you can't register again with this email.");
+    expect(alert).toHaveTextContent(DECLINED_SAID);
+    expect(alert).not.toHaveTextContent(/We couldn.t register you|Try again/);
     expect(within(alert).getByRole("link", { name: "Back to the event" })).toHaveAttribute("href", "/events/hack-night-04");
     expect(screen.queryByText("You're already registered")).toBeNull();
   });
