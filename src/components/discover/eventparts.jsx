@@ -131,6 +131,8 @@ export function RegisterCard({ event, club = null }) {
             eventId={String(event.id)}
             state={{ kind: state.kind, label: state.label, href: state.href || null, also: state.also ? { label: state.also.label, href: state.also.href } : null }}
             approval={event.requires_approval === true}
+            eventName={event.name || null}
+            clubName={club?.name || null}
           />
         </div>
       </div>

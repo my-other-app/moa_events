@@ -5,7 +5,7 @@ import Link from "next/link";
 import { eventsApi } from "@/api/events";
 import { useAuth } from "@/auth/context";
 import { myRegistration } from "@/utils/register";
-import { payButton, payLine } from "@/utils/requests";
+import { lastRequestNote, payButton, payLine, statusWord } from "@/utils/requests";
 import { liveEntries, waitlistTypes } from "@/utils/ticketing";
 import { askToJoin } from "./eventtickets";
 import { FinishPaymentButton } from "./finishpayment";
@@ -34,13 +34,17 @@ import { useEventTicketing, useLinkedType } from "./tickets";
  * approval), the viewer's own open registration (`ticketing.viewer_request`):
  * "See your registration" (under review), or "Pay ₹…" / "Pay now"
  * (confirmed, not yet paid), to its page (or the claim page, when the API
- * says where). Such an event (`approval`, or its tickets say so) never
+ * says where). Once none is open, how their last one ended
+ * (`ticketing.viewer_last_request`): declined, or the event ended or was
+ * cancelled first, replaces "Register" with "See your registration" and why
+ * (the club's note too); cancelled or expired keeps "Register", with a line
+ * under it saying so. Such an event (`approval`, or its tickets say so) never
  * offers "Join the waiting list": people register, and the club reviews.
  *
  * GET /events/info/{id} is asked only for someone signed in; a cancelled or
- * ended event asks nothing.
+ * ended event asks nothing. `eventName` and `clubName` are for those lines.
  */
-export function RegisterGo({ eventId, state, approval = false }) {
+export function RegisterGo({ eventId, state, approval = false, eventName = null, clubName = null }) {
   const auth = useAuth();
   const signedIn = auth.ready && auth.status === "signed-in";
   const ended = state.kind === "ended" || state.kind === "cancelled";
@@ -133,6 +137,33 @@ export function RegisterGo({ eventId, state, approval = false }) {
     );
   }
 
+  // None open, but one before: where registering again isn't possible, why, and its page instead of "Register".
+  const last = ticketing?.viewerLastRequest || null;
+  const earlier = lastRequestNote(last, { club: clubName ? { name: clubName } : null, eventName });
+  if (earlier?.blocks) {
+    return (
+      <>
+        {last.path ? (
+          <Link className="dc-btn dc-btn--ghost ep-cta-btn" href={last.path}>
+            See your registration
+          </Link>
+        ) : (
+          <button type="button" className="dc-btn ep-cta-btn" disabled>
+            {statusWord(last) || "Closed"}
+          </button>
+        )}
+        <p className="ep-cta-mine" role="status">
+          {`${earlier.title}. ${earlier.again || earlier.text}`}
+        </p>
+        {earlier.note ? (
+          <p className="ep-cta-mine">
+            {clubName || "The club"} said: {earlier.note}
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
   // Sold out (the page's state, or the tickets read just now): the waiting list, when there is one.
   const soldOut = state.kind === "full" || (state.kind === "open" && ticketing?.soldOut === true);
   if (soldOut && ticketing) {
@@ -192,6 +223,12 @@ export function RegisterGo({ eventId, state, approval = false }) {
         <Link className="ep-cta-also" href={state.also.href}>
           {state.also.label}
         </Link>
+      ) : null}
+      {/* Cancelled, or expired unpaid: they may register again, and the button says it. */}
+      {earlier && href ? (
+        <p className="ep-cta-mine" role="status">
+          {`${earlier.title}. ${earlier.text}`}
+        </p>
       ) : null}
     </>
   );

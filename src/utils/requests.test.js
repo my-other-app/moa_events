@@ -5,6 +5,7 @@ import {
   clubName,
   confirmsEachPlace,
   describeRequestError,
+  lastRequestNote,
   nobodyGoingLine,
   openRequests,
   parseApproval,
@@ -261,5 +262,45 @@ describe("the public line in place of \"Be the first to register\"", () => {
     expect(nobodyGoingLine({ requires_approval: false }, { name: "Circuit Society" })).toBe("Be the first to register");
     expect(nobodyGoingLine({}, null)).toBe("Be the first to register");
     expect(nobodyGoingLine(null, null)).toBe("Be the first to register");
+  });
+});
+
+describe("how the viewer's last registration ended (viewer_last_request)", () => {
+  const club = { name: "Circuit Society" };
+  const last = (status, over = {}) => ({ status, path: "/requests/x", declineNote: null, closedReason: null, canRegisterAgain: status !== "declined", ...over });
+  const note = (l, c = club) => lastRequestNote(l, { club: c, eventName: "Hack Night 04" });
+
+  it("declined: not confirmed, the note, and no registering again", () => {
+    expect(note(last("declined", { declineNote: "Full this time." }))).toEqual({
+      status: "declined",
+      title: "Your registration wasn't confirmed",
+      text: "Circuit Society couldn't confirm your registration for this event.",
+      note: "Full this time.",
+      again: "You can't register for this event again.",
+      blocks: true,
+    });
+    expect(note(last("declined"), null).text).toBe("The club couldn't confirm your registration for this event.");
+  });
+
+  it("withdrawn and lapsed: registering again is allowed, unless the API says not", () => {
+    expect(note(last("withdrawn"))).toMatchObject({ title: "You cancelled your registration", text: "If you've changed your mind, you can register again.", again: null, blocks: false });
+    expect(note(last("lapsed"))).toMatchObject({ title: "Your registration expired: it wasn't paid in time", text: "You can register again.", blocks: false });
+    expect(note(last("lapsed", { canRegisterAgain: false }))).toMatchObject({
+      text: "Circuit Society couldn't confirm an earlier registration of yours for this event.",
+      again: "You can't register for this event again.",
+      blocks: true,
+    });
+  });
+
+  it("closed: why, and no registering when the event is over or cancelled", () => {
+    expect(note(last("closed", { closedReason: "event_cancelled" }))).toMatchObject({ title: "This registration is closed", text: "Hack Night 04 was cancelled.", again: null, blocks: true });
+    expect(note(last("closed", { closedReason: "event_ended" })).text).toBe("Hack Night 04 ended before Circuit Society could confirm your registration.");
+    expect(note(last("closed", { closedReason: "event_deleted" }), null).text).toBe("Hack Night 04 ended before the club could confirm your registration.");
+    expect(note(last("closed", { closedReason: "registered_directly" }))).toMatchObject({ title: "Your earlier registration is closed", blocks: false });
+    expect(note(last("closed", { closedReason: "something_new" }))).toMatchObject({ text: "You can register again.", blocks: false });
+  });
+
+  it("none: nothing", () => {
+    expect(lastRequestNote(null)).toBeNull();
   });
 });

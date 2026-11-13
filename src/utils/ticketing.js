@@ -85,11 +85,13 @@ export function parseWaitlistEntry(e) {
  * /events/{id}/ticket-types):
  *
  *   {types, requiresChoice, available, soldOut, waitlist: {enabled, offerHours}, viewerWaitlist,
- *    requiresApproval, viewerRequest}
+ *    requiresApproval, viewerRequest, viewerLastRequest}
  *
  * `viewerRequest` (signed in, an event that reviews registrations): the
  * viewer's open registration, under review or confirmed and not yet paid,
  * as {id, status, token, path} (and `pay`, when the API says it); else null.
+ * `viewerLastRequest`: once none is open, how their last one ended
+ * (viewerLastRequestOf); else null.
  *
  * An event that reviews registrations has no waiting list (people simply
  * register, and the club reviews them): its list reads as off, and no type
@@ -114,6 +116,7 @@ export function parseTicketing(raw) {
     // The club reviews every registration (registration approval): the form's goes in under review.
     requiresApproval: o.requires_approval === true,
     viewerRequest: viewerRequest(o.viewer_request),
+    viewerLastRequest: viewerLastRequestOf(o),
   };
   return parsed.requiresApproval ? withoutWaitlist(parsed) : parsed;
 }
@@ -126,6 +129,38 @@ function viewerRequest(v) {
 
 /** `ticketing.viewer_request` from the raw `ticketing`, whatever else it says: {id, status, token, path} or null. */
 export const viewerRequestOf = (raw) => viewerRequest(obj(raw)?.viewer_request);
+
+const LAST_STATUSES = new Set(["declined", "withdrawn", "lapsed", "closed"]);
+
+/**
+ * `ticketing.viewer_last_request` from the raw `ticketing` (signed in, an
+ * event that reviews registrations): once none is open, the viewer's latest
+ * registration for the event and how it ended, as
+ *
+ *   {id, status, token, path, submittedAt, decidedAt, declineNote, closedReason, canRegisterAgain}
+ *
+ * `status` is declined, withdrawn, lapsed or closed. `declineNote` only for a
+ * declined one, `closedReason` only for a closed one (as the API says it).
+ * `canRegisterAgain` is the API's word: false once the club declined them for
+ * this event, whatever came since; without it, only a declined one can't.
+ *
+ * Null while one is open (`viewer_request`), when there was none before, and
+ * from an older server, which doesn't send it: the page is then what it was.
+ */
+export function viewerLastRequestOf(raw) {
+  const t = obj(raw);
+  if (!t || viewerRequest(t.viewer_request)) return null;
+  const o = obj(t.viewer_last_request);
+  const r = parseRequestRef(o);
+  if (!r || !LAST_STATUSES.has(o.status)) return null;
+  return {
+    ...r,
+    decidedAt: iso(o.decided_at),
+    declineNote: o.status === "declined" ? str(o.decline_note) : null,
+    closedReason: o.status === "closed" ? str(o.closed_reason) : null,
+    canRegisterAgain: typeof o.can_register_again === "boolean" ? o.can_register_again : o.status !== "declined",
+  };
+}
 
 /** Whether the form shows a choice of tickets: more than one to choose from. */
 export const needsPicker = (ticketing) => Boolean(ticketing && ticketing.types.length > 1);

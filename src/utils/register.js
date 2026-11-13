@@ -412,7 +412,9 @@ function closedCopy(errors, status) {
  * 422 list) are still read.
  *
  *   declined   REQUEST_DECLINED (409): the club reviews registrations and has
- *              declined this person's for this event already
+ *              declined this person's for this event already. In the server's
+ *              own words when it sent some (a signed-in page asks first, and
+ *              only an older server lets the form get this far)
  *   approval   APPROVAL_REQUIRED (409): the club reviews registrations and the
  *              call didn't say this form understands that (it always does):
  *              reload and register again; or ADD_ONS_NOT_ALLOWED (422, with
@@ -466,7 +468,7 @@ export function describeRegisterError(error, questionKeys = [], { approval = fal
   }
   const code = typeof data?.error_code === "string" ? data.error_code : null;
   if (code === "REQUEST_DECLINED") {
-    return { kind: "declined", message: "The club couldn't confirm your registration for this event, so you can't register again with this email." };
+    return { kind: "declined", message: said || "The club couldn't confirm your registration for this event, so you can't register again with this email." };
   }
   if (code === "APPROVAL_REQUIRED") {
     return { kind: "approval", message: "Reload this page and register again." };

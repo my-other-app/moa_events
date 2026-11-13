@@ -171,6 +171,77 @@ export const underReviewNote = (club) => `${clubName(club)} reviews every regist
 /** Nobody going yet: what the event says in place of a count. */
 export const nobodyGoingLine = (event, club) => (event?.requires_approval === true ? confirmsEachPlace(club) : "Be the first to register");
 
+/** A registration closed because the event ended, was deleted or was cancelled first: nobody registers for it again. */
+const OVER = new Set(["event_ended", "event_deleted", "event_cancelled"]);
+
+/**
+ * The signed-in viewer's last registration for an event once none is open
+ * (`ticketing.viewer_last_request`, as utils/ticketing.js reads it), as the
+ * event page's button and the form say it:
+ *
+ *   {status, title, text, note, again, blocks}
+ *
+ *   declined   "Your registration wasn't confirmed", the club's note (`note`)
+ *              and that they can't register for this event again
+ *   withdrawn  "You cancelled your registration": they may register again
+ *   lapsed     "Your registration expired: it wasn't paid in time": they may
+ *              register again
+ *   closed     why: the event ended (or was deleted) or was cancelled first,
+ *              so there's nothing to register for; or they got a ticket
+ *              another way (or a reason this site doesn't know yet), and they
+ *              may register again
+ *
+ * `blocks`: no register button or form, only this and a link to the
+ * registration's page. Also whenever the API says they can't register again
+ * (`can_register_again: false`: declined once for this event, whatever came
+ * since); `again` then says so, after the club's note. Null for none.
+ */
+export function lastRequestNote(last, { club = null, eventName = null } = {}) {
+  if (!last) return null;
+  const who = clubName(club);
+  const refused = last.status === "declined" || last.canRegisterAgain === false;
+  const over = last.status === "closed" && OVER.has(last.closedReason);
+  // Declined for this event before, though the last one ended another way.
+  const earlier = `${who} couldn't confirm an earlier registration of yours for this event.`;
+  let title;
+  let text;
+  switch (last.status) {
+    case "declined":
+      title = "Your registration wasn't confirmed";
+      text = `${who} couldn't confirm your registration for this event.`;
+      break;
+    case "withdrawn":
+      title = "You cancelled your registration";
+      text = refused ? earlier : "If you've changed your mind, you can register again.";
+      break;
+    case "lapsed":
+      title = "Your registration expired: it wasn't paid in time";
+      text = refused ? earlier : "You can register again.";
+      break;
+    default: {
+      const event = str(eventName) || "The event";
+      if (over) {
+        title = "This registration is closed";
+        text =
+          last.closedReason === "event_cancelled"
+            ? `${event} was cancelled.`
+            : `${event} ended before ${clubName(club, { start: false })} could confirm your registration.`;
+      } else {
+        title = "Your earlier registration is closed";
+        text = refused ? earlier : last.closedReason === "registered_directly" ? "It closed when you got a ticket another way. You can register again." : "You can register again.";
+      }
+    }
+  }
+  return {
+    status: last.status,
+    title,
+    text,
+    note: last.status === "declined" ? last.declineNote || null : null,
+    again: refused && !over ? "You can't register for this event again." : null,
+    blocks: refused || over,
+  };
+}
+
 /**
  * The event's "Review registrations" setting: the form's GET
  * /events/info (freshest) says it at the top or in its `ticketing`;
