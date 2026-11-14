@@ -86,6 +86,12 @@ describe(AASA, () => {
     // The details a club asks for after sign-up: the app's own answers screen.
     ["/answers/123/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", true],
     ["/answers/123/q0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", true],
+    // A person's profile, and their QR code (the app's save flow).
+    ["/u/asha", true],
+    ["/u/asha.rao", true],
+    ["/p/k7mx3qp9wz", true],
+    // The recap's link: the app's Network tab, by event (/network?event=12).
+    ["/network", true],
     // So do the city pages, which the app has no screen for.
     ["/events/in", false],
     ["/events/in/kochi", false],
