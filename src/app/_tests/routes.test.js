@@ -95,6 +95,12 @@ describe("which file answers which address", () => {
     ["/speakers/me", "speakers/me/page.jsx"],
     ["/speakers/claim/Sp3abcdefghijklmnopqrstuv", "speakers/claim/[token]/page.jsx"],
     ["/sitemaps/speakers.xml", "sitemaps/[name]/route.js"],
+    // A person's profile and their QR code: words of the site's own, never an old event address.
+    ["/u/asha", "u/[handle]/page.jsx"],
+    ["/u/asha.rao", "u/[handle]/page.jsx"],
+    ["/u/live", "u/[handle]/page.jsx"],
+    ["/p/k7mx3qp9wz", "p/[code]/page.jsx"],
+    ["/p/live", "p/[code]/page.jsx"],
     ["/help", "help/page.jsx"],
     // The developer docs: the one public page, the private pages and the two downloads (files of their own,
     // never a page; src/proxy.js and each file check the docs cookie), the docs link, and signing out.
