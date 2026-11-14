@@ -126,6 +126,16 @@ describe("Save to your network", () => {
     expect(profilesApi.save).toHaveBeenCalledTimes(1);
   });
 
+  it("says when they were in the network already (200, created false)", async () => {
+    enableSignIn();
+    signInAs();
+    profilesApi.page.mockResolvedValue(parsePublicProfile(PUBLIC_PROFILE({ relation: { saved_by_me: false, saved_me: false, mutual: false, network_id: null } })));
+    profilesApi.save.mockResolvedValue(parseSaveResult({ person: { id: 5, mutual: false }, created: false, new_encounter: false, profile: PUBLIC_PROFILE() }));
+    show(anon());
+    fireEvent.click(await screen.findByRole("button", { name: "Save Asha Rao to your network" }));
+    expect(await screen.findByText("Asha was in your network already.")).toBeInTheDocument();
+  });
+
   it("says when the two of them have saved each other", async () => {
     enableSignIn();
     signInAs();
@@ -209,13 +219,18 @@ describe("Save contact", () => {
     profilesApi.vcard.mockResolvedValue(new Blob(["BEGIN:VCARD\nEND:VCARD"], { type: "text/vcard" }));
     URL.createObjectURL = vi.fn(() => "blob:card");
     URL.revokeObjectURL = vi.fn();
-    const clicked = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    // The API's Content-Disposition isn't readable across origins: the site names the file.
+    const saved = [];
+    const clicked = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () {
+      saved.push({ href: this.href, download: this.download });
+    });
     show(anon());
     await waitFor(() => expect(profilesApi.page).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("link", { name: "Save Asha Rao's contact card" }));
     await waitFor(() => expect(profilesApi.vcard).toHaveBeenCalledWith("asha"));
     await waitFor(() => expect(clicked).toHaveBeenCalled());
     expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(saved).toEqual([{ href: "blob:card", download: "asha.vcf" }]);
     clicked.mockRestore();
   });
 

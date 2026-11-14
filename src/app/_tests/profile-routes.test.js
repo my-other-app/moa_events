@@ -15,6 +15,9 @@ import { parseSitemapName, staticEntries } from "@/seo/sitemap";
  * strangers, the 404; a QR's code looked up fresh and sent on with the save
  * intent, with pages of its own for a replaced code and scanning off.
  */
+let requestHeaders = new Headers();
+vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
+
 const params = (o) => Promise.resolve(o);
 const textOf = (out) => out.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
@@ -29,6 +32,7 @@ const load = async (table, file = "../u/[handle]/page.jsx") => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
+  requestHeaders = new Headers();
 });
 
 describe("/u/{handle}", { timeout: 30000 }, () => {
@@ -164,6 +168,7 @@ describe("/u/{handle}", { timeout: 30000 }, () => {
   });
 
   it("shows a private profile's header and says it is private, whatever else came with it", async () => {
+    // The API's minimal shape (every key, the rest empty, all five sections hidden), and anything more that came with it.
     const route = await load({ "/api/v1/profiles/asha": { body: PRIVATE_PROFILE({ bio: "Secret bio", links: [{ type: "github", url: "https://github.com/asha" }] }) } });
     const out = html(await route.default({ params: params({ handle: "asha" }) }), "/u/asha");
     const text = textOf(out);
@@ -173,6 +178,10 @@ describe("/u/{handle}", { timeout: 30000 }, () => {
     expect(text).toContain("Only people Asha has saved to their network can see the rest of it.");
     expect(text).not.toContain("Secret bio");
     expect(out).not.toContain("github.com/asha");
+    // The hidden sections aren't listed one by one: the whole profile is private.
+    expect(text).not.toContain("only with people they know");
+    expect(out).toContain("/media/profiles/asha/picture?size=medium");
+    expect(out).not.toMatch(/X-Amz-/);
     // Saving them is still offered; their contact card isn't.
     expect(text).toContain("Save to your network");
     expect(text).not.toContain("Save contact");
@@ -217,6 +226,14 @@ describe("/p/{code}", { timeout: 30000 }, () => {
     expect(await outcome(() => route.default({ params: params({ code: "K7MX3QP9WZ" }) }))).toEqual({ redirect: { url: "/u/asha?save=1", status: 307 } });
   });
 
+  it("asks for the visitor who scanned (X-Visitor-IP behind the site's token), so the API's 30 a minute is theirs", async () => {
+    vi.stubEnv("API_SITE_TOKEN", "site-token");
+    requestHeaders = new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" });
+    const route = await load({ "/api/v1/profiles/by-code/k7mx3qp9wz": { body: { handle: "asha", profile: PUBLIC_PROFILE() } } }, P);
+    await outcome(() => route.default({ params: params({ code: "k7mx3qp9wz" }) }));
+    expect(fetched.calls[0].init.headers).toMatchObject({ "X-Site-Token": "site-token", "X-Visitor-IP": "203.0.113.7" });
+  });
+
   it("says a replaced code was replaced (410 PROFILE_CODE_INACTIVE)", async () => {
     const route = await load({ "/api/v1/profiles/by-code/k7mx3qp9wz": { status: 410, body: { error_code: "PROFILE_CODE_INACTIVE", message: "Replaced" } } }, P);
     const res = await outcome(() => route.default({ params: params({ code: "k7mx3qp9wz" }) }));
@@ -244,8 +261,10 @@ describe("/p/{code}", { timeout: 30000 }, () => {
   });
 
   it("treats any other refusal as the API's trouble, not as scanning off", async () => {
-    const route = await load({ "/api/v1/profiles/by-code/k7mx3qp9wz": { status: 403, body: { detail: "Forbidden" } } }, P);
+    let route = await load({ "/api/v1/profiles/by-code/k7mx3qp9wz": { status: 403, body: { detail: "Forbidden" } } }, P);
     await expect(route.default({ params: params({ code: "k7mx3qp9wz" }) })).rejects.toMatchObject({ name: "ApiError", status: 403 });
+    route = await load({ "/api/v1/profiles/by-code/k7mx3qp9wz": { status: 429, body: { error_code: "RATE_LIMITED", errors: { retry_after: 20 } } } }, P);
+    await expect(route.default({ params: params({ code: "k7mx3qp9wz" }) })).rejects.toMatchObject({ name: "ApiError", status: 429 });
   });
 
   it("is never indexed, kept or framed", async () => {
@@ -283,8 +302,8 @@ describe("profiles and the rest of the site", () => {
       fakeFetch({
         "/api/v1/profiles/asha": {
           body: PUBLIC_PROFILE({
-            picture: { thumbnail: "https://cdn.example/t.jpg", medium: "https://cdn.example/m.jpg" },
-            projects: [{ id: 11, title: "Tiny C", image: { medium: "https://cdn.example/p11.jpg" }, tags: [] }],
+            picture: "https://cdn.example/m.jpg",
+            projects: [{ id: 11, title: "Tiny C", image: "https://cdn.example/p11.jpg", tags: [] }],
           }),
         },
       }),
@@ -293,7 +312,7 @@ describe("profiles and the rest of the site", () => {
     const req = (p) => Object.assign(new Request(`https://myotherapp.in${p}`), { nextUrl: new URL(`https://myotherapp.in${p}`) });
     let res = await media.GET(req("/media/profiles/asha/picture?size=thumbnail"), { params: params({ path: ["profiles", "asha", "picture"] }) });
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("https://cdn.example/t.jpg");
+    expect(res.headers.get("location")).toBe("https://cdn.example/m.jpg");
     res = await media.GET(req("/media/profiles/asha/picture"), { params: params({ path: ["profiles", "asha", "picture"] }) });
     expect(res.headers.get("location")).toBe("https://cdn.example/m.jpg");
     res = await media.GET(req("/media/profiles/asha/projects/11/image"), { params: params({ path: ["profiles", "asha", "projects", "11", "image"] }) });
@@ -303,5 +322,25 @@ describe("profiles and the rest of the site", () => {
     expect(res.status).toBe(404);
     res = await media.GET(req("/media/profiles/../picture"), { params: params({ path: ["profiles", "..", "picture"] }) });
     expect(res.status).toBe(404);
+  });
+
+  it("never hands out a signed picture link about to expire: it reads the profile again, past the cache", async () => {
+    const signed = (date, key) => `https://moa-media.s3.amazonaws.com/${key}?X-Amz-Date=${date}&X-Amz-Expires=3600&X-Amz-Signature=abc`;
+    const now = new Date();
+    const stamp = (d) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const old = signed(stamp(new Date(now.getTime() - 58 * 60 * 1000)), "old.jpg");
+    const fresh = signed(stamp(now), "fresh.jpg");
+    vi.resetModules();
+    const fetch = fakeFetch((u, init) => (u.pathname === "/api/v1/profiles/asha" ? { body: PUBLIC_PROFILE({ picture: init?.cache === "no-store" ? fresh : old }) } : null));
+    vi.stubGlobal("fetch", fetch);
+    const media = await import("../media/[...path]/route.jsx");
+    const req = Object.assign(new Request("https://myotherapp.in/media/profiles/asha/picture"), { nextUrl: new URL("https://myotherapp.in/media/profiles/asha/picture") });
+    const res = await media.GET(req, { params: params({ path: ["profiles", "asha", "picture"] }) });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe(fresh);
+    expect(fetch.calls.map((c) => c.init?.cache ?? "cached")).toEqual(["cached", "no-store"]);
+    // Kept no longer than the link lives, less two minutes, and never past five.
+    expect(res.headers.get("cache-control")).toMatch(/max-age=(\d+)/);
+    expect(Number(/max-age=(\d+)/.exec(res.headers.get("cache-control"))[1])).toBeLessThanOrEqual(300);
   });
 });

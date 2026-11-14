@@ -77,6 +77,14 @@ describe("PublicProfile", () => {
     expect(p).toMatchObject({ private: true, locked: true, indexable: false, bio: null, links: [], contact: { email: null, phone: null } });
   });
 
+  it("reads the API's minimal private shape (every key, the rest empty) as locked", () => {
+    const p = parsePublicProfile(PRIVATE_PROFILE());
+    expect(p).toMatchObject({ handle: "asha", name: "Asha Rao", headline: "Compiler engineer", private: true, locked: true, indexable: false });
+    expect(p.picture).toMatch(/^https:\/\/moa-media\.s3\.amazonaws\.com\//);
+    expect(p.hidden).toEqual(["links", "projects", "achievements", "interests", "org"]);
+    expect(p.achievements).toEqual({ eventsAttended: null, certificates: null, talks: null, clubs: null });
+  });
+
   it("opens a private profile to its owner, and to someone its owner saved", () => {
     expect(parsePublicProfile(PUBLIC_PROFILE({ private: true, is_me: true })).locked).toBe(false);
     const saved = parsePublicProfile(PUBLIC_PROFILE({ private: true, relation: { saved_by_me: false, saved_me: true, mutual: false, network_id: null } }));
@@ -116,6 +124,7 @@ describe("saving", () => {
     const r = parseSaveResult({ person: { id: 3, mutual: true }, created: false, new_encounter: false, profile: PUBLIC_PROFILE() });
     expect(r).toMatchObject({ saved: true, created: false, mutual: true });
     expect(r.profile.handle).toBe("asha");
+    expect(parseSaveResult({ person: { id: 3, mutual: false }, created: true, profile: PUBLIC_PROFILE() }).created).toBe(true);
   });
 
   it.each([
@@ -123,6 +132,7 @@ describe("saving", () => {
     [{ status: 403, code: "PROFILE_SCANNING_OFF" }, "off"],
     [{ status: 410, code: "PROFILE_CODE_INACTIVE" }, "inactive"],
     [{ status: 404 }, "gone"],
+    [{ status: 404, code: "NOT_FOUND" }, "gone"],
     [{ status: 429, code: "RATE_LIMITED" }, "limit"],
     [{ status: 401 }, "signin"],
     [{ authExpired: true }, "signin"],

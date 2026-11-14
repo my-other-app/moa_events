@@ -228,15 +228,17 @@ export const linkLabel = (link) => link.label || (LINK_TYPES[link.type] || LINK_
 export const linkIcon = (link) => (LINK_TYPES[link.type] || LINK_TYPES.other)[1];
 
 /**
- * POST /network's answer: {saved, created, mutual, profile}. `profile` is
- * the person as the saver sees them now (saving may open sections up).
+ * POST /network's answer (always 200, new row or not): {saved, created,
+ * mutual, profile}. `created` is false when they were saved already;
+ * `profile` is the person as the saver sees them now (saving may open
+ * sections up).
  */
 export function parseSaveResult(d) {
   const o = obj(d) || {};
   const person = obj(o.person) || {};
   return {
     saved: true,
-    created: o.created !== false,
+    created: bool(o.created),
     mutual: bool(person.mutual),
     profile: parsePublicProfile(o.profile),
   };
@@ -264,8 +266,8 @@ export function describeSaveError(f = {}, name = "") {
  *   {state: "ok", handle}     → the profile, with the save intent
  *   {state: "inactive"}       410 PROFILE_CODE_INACTIVE: the owner made a new code
  *   {state: "scanning-off"}   403 PROFILE_SCANNING_OFF: the owner turned saving by QR off
- *   {state: "missing"}        404 (or an answer with no handle in it)
- *   null                      anything else: the caller treats it as an error
+ *   {state: "missing"}        404 NOT_FOUND (or an answer with no handle in it)
+ *   null                      anything else (429 RATE_LIMITED, 5xx): the caller treats it as an error
  */
 export function readCodeAnswer(status, body) {
   const o = obj(body) || {};
