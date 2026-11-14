@@ -10,7 +10,7 @@ import { summary, whenLine } from "@/utils/eventpage";
 import { formatPrice, imageUrl } from "@/utils/format";
 import { hostNames, hostsOf } from "@/utils/hosts";
 import { previewImage } from "@/utils/share";
-import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, speakerPagePath, topicPagePath } from "./urls";
+import { absoluteUrl, eventPagePath, feeds, fingerprint, imageKey, media, ogImage, profilePagePath, speakerPagePath, topicPagePath } from "./urls";
 
 export const SITE_NAME = "MyOtherApp";
 export const TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
@@ -132,6 +132,34 @@ export function speakerMetadata(page) {
   });
   // A square photo reads better as the small card than cut to a banner.
   return page.photo ? { ...meta, twitter: { ...meta.twitter, card: "summary" } } : meta;
+}
+
+/* ---------- people's profiles ---------- */
+
+/** What a profile's preview says: their bio, else their headline, else who they are. */
+export function profileDescription(p) {
+  if (p.bio) return summary(p.bio);
+  const bits = [p.headline, p.org?.name, p.city].filter(Boolean).join(" · ");
+  return summary(bits ? `${p.name}: ${bits}. On ${SITE_NAME}.` : `${p.name} on ${SITE_NAME}.`);
+}
+
+/**
+ * A person's profile (/u/{handle}): their name, headline and picture in Open
+ * Graph and the Twitter card; `noindex` unless the owner made it findable
+ * (`indexable`, never for a private one). `p` is parsePublicProfile's
+ * result as nobody sees it.
+ */
+export function profileMetadata(p) {
+  const image = p.picture ? { url: absoluteUrl(media.profilePicture(p.handle, "medium")), alt: p.name } : OG_IMAGE;
+  const meta = pageMetadata({
+    title: p.headline ? `${p.name}, ${p.headline}` : p.name,
+    description: profileDescription(p),
+    path: profilePagePath(p.handle),
+    image,
+    type: "profile",
+  });
+  const card = p.picture ? { ...meta.twitter, card: "summary" } : meta.twitter;
+  return { ...meta, twitter: card, ...(p.indexable ? {} : { robots: { index: false } }) };
 }
 
 /* ---------- topics ---------- */

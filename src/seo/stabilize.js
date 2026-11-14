@@ -90,6 +90,20 @@ export function stableSpeakerPage(page) {
   };
 }
 
+/**
+ * parsePublicProfile's result (src/utils/profiles.js) as nobody sees it,
+ * with the picture and each project's picture on a stable address.
+ */
+export function stableProfile(profile) {
+  if (!profile) return profile;
+  const h = profile.handle;
+  return {
+    ...profile,
+    picture: profile.picture ? { thumbnail: media.profilePicture(h, "thumbnail"), medium: media.profilePicture(h, "medium") } : null,
+    projects: profile.projects.map((p) => ({ ...p, image: p.image && p.id !== null ? media.profileProject(h, p.id) : null })),
+  };
+}
+
 /** parseClubPage's result, with every image on a stable address. */
 export function stableClubPage(data) {
   if (!data) return data;

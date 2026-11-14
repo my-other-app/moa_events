@@ -26,6 +26,8 @@ export const eventPagePath = (event, sub = "") => `/events/${enc(eventRefOf(even
 export const clubPagePath = (club) => `/clubs/${enc(club.slug)}`;
 /** A speaker's page (feature-register/speakers-contract.md). */
 export const speakerPagePath = (slug) => `/speakers/${enc(slug)}`;
+/** A person's profile (feature-register/profiles-networking-contract.md). */
+export const profilePagePath = (handle) => `/u/${enc(handle)}`;
 /** A topic's page (`interest`: one of its interests, the same page filtered). */
 export const topicPagePath = (topic, interest = null) => `/topics/${enc(topic.slug)}${interest ? `?interest=${enc(interest)}` : ""}`;
 
@@ -48,6 +50,10 @@ export const media = {
   threadImage: (id, size = "medium") => sized(`/media/threads/${enc(id)}/image`, size),
   /** A speaker profile's photo ("thumbnail" or "medium"). */
   speakerPhoto: (slug, size = "medium") => sized(`/media/speakers/${enc(slug)}/photo`, size),
+  /** A person's picture on their profile ("thumbnail" or "medium"). */
+  profilePicture: (handle, size = "medium") => sized(`/media/profiles/${enc(handle)}/picture`, size),
+  /** One of their projects' pictures, by the project's id. */
+  profileProject: (handle, id) => `/media/profiles/${enc(handle)}/projects/${enc(id)}/image`,
 };
 
 /** The share pictures (1200×630), made by src/app/og/.../route.jsx. `v` changes when what they show does. */

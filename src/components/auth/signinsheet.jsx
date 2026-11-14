@@ -21,6 +21,7 @@ const TITLES = {
   register: "Sign in to register",
   speaker: "Sign in to your speaker profile",
   help: "Sign in to see your requests",
+  save: "Sign in to save people",
 };
 
 /** How long after Google's window closes a sign-in still counts as on its way. */
