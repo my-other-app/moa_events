@@ -13,8 +13,12 @@
  *   /media/clubs/{slug}/team/{n}/photo
  *   /media/clubs/{slug}/partners/{n}/logo
  *   /media/threads/{id}/image[?size=]
+ *   /media/speakers/{slug}/photo[?size=]
+ *   /media/profiles/{handle}/picture[?size=]         a person's picture (thumbnail | medium)
+ *   /media/profiles/{handle}/projects/{id}/image     one of their projects' pictures
  */
 import { imageUrl } from "@/utils/format";
+import { isProfileHandle } from "@/utils/profiles";
 
 const SIZES = new Set(["thumbnail", "medium", "large", "original"]);
 const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -32,6 +36,8 @@ export const sizeOf = (v, fallback = "original") => (SIZES.has(v) ? v : fallback
  */
 export function mediaTarget(segments) {
   const [kind, ref, a, b, c] = segments || [];
+  // A person's pictures, from their profile as nobody sees it (a handle may have a dot in it).
+  if (kind === "profiles") return profileTarget(segments);
   if (!REF.test(String(ref || ""))) return null;
   const n = segments.length;
   if (kind === "events") {
@@ -62,6 +68,17 @@ export function mediaTarget(segments) {
   // A speaker's profile photo (/speakers/{slug}): thumbnail or medium, the two the API sends.
   if (kind === "speakers" && n === 3 && a === "photo") {
     return { source: "speaker", ref, what: "photo", pick: (p, size) => (p && !p.redirect ? imageUrl(p.photo, sizeOf(size, "medium") === "thumbnail" ? "thumbnail" : "medium") : null) };
+  }
+  return null;
+}
+
+function profileTarget([, handle, a, b, c, ...more]) {
+  if (more.length || !isProfileHandle(String(handle || ""))) return null;
+  if (a === "picture" && b === undefined) {
+    return { source: "profile", ref: handle, what: "picture", pick: (p, size) => imageUrl(p?.picture, sizeOf(size, "medium") === "thumbnail" ? "thumbnail" : "medium") };
+  }
+  if (a === "projects" && c === "image" && KEY.test(b || "")) {
+    return { source: "profile", ref: handle, what: "project", pick: (p) => imageUrl(p?.projects?.find((x) => x.id !== null && String(x.id) === b)?.image, "medium") };
   }
   return null;
 }

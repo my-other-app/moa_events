@@ -40,6 +40,9 @@ export const RESERVED = new Set([
   "claim",
   "requests",
   "answers",
+  // People's profiles (/u/{handle}) and their QR codes (/p/{code}).
+  "u",
+  "p",
   "certificates",
   "verify",
   "register",

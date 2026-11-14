@@ -13,8 +13,8 @@
  *     addresses that are themselves a credential -- a check's result
  *     (/verify/{number}), a ticket (/tickets/{id}), a guest's certificate
  *     (/certificates/{id}), a survey link (/feedback/...), a missing-answers
- *     link (/answers/...), a claim or a request link -- never framed,
- *     stored, indexed or referred on;
+ *     link (/answers/...), a claim or a request link, a person's QR code
+ *     (/p/{code}) -- never framed, stored, indexed or referred on;
  *   - the OG fonts traced into the functions that read them;
  *   - Sentry's build settings, only when it is on (withSentry, below).
  */
@@ -113,6 +113,8 @@ const nextConfig = {
       { source: "/speakers/claim/:token", headers: CLAIM_HEADERS },
       // "Did we solve it?" from a support email: the link's token is its only credential.
       { source: "/help/survey/:token", headers: CLAIM_HEADERS },
+      // A person's QR code: looked up afresh on every scan (a replaced code stops at once), never indexed.
+      { source: "/p/:code", headers: PRIVATE_LINK_HEADERS },
     ];
   },
   async redirects() {

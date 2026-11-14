@@ -5,6 +5,7 @@ import { isStale, mediaTarget, redirectTtl } from "@/seo/media";
 import { media } from "@/seo/urls";
 import { ApiError } from "@/server/api";
 import { getClubPage, getClubPageFresh, getEventPage, getEventPageFresh, getThread } from "@/server/discover";
+import { getProfile, getProfileFresh } from "@/server/profiles";
 import { getSpeakerPage, getSpeakerPageFresh } from "@/server/speakers";
 
 /**
@@ -24,6 +25,8 @@ const LOADERS = {
   club: (slug, fresh) => (fresh ? getClubPageFresh(slug) : getClubPage(slug)),
   thread: (id, fresh) => getThread(id, { fresh }),
   speaker: (slug, fresh) => (fresh ? getSpeakerPageFresh(slug) : getSpeakerPage(slug)),
+  // As nobody sees the profile: a picture in a section hidden from strangers is a 404 here.
+  profile: (handle, fresh) => (fresh ? getProfileFresh(handle) : getProfile(handle)),
 };
 
 const status = (code, text, cache) => new Response(text, { status: code, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": cache } });

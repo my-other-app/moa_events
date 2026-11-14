@@ -33,6 +33,7 @@ import "@/styles/topics.css";
 import "@/styles/verify.css";
 import "@/styles/share.css";
 import "@/styles/speakers.css";
+import "@/styles/profiles.css";
 import "@/styles/help.css";
 import "@/styles/developers.css";
 import "@/styles/motion.css";
