@@ -280,6 +280,45 @@ describe("/p/{code}", { timeout: 30000 }, () => {
   });
 });
 
+describe("/network", () => {
+  const N = "../network/page.jsx";
+  const sp = (o) => Promise.resolve(o);
+
+  it("says the Network lives in the app, with Open in the app (?event= kept) and the store badges, and asks the API nothing", async () => {
+    const route = await load({}, N);
+    expect(route.dynamic).toBe("force-dynamic");
+    const out = html(await route.default({ searchParams: sp({ event: "12" }) }), "/network?event=12");
+    const text = textOf(out);
+    expect(text).toContain("Your Network lives in the MyOtherApp app");
+    expect(out).toMatch(/<a class="dc-btn" href="https:\/\/myotherapp\.in\/network\?event=12">Open in the app<\/a>/);
+    expect(text).toContain("Google Play");
+    expect(fetched.calls).toEqual([]);
+  });
+
+  it("keeps only an event's id, and works without one", async () => {
+    const route = await load({}, N);
+    for (const event of [undefined, "", "abc", "12; drop", "1".repeat(13), ["x", "7"]]) {
+      const out = html(await route.default({ searchParams: sp(event === undefined ? {} : { event }) }));
+      expect(out).toContain('href="https://myotherapp.in/network">Open in the app');
+    }
+    const out = html(await route.default({ searchParams: sp({ event: ["7", "8"] }) }));
+    expect(out).toContain('href="https://myotherapp.in/network?event=7"');
+  });
+
+  it("is never indexed or kept, and is a word of the site's own", async () => {
+    const route = await import(N);
+    expect(route.metadata.robots).toEqual({ index: false, follow: false });
+    const h = (await nextConfig.headers()).find((x) => x.source === "/network")?.headers || [];
+    expect(Object.fromEntries(h.map((x) => [x.key, x.value]))).toMatchObject({
+      "Cache-Control": "no-store, max-age=0",
+      "Vercel-CDN-Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+    });
+    expect(RESERVED.has("network")).toBe(true);
+    expect(isLegacyRef("network")).toBe(false);
+  });
+});
+
 describe("profiles and the rest of the site", () => {
   it("are words of the site's own, never an old event address", () => {
     expect(RESERVED.has("u")).toBe(true);

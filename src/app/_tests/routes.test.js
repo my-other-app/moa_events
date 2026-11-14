@@ -101,6 +101,8 @@ describe("which file answers which address", () => {
     ["/u/live", "u/[handle]/page.jsx"],
     ["/p/k7mx3qp9wz", "p/[code]/page.jsx"],
     ["/p/live", "p/[code]/page.jsx"],
+    // The recap's link into the app's Network tab.
+    ["/network?event=12", "network/page.jsx"],
     ["/help", "help/page.jsx"],
     // The developer docs: the one public page, the private pages and the two downloads (files of their own,
     // never a page; src/proxy.js and each file check the docs cookie), the docs link, and signing out.

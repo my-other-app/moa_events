@@ -43,6 +43,8 @@ export const RESERVED = new Set([
   // People's profiles (/u/{handle}) and their QR codes (/p/{code}).
   "u",
   "p",
+  // The recap's link into the app's Network tab (/network?event={id}).
+  "network",
   "certificates",
   "verify",
   "register",

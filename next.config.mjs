@@ -115,6 +115,8 @@ const nextConfig = {
       { source: "/help/survey/:token", headers: CLAIM_HEADERS },
       // A person's QR code: looked up afresh on every scan (a replaced code stops at once), never indexed.
       { source: "/p/:code", headers: PRIVATE_LINK_HEADERS },
+      // The recap's link into the app's Network tab: a page about the app, never indexed or kept.
+      { source: "/network", headers: PRIVATE_LINK_HEADERS },
     ];
   },
   async redirects() {

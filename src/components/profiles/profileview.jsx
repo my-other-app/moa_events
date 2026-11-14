@@ -1,8 +1,8 @@
 import { Link } from "@/lib/router";
-import { clubPagePath, eventPagePath } from "@/seo/urls";
+import { absoluteUrl, clubPagePath, eventPagePath } from "@/seo/urls";
 import { imageUrl } from "@/utils/format";
 import { firstName, hasAchievements, linkIcon, linkLabel, monthLabel } from "@/utils/profiles";
-import { EmptyState, Img } from "../discover/bits";
+import { EmptyState, Img, StoreButtons } from "../discover/bits";
 import { Face } from "../discover/eventparts";
 import Icon from "../discover/icons";
 
@@ -317,6 +317,32 @@ export function ProfileCodeProblem({ state }) {
           <Link className="dc-btn" to="/events">
             Find events
           </Link>
+        </EmptyState>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * /network: the recap's link into the app's Network tab (?event={id}, the
+ * event it was about). The Network is the app's alone; this page, for
+ * someone without the app, says so: open it there (the same address, which
+ * the app claims), or get it.
+ */
+export function NetworkInApp({ eventId = null }) {
+  const href = absoluteUrl(eventId ? `/network?event=${encodeURIComponent(eventId)}` : "/network");
+  return (
+    <div className="dc-wrap">
+      <div className="dc-section">
+        <EmptyState
+          as="h1"
+          title="Your Network lives in the MyOtherApp app"
+          message="Everyone you've saved at events, with your notes and tags, is in the app's Network tab. Open it there, or get the app: it's free."
+        >
+          <a className="dc-btn" href={href}>
+            Open in the app
+          </a>
+          <StoreButtons />
         </EmptyState>
       </div>
     </div>
