@@ -5,8 +5,9 @@ import { NetworkInApp } from "@/components/profiles/profileview";
  * /network?event={id}: the link in the morning-after recap (push and email)
  * into the app's Network tab (feature-register/profiles-networking-contract.md).
  * The Network is the app's alone: with the app installed the phone opens it
- * there; this page is for everyone else and says where it lives, with
- * "Open in the app" (the same address, ?event= kept) and the store badges.
+ * there; this page is for everyone else and says where it lives, with the
+ * store badges and, on Android, "Open in the app" (an intent link, ?event=
+ * kept).
  * No sign-in and no API call. Never indexed or kept (next.config.mjs).
  */
 export const dynamic = "force-dynamic";

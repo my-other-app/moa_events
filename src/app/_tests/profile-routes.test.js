@@ -36,9 +36,9 @@ afterEach(() => {
 });
 
 describe("/u/{handle}", { timeout: 30000 }, () => {
-  it("is regenerated every minute, with their name, headline and picture in Open Graph and the Twitter card", async () => {
+  it("is rendered per request, with their name, headline and picture in Open Graph and the Twitter card", async () => {
     const route = await load({ "/api/v1/profiles/asha": { body: PUBLIC_PROFILE() } });
-    expect(route.revalidate).toBe(60);
+    expect(route.dynamic).toBe("force-dynamic");
     const meta = await route.generateMetadata({ params: params({ handle: "asha" }) });
     expect(meta.title).toBe("Asha Rao, Compiler engineer");
     expect(meta.description).toBe("Builds compilers. Teaches on weekends.");
@@ -206,7 +206,37 @@ describe("/u/{handle}", { timeout: 30000 }, () => {
     expect(await outcome(() => route.default({ params: params({ handle: "Asha" }) }))).toEqual({ redirect: { url: "/u/asha", status: 308 } });
   });
 
-  it("keeps an API that can't answer from being a 404 (the kept copy stays)", async () => {
+  it("never loops for an older username stored with capitals: the page is at its lower-case address", async () => {
+    const route = await load({ "/api/v1/profiles/asha.rao": { body: PUBLIC_PROFILE({ handle: "Asha.Rao" }) } });
+    const res = await outcome(() => route.default({ params: params({ handle: "asha.rao" }) }));
+    expect(res.redirect).toBeUndefined();
+    const out = html(res.value, "/u/asha.rao");
+    expect(textOf(out)).toContain("@asha.rao");
+    expect(out).toContain("/media/profiles/asha.rao/picture?size=medium");
+    expect(out).toContain('href="https://api.myotherapp.in/api/v1/profiles/asha.rao/vcard"');
+    expect((await route.generateMetadata({ params: params({ handle: "asha.rao" }) })).alternates.canonical).toBe("https://myotherapp.in/u/asha.rao");
+    expect(await outcome(() => route.default({ params: params({ handle: "Asha.Rao" }) }))).toEqual({ redirect: { url: "/u/asha.rao", status: 308 } });
+  });
+
+  it("reads the profile, head and body, for the visitor's address (X-Visitor-IP behind the site's token)", async () => {
+    vi.stubEnv("API_SITE_TOKEN", "site-token");
+    requestHeaders = new Headers({ "x-forwarded-for": "203.0.113.9" });
+    const route = await load({ "/api/v1/profiles/asha": { body: PUBLIC_PROFILE() } });
+    await route.generateMetadata({ params: params({ handle: "asha" }) });
+    await route.default({ params: params({ handle: "asha" }) });
+    expect(fetched.calls.length).toBeGreaterThan(0);
+    for (const c of fetched.calls) {
+      expect(c.init.headers).toMatchObject({ "X-Site-Token": "site-token", "X-Visitor-IP": "203.0.113.9" });
+      expect(Object.keys(c.init.headers).map((k) => k.toLowerCase())).not.toContain("authorization");
+    }
+    // Without the site's token the API wouldn't believe it, so it isn't sent.
+    vi.unstubAllEnvs();
+    const again = await load({ "/api/v1/profiles/asha": { body: PUBLIC_PROFILE() } });
+    await again.default({ params: params({ handle: "asha" }) });
+    expect(fetched.calls[0].init.headers["X-Visitor-IP"]).toBeUndefined();
+  });
+
+  it("is an error, never a 404, while the API can't answer", async () => {
     const route = await load({ "/api/v1/profiles/asha": { status: 503, body: {} } });
     await expect(route.default({ params: params({ handle: "asha" }) })).rejects.toMatchObject({ name: "ApiError", status: 503 });
   });
@@ -224,6 +254,11 @@ describe("/p/{code}", { timeout: 30000 }, () => {
     expect(Object.keys(fetched.calls[0].init.headers).map((k) => k.toLowerCase())).not.toContain("authorization");
     // A code typed in capitals is the same code.
     expect(await outcome(() => route.default({ params: params({ code: "K7MX3QP9WZ" }) }))).toEqual({ redirect: { url: "/u/asha?save=1", status: 307 } });
+  });
+
+  it("sends an older username stored with capitals to its lower-case address", async () => {
+    const route = await load({ "/api/v1/profiles/by-code/k7mx3qp9wz": { body: { handle: "Asha.Rao", profile: PUBLIC_PROFILE({ handle: "Asha.Rao" }) } } }, P);
+    expect(await outcome(() => route.default({ params: params({ code: "k7mx3qp9wz" }) }))).toEqual({ redirect: { url: "/u/asha.rao?save=1", status: 307 } });
   });
 
   it("asks for the visitor who scanned (X-Visitor-IP behind the site's token), so the API's 30 a minute is theirs", async () => {
@@ -284,25 +319,25 @@ describe("/network", () => {
   const N = "../network/page.jsx";
   const sp = (o) => Promise.resolve(o);
 
-  it("says the Network lives in the app, with Open in the app (?event= kept) and the store badges, and asks the API nothing", async () => {
+  it("says the Network lives in the app, with the store badges, and asks the API nothing", async () => {
     const route = await load({}, N);
     expect(route.dynamic).toBe("force-dynamic");
     const out = html(await route.default({ searchParams: sp({ event: "12" }) }), "/network?event=12");
     const text = textOf(out);
     expect(text).toContain("Your Network lives in the MyOtherApp app");
-    expect(out).toMatch(/<a class="dc-btn" href="https:\/\/myotherapp\.in\/network\?event=12">Open in the app<\/a>/);
     expect(text).toContain("Google Play");
+    // Open in the app is the browser's to add, on Android only (an intent link): never a link back to this page.
+    expect(out).not.toContain('href="https://myotherapp.in/network');
     expect(fetched.calls).toEqual([]);
   });
 
   it("keeps only an event's id, and works without one", async () => {
     const route = await load({}, N);
-    for (const event of [undefined, "", "abc", "12; drop", "1".repeat(13), ["x", "7"]]) {
-      const out = html(await route.default({ searchParams: sp(event === undefined ? {} : { event }) }));
-      expect(out).toContain('href="https://myotherapp.in/network">Open in the app');
-    }
-    const out = html(await route.default({ searchParams: sp({ event: ["7", "8"] }) }));
-    expect(out).toContain('href="https://myotherapp.in/network?event=7"');
+    const eventOf = async (q) => (await route.default({ searchParams: sp(q) })).props.children.props.eventId;
+    for (const event of ["", "abc", "12; drop", "1".repeat(13), ["x", "7"]]) expect(await eventOf({ event })).toBeNull();
+    expect(await eventOf({})).toBeNull();
+    expect(await eventOf({ event: "12" })).toBe("12");
+    expect(await eventOf({ event: ["7", "8"] })).toBe("7");
   });
 
   it("is never indexed or kept, and is a word of the site's own", async () => {
@@ -361,6 +396,19 @@ describe("profiles and the rest of the site", () => {
     expect(res.status).toBe(404);
     res = await media.GET(req("/media/profiles/../picture"), { params: params({ path: ["profiles", "..", "picture"] }) });
     expect(res.status).toBe(404);
+  });
+
+  it("reads a picture's profile for the visitor asking (X-Visitor-IP behind the site's token)", async () => {
+    vi.stubEnv("API_SITE_TOKEN", "site-token");
+    vi.resetModules();
+    const fetch = fakeFetch({ "/api/v1/profiles/asha": { body: PUBLIC_PROFILE({ picture: "https://cdn.example/m.jpg" }) } });
+    vi.stubGlobal("fetch", fetch);
+    const media = await import("../media/[...path]/route.jsx");
+    const url = "https://myotherapp.in/media/profiles/asha/picture";
+    const req = Object.assign(new Request(url, { headers: { "x-forwarded-for": "198.51.100.4" } }), { nextUrl: new URL(url) });
+    const res = await media.GET(req, { params: params({ path: ["profiles", "asha", "picture"] }) });
+    expect(res.status).toBe(307);
+    expect(fetch.calls[0].init.headers).toMatchObject({ "X-Site-Token": "site-token", "X-Visitor-IP": "198.51.100.4" });
   });
 
   it("never hands out a signed picture link about to expire: it reads the profile again, past the cache", async () => {

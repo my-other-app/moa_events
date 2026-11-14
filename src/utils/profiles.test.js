@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { PRIVATE_PROFILE, PUBLIC_PROFILE } from "@/test/profileFixture";
-import { describeSaveError, httpLink, isProfileCode, isProfileHandle, parsePublicProfile, parseSaveResult, readCodeAnswer } from "./profiles";
+import { androidIntentUrl, describeSaveError, httpLink, isProfileCode, isProfileHandle, parsePublicProfile, parseSaveResult, readCodeAnswer } from "./profiles";
 
 /*
  * Reading the profile shapes (feature-register/profiles-networking-contract.md):
@@ -141,5 +141,24 @@ describe("saving", () => {
     [{ status: 400, message: "Bad" }, "message"],
   ])("%j is %s", (f, kind) => {
     expect(describeSaveError(f, "Asha Rao").kind).toBe(kind);
+  });
+});
+
+describe("Open in the app on Android", () => {
+  const PLAY = encodeURIComponent("https://play.google.com/store/apps/details?id=app.myotherapp.in");
+  it("is an intent link to the site's own address in the app's package, the Play Store without it", () => {
+    expect(androidIntentUrl("/u/asha?save=1")).toBe(`intent://myotherapp.in/u/asha?save=1#Intent;scheme=https;package=app.myotherapp.in;S.browser_fallback_url=${PLAY};end`);
+    expect(androidIntentUrl("/network?event=12")).toBe(`intent://myotherapp.in/network?event=12#Intent;scheme=https;package=app.myotherapp.in;S.browser_fallback_url=${PLAY};end`);
+  });
+
+  it("never leaves the site's own host", () => {
+    for (const p of ["//evil.example/x", "https://evil.example", "", null]) expect(androidIntentUrl(p)).toMatch(/^intent:\/\/myotherapp\.in\/#Intent;/);
+  });
+});
+
+describe("handles stored with capitals", () => {
+  it("are read lower case, one spelling for every address", () => {
+    expect(parsePublicProfile(PUBLIC_PROFILE({ handle: "Asha.Rao" })).handle).toBe("asha.rao");
+    expect(readCodeAnswer(200, { handle: "Asha" })).toEqual({ state: "ok", handle: "asha" });
   });
 });

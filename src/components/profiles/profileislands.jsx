@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { profilesApi, vcardUrl } from "@/api/profiles";
 import { useAuth } from "@/auth/context";
-import { absoluteUrl } from "@/seo/urls";
 import { describeSaveError, firstName, profileSavePath } from "@/utils/profiles";
 import { AppPrompt } from "../discover/dialog";
 import Icon from "../discover/icons";
+import { OpenInApp, useAndroid } from "./openinapp";
 import { ProfileMissing, ProfileView } from "./profileview";
 
 /**
@@ -16,14 +16,17 @@ import { ProfileMissing, ProfileView } from "./profileview";
  * their token, and whatever more it says (their relation, the sections they
  * may see, contact details shared with them) replaces it here.
  *
- *   Save to your network   signed in: POST /network {handle, method: "link"},
- *                          then "saved" or "you've saved each other"; signed
- *                          out: the app (open it, or get it), or sign in here
+ *   Save to your network   only on the reader's own tap (never on opening the
+ *                          page, ?save=1 or not): signed in, POST /network
+ *                          {handle, method: "link"}, then "saved" or "you've
+ *                          saved each other"; signed out, the app (open it on
+ *                          Android, or get it), or sign in here and save
  *   Save contact           the API's vCard: as a plain link for anyone, and
  *                          fetched with the reader's token when signed in (so
  *                          it carries what they may see)
  *
- * ?save=1 (a scanned QR, sent on from /p/{code}) puts the offer first.
+ * ?save=1 (a QR's link, sent on from /p/{code}) only puts the offer first:
+ * a link someone was sent is not a scan, and saving makes the two "met".
  */
 
 /** True when the address asks to save (a scanned QR sent on from /p/{code}). */
@@ -79,6 +82,7 @@ const savedLine = (r, first) => (r.mutual ? `Saved. You and ${first} have saved 
 
 export function SaveToNetwork({ profile, signedIn, onSaved = () => {} }) {
   const auth = useAuth();
+  const android = useAndroid();
   const first = firstName(profile.name);
   const rel = profile.relation;
   const [s, setS] = useState({ busy: false, done: null, error: null });
@@ -154,16 +158,16 @@ export function SaveToNetwork({ profile, signedIn, onSaved = () => {} }) {
         title={`Save ${first} to your network`}
         message={`Saving people happens in the MyOtherApp app: open ${first}'s profile there and tap Save, or scan their QR code. Free on your phone.`}
         alt={
-          <div className="pf-prompt-alt">
-            <a className="dc-btn dc-btn--ghost" href={absoluteUrl(profileSavePath(profile.handle))}>
-              Open in the app
-            </a>
-            {auth.enabled ? (
-              <button type="button" className="dc-btn dc-btn--ghost" onClick={signInToSave}>
-                Sign in to save here
-              </button>
-            ) : null}
-          </div>
+          android || auth.enabled ? (
+            <div className="pf-prompt-alt">
+              <OpenInApp path={profileSavePath(profile.handle)} className="dc-btn dc-btn--ghost" />
+              {auth.enabled ? (
+                <button type="button" className="dc-btn dc-btn--ghost" onClick={signInToSave}>
+                  Sign in to save here
+                </button>
+              ) : null}
+            </div>
+          ) : null
         }
       />
     </div>

@@ -1,10 +1,11 @@
 import { Link } from "@/lib/router";
-import { absoluteUrl, clubPagePath, eventPagePath } from "@/seo/urls";
+import { clubPagePath, eventPagePath } from "@/seo/urls";
 import { imageUrl } from "@/utils/format";
 import { firstName, hasAchievements, linkIcon, linkLabel, monthLabel } from "@/utils/profiles";
 import { EmptyState, Img, StoreButtons } from "../discover/bits";
 import { Face } from "../discover/eventparts";
 import Icon from "../discover/icons";
+import { OpenInApp } from "./openinapp";
 
 /**
  * A person's profile, laid out (feature-register/profiles-networking-contract.md):
@@ -326,11 +327,11 @@ export function ProfileCodeProblem({ state }) {
 /**
  * /network: the recap's link into the app's Network tab (?event={id}, the
  * event it was about). The Network is the app's alone; this page, for
- * someone without the app, says so: open it there (the same address, which
- * the app claims), or get it.
+ * someone without the app, says so: open it there (Android: OpenInApp), or
+ * get it.
  */
 export function NetworkInApp({ eventId = null }) {
-  const href = absoluteUrl(eventId ? `/network?event=${encodeURIComponent(eventId)}` : "/network");
+  const path = eventId ? `/network?event=${encodeURIComponent(eventId)}` : "/network";
   return (
     <div className="dc-wrap">
       <div className="dc-section">
@@ -339,9 +340,7 @@ export function NetworkInApp({ eventId = null }) {
           title="Your Network lives in the MyOtherApp app"
           message="Everyone you've saved at events, with your notes and tags, is in the app's Network tab. Open it there, or get the app: it's free."
         >
-          <a className="dc-btn" href={href}>
-            Open in the app
-          </a>
+          <OpenInApp path={path} />
           <StoreButtons />
         </EmptyState>
       </div>

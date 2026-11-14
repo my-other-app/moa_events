@@ -7,6 +7,7 @@ import { ApiError } from "@/server/api";
 import { getClubPage, getClubPageFresh, getEventPage, getEventPageFresh, getThread } from "@/server/discover";
 import { getProfile, getProfileFresh } from "@/server/profiles";
 import { getSpeakerPage, getSpeakerPageFresh } from "@/server/speakers";
+import { readVisitor } from "@/server/visitor";
 
 /**
  * GET /media/... — a stable address for an image the API only hands out as
@@ -25,8 +26,9 @@ const LOADERS = {
   club: (slug, fresh) => (fresh ? getClubPageFresh(slug) : getClubPage(slug)),
   thread: (id, fresh) => getThread(id, { fresh }),
   speaker: (slug, fresh) => (fresh ? getSpeakerPageFresh(slug) : getSpeakerPage(slug)),
-  // As nobody sees the profile: a picture in a section hidden from strangers is a 404 here.
-  profile: (handle, fresh) => (fresh ? getProfileFresh(handle) : getProfile(handle)),
+  // As nobody sees the profile (a picture in a section hidden from strangers is a 404 here),
+  // read for the visitor asking (X-Visitor-IP): the API's per-address limit is theirs.
+  profile: (handle, fresh, visitor) => (fresh ? getProfileFresh(handle, visitor?.ip) : getProfile(handle, visitor?.ip)),
 };
 
 const status = (code, text, cache) => new Response(text, { status: code, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": cache } });
@@ -60,11 +62,12 @@ export async function GET(request, { params }) {
     // Only an event's cover is drawn here; a club's cover is its own picture, looked up below.
     if (target.source === "event" && target.what === "cover") return await cover(target.ref);
     const load = LOADERS[target.source];
-    let data = await load(target.ref, false);
+    const visitor = target.source === "profile" ? readVisitor(request.headers) : null;
+    let data = await load(target.ref, false, visitor);
     let url = data ? target.pick(data, size) : null;
     // A link about to die (an old cached answer) is asked for again, fresh.
     if (data && isStale(url)) {
-      data = await load(target.ref, true);
+      data = await load(target.ref, true, visitor);
       url = data ? target.pick(data, size) : null;
     }
     if (!data) return status(404, "Not found", "public, max-age=60, s-maxage=60");

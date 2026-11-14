@@ -24,6 +24,7 @@ const { apiFailure } = await import("@/utils/ticketing");
 const { parsePublicProfile, parseSaveResult } = await import("@/utils/profiles");
 const { stableProfile } = await import("@/seo/stabilize");
 const { ProfileLive } = await import("./profileislands");
+const { NetworkInApp } = await import("./profileview");
 const { PRIVATE_PROFILE, PUBLIC_PROFILE } = await import("@/test/profileFixture");
 const { PROFILE, enableSignIn, resetAuth, signInAs } = await import("@/test/auth");
 
@@ -172,34 +173,64 @@ describe("Save to your network", () => {
     expect(screen.getByRole("button", { name: "Save Asha Rao to your network" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("signed out: offers the app (open it, or get it) and signing in, and saves nothing", async () => {
+  it("signed out: offers the store and signing in, and saves nothing", async () => {
     enableSignIn();
     show(anon());
     fireEvent.click(screen.getByRole("button", { name: "Save Asha Rao to your network" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: "Save Asha to your network" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: "Open in the app" })).toHaveAttribute("href", "https://myotherapp.in/u/asha?save=1");
     expect(within(dialog).getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Sign in to save here" })).toBeInTheDocument();
+    // Not on Android: a link to this site's own page wouldn't leave the browser, so there is none.
+    expect(within(dialog).queryByRole("link", { name: "Open in the app" })).not.toBeInTheDocument();
     expect(profilesApi.save).not.toHaveBeenCalled();
     expect(profilesApi.page).not.toHaveBeenCalled();
   });
 
-  it("on a site without sign-in, the app alone", async () => {
+  it("on Android, Open in the app is an intent link into the app (the Play Store without it), ?save=1 kept", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131 Mobile Safari/537.36");
     show(anon());
     fireEvent.click(screen.getByRole("button", { name: "Save Asha Rao to your network" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("link", { name: "Open in the app" })).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Sign in to save here" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Open in the app" })).toHaveAttribute(
+      "href",
+      `intent://myotherapp.in/u/asha?save=1#Intent;scheme=https;package=app.myotherapp.in;S.browser_fallback_url=${encodeURIComponent("https://play.google.com/store/apps/details?id=app.myotherapp.in")};end`,
+    );
+    vi.restoreAllMocks();
   });
 
-  it("puts the offer first for a scanned QR (?save=1), and not otherwise", async () => {
+  it("on a site without sign-in and off Android, the store alone (no empty 'or')", async () => {
+    show(anon());
+    fireEvent.click(screen.getByRole("button", { name: "Save Asha Rao to your network" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Sign in to save here" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("or")).not.toBeInTheDocument();
+  });
+
+  it("puts the offer first for a QR's link (?save=1), and not otherwise", async () => {
     const { unmount } = show(anon());
     expect(screen.queryByText(/so you can find them again after the event/)).not.toBeInTheDocument();
     unmount();
     window.history.replaceState({}, "", "/u/asha?save=1");
     show(anon());
     expect(await screen.findByText("Save Asha to your network, so you can find them again after the event.")).toBeInTheDocument();
+  });
+
+  it("never saves on opening, ?save=1 and signed in or not: only the reader's tap saves", async () => {
+    enableSignIn();
+    signInAs();
+    window.history.replaceState({}, "", "/u/asha?save=1");
+    profilesApi.page.mockResolvedValue(parsePublicProfile(PUBLIC_PROFILE()));
+    profilesApi.save.mockResolvedValue(parseSaveResult({ person: { id: 5, mutual: false }, created: true, profile: PUBLIC_PROFILE() }));
+    show(anon());
+    await waitFor(() => expect(profilesApi.page).toHaveBeenCalled());
+    expect(await screen.findByText(/so you can find them again after the event/)).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(profilesApi.save).not.toHaveBeenCalled();
+    expect(screen.queryByText(/is in your network/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save Asha Rao to your network" }));
+    await waitFor(() => expect(profilesApi.save).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -237,5 +268,18 @@ describe("Save contact", () => {
   it("isn't offered for a private profile the reader can't see", () => {
     show(stableProfile(parsePublicProfile(PRIVATE_PROFILE())));
     expect(screen.queryByRole("link", { name: /contact card/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("/network's page in the browser", () => {
+  it("on Android, opens the Network tab in the app for that event; elsewhere, the store alone", () => {
+    const { unmount } = render(<NetworkInApp eventId="12" />);
+    expect(screen.queryByRole("link", { name: "Open in the app" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
+    unmount();
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Linux; Android 14) Chrome/131 Mobile");
+    render(<NetworkInApp eventId="12" />);
+    expect(screen.getByRole("link", { name: "Open in the app" }).getAttribute("href")).toMatch(/^intent:\/\/myotherapp\.in\/network\?event=12#Intent;scheme=https;package=app\.myotherapp\.in;/);
+    vi.restoreAllMocks();
   });
 });

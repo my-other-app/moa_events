@@ -13,6 +13,7 @@
  * Everything a person typed is kept as text (the components render it as
  * text, never as HTML), and only http(s) links survive.
  */
+import { PLAY_STORE_URL } from "@/config";
 import { profilePagePath } from "@/seo/urls";
 
 const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
@@ -39,6 +40,21 @@ export const isProfileCode = (v) => CODE.test(String(v ?? ""));
 export const profilePath = profilePagePath;
 /** The page a scanned code lands on: "save" survives the redirect, so the page can offer it. */
 export const profileSavePath = (handle) => `${profilePath(handle)}?save=1`;
+
+/**
+ * "Open in the app" on Android: an intent link to one of the site's own
+ * addresses (`path`, query kept) in the app's package, which Chrome hands to
+ * the app when it is installed and otherwise sends to the Play Store. A
+ * plain link to this site's own address would not leave the browser; on an
+ * iPhone nothing can (Safari keeps a tap on a page's own domain), so the
+ * page offers the store there instead.
+ */
+export const ANDROID_PACKAGE = "app.myotherapp.in";
+export function androidIntentUrl(path, { fallback = PLAY_STORE_URL } = {}) {
+  const p = String(path || "/");
+  const rest = p.startsWith("/") && !p.startsWith("//") ? p : "/";
+  return `intent://myotherapp.in${rest}#Intent;scheme=https;package=${ANDROID_PACKAGE};S.browser_fallback_url=${encodeURIComponent(fallback)};end`;
+}
 
 /** The sections a profile owner chooses who sees (visibility keys). */
 export const SECTIONS = ["links", "projects", "achievements", "interests", "org"];
@@ -175,9 +191,11 @@ const parseRelation = (r) => {
 export function parsePublicProfile(d) {
   const o = obj(d);
   if (!o) return null;
-  const handle = str(o.handle);
+  // Handles are case-blind; an older username may be stored with capitals. One spelling, lower
+  // case, for every address the page builds (and /u/{handle}'s own redirect never loops).
+  const handle = str(o.handle)?.toLowerCase() || null;
   const name = str(o.full_name);
-  if (!handle || !isProfileHandle(handle.toLowerCase()) || !name) return null;
+  if (!handle || !isProfileHandle(handle) || !name) return null;
   const isPrivate = bool(o.private);
   const isMe = bool(o.is_me);
   const relation = parseRelation(o.relation);
@@ -276,8 +294,8 @@ export function readCodeAnswer(status, body) {
   if (status === 403 && code === "PROFILE_SCANNING_OFF") return { state: "scanning-off" };
   if (status === 404) return { state: "missing" };
   if (status >= 200 && status < 300) {
-    const handle = str(o.handle) || str(obj(o.profile)?.handle);
-    return handle && isProfileHandle(handle.toLowerCase()) ? { state: "ok", handle } : { state: "missing" };
+    const handle = (str(o.handle) || str(obj(o.profile)?.handle))?.toLowerCase();
+    return handle && isProfileHandle(handle) ? { state: "ok", handle } : { state: "missing" };
   }
   return null;
 }
