@@ -1,4 +1,5 @@
 import { revalidatePath, revalidateTag } from "next/cache";
+import { namesSecret } from "@/server/secret";
 import { TAGS } from "@/server/discover";
 import { SPEAKER_TAG } from "@/server/speakers";
 import { HELP_TAG } from "@/server/support";
@@ -22,7 +23,7 @@ const REF = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 export async function POST(request) {
   const secret = process.env.REVALIDATE_SECRET;
   if (!secret) return new Response("Not found", { status: 404 });
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("Unauthorized", { status: 401 });
+  if (!namesSecret(request.headers.get("authorization"), secret)) return new Response("Unauthorized", { status: 401 });
   let body;
   try {
     body = await request.json();
