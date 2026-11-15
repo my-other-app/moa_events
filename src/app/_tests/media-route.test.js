@@ -88,6 +88,27 @@ describe("a stable image address", () => {
     expect((await get("/media/events/hack-night-04/team/0/photo")).status).toBe(404);
   });
 
+  it("never redirects to a link off our own storage: such a picture is no picture", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fakeFetch((url) => {
+        if (url.pathname === "/api/v1/discover/events/typed-link")
+          return { body: fullEvent({ event: { ...fullEvent().event, poster: "https://evil.example/p.png", poster_thumb: "http://media.myotherapp.in/p.png" } }) };
+        if (url.pathname === "/api/v1/discover/clubs/typed-link")
+          return { body: { club: { id: 4, slug: "typed-link", name: "Typed", logo: "https://169.254.169.254/latest/meta-data", cover: "https://login.example/phish" } } };
+        return { status: 404, body: {} };
+      }),
+    );
+    const poster = await get("/media/events/typed-link/poster");
+    expect(poster.status).toBe(307);
+    expect(poster.headers.get("location")).toBe("https://myotherapp.in/media/events/typed-link/cover");
+    for (const what of ["logo", "cover"]) {
+      const res = await get(`/media/clubs/typed-link/${what}`);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("location")).toBeNull();
+    }
+  });
+
   it("says so (502, not kept) when the API can't be asked", async () => {
     const res = await get("/media/events/boom/poster");
     expect(res.status).toBe(502);

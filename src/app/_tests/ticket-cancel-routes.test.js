@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import nextConfig from "../../../next.config.mjs";
+import { effectiveHeaders } from "@/test/headers";
 import { appleAppSiteAssociation } from "@/seo/appLinks";
 import { RESERVED } from "@/seo/legacy";
 
@@ -28,9 +29,7 @@ describe("/tickets/cancel", () => {
   });
 
   it("gets the private-link headers (the ticket's own rule covers it)", async () => {
-    const rules = await nextConfig.headers();
-    const rule = rules.find((x) => new RegExp(`^${x.source.replace(/:\w+/g, "[^/]+")}$`).test("/tickets/cancel"));
-    const h = Object.fromEntries(rule.headers.map((x) => [x.key, x.value]));
+    const h = await effectiveHeaders(nextConfig, "/tickets/cancel");
     expect(h).toMatchObject({ "Referrer-Policy": "no-referrer", "Cache-Control": "no-store, max-age=0", "X-Robots-Tag": "noindex, nofollow", "X-Frame-Options": "DENY" });
   });
 

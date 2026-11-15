@@ -376,8 +376,8 @@ describe("profiles and the rest of the site", () => {
       fakeFetch({
         "/api/v1/profiles/asha": {
           body: PUBLIC_PROFILE({
-            picture: "https://cdn.example/m.jpg",
-            projects: [{ id: 11, title: "Tiny C", image: "https://cdn.example/p11.jpg", tags: [] }],
+            picture: "https://media.myotherapp.in/m.jpg",
+            projects: [{ id: 11, title: "Tiny C", image: "https://media.myotherapp.in/p11.jpg", tags: [] }],
           }),
         },
       }),
@@ -386,11 +386,11 @@ describe("profiles and the rest of the site", () => {
     const req = (p) => Object.assign(new Request(`https://myotherapp.in${p}`), { nextUrl: new URL(`https://myotherapp.in${p}`) });
     let res = await media.GET(req("/media/profiles/asha/picture?size=thumbnail"), { params: params({ path: ["profiles", "asha", "picture"] }) });
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("https://cdn.example/m.jpg");
+    expect(res.headers.get("location")).toBe("https://media.myotherapp.in/m.jpg");
     res = await media.GET(req("/media/profiles/asha/picture"), { params: params({ path: ["profiles", "asha", "picture"] }) });
-    expect(res.headers.get("location")).toBe("https://cdn.example/m.jpg");
+    expect(res.headers.get("location")).toBe("https://media.myotherapp.in/m.jpg");
     res = await media.GET(req("/media/profiles/asha/projects/11/image"), { params: params({ path: ["profiles", "asha", "projects", "11", "image"] }) });
-    expect(res.headers.get("location")).toBe("https://cdn.example/p11.jpg");
+    expect(res.headers.get("location")).toBe("https://media.myotherapp.in/p11.jpg");
     // A project strangers don't see has no picture here.
     res = await media.GET(req("/media/profiles/asha/projects/99/image"), { params: params({ path: ["profiles", "asha", "projects", "99", "image"] }) });
     expect(res.status).toBe(404);
@@ -401,7 +401,7 @@ describe("profiles and the rest of the site", () => {
   it("reads a picture's profile for the visitor asking (X-Visitor-IP behind the site's token)", async () => {
     vi.stubEnv("API_SITE_TOKEN", "site-token");
     vi.resetModules();
-    const fetch = fakeFetch({ "/api/v1/profiles/asha": { body: PUBLIC_PROFILE({ picture: "https://cdn.example/m.jpg" }) } });
+    const fetch = fakeFetch({ "/api/v1/profiles/asha": { body: PUBLIC_PROFILE({ picture: "https://media.myotherapp.in/m.jpg" }) } });
     vi.stubGlobal("fetch", fetch);
     const media = await import("../media/[...path]/route.jsx");
     const url = "https://myotherapp.in/media/profiles/asha/picture";

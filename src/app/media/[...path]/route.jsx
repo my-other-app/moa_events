@@ -8,6 +8,7 @@ import { getClubPage, getClubPageFresh, getEventPage, getEventPageFresh, getThre
 import { getProfile, getProfileFresh } from "@/server/profiles";
 import { getSpeakerPage, getSpeakerPageFresh } from "@/server/speakers";
 import { readVisitor } from "@/server/visitor";
+import { ourImage } from "@/utils/imagehosts";
 
 /**
  * GET /media/... — a stable address for an image the API only hands out as
@@ -19,6 +20,10 @@ import { readVisitor } from "@/server/visitor";
  *
  * An event without a poster redirects to its drawn cover
  * (/media/events/{ref}/cover), which is drawn here as a PNG.
+ *
+ * Only to a link on our own storage (src/utils/imagehosts.js): an image
+ * field holding any other address is answered as no image, so this is
+ * never a redirect to somewhere else on our domain's word.
  */
 
 const LOADERS = {
@@ -64,11 +69,11 @@ export async function GET(request, { params }) {
     const load = LOADERS[target.source];
     const visitor = target.source === "profile" ? readVisitor(request.headers) : null;
     let data = await load(target.ref, false, visitor);
-    let url = data ? target.pick(data, size) : null;
+    let url = data ? ourImage(target.pick(data, size)) : null;
     // A link about to die (an old cached answer) is asked for again, fresh.
     if (data && isStale(url)) {
       data = await load(target.ref, true, visitor);
-      url = data ? target.pick(data, size) : null;
+      url = data ? ourImage(target.pick(data, size)) : null;
     }
     if (!data) return status(404, "Not found", "public, max-age=60, s-maxage=60");
     if (!url) {

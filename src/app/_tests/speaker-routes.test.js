@@ -182,13 +182,13 @@ describe("the speakers' sitemap and photos", { timeout: 30000 }, () => {
 
   it("redirects the photo's stable address to the current link", async () => {
     vi.resetModules();
-    vi.stubGlobal("fetch", fakeFetch({ "/api/v1/speakers/asha-rao": { body: SPEAKER({ photo: { thumbnail: "https://cdn.example/t.jpg", medium: "https://cdn.example/m.jpg" } }) } }));
+    vi.stubGlobal("fetch", fakeFetch({ "/api/v1/speakers/asha-rao": { body: SPEAKER({ photo: { thumbnail: "https://media.myotherapp.in/t.jpg", medium: "https://media.myotherapp.in/m.jpg" } }) } }));
     const media = await import("../media/[...path]/route.jsx");
     const req = (q) => Object.assign(new Request(`https://myotherapp.in/media/speakers/asha-rao/photo${q}`), { nextUrl: new URL(`https://myotherapp.in/media/speakers/asha-rao/photo${q}`) });
     const res = await media.GET(req("?size=thumbnail"), { params: params({ path: ["speakers", "asha-rao", "photo"] }) });
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("https://cdn.example/t.jpg");
+    expect(res.headers.get("location")).toBe("https://media.myotherapp.in/t.jpg");
     const big = await media.GET(req(""), { params: params({ path: ["speakers", "asha-rao", "photo"] }) });
-    expect(big.headers.get("location")).toBe("https://cdn.example/m.jpg");
+    expect(big.headers.get("location")).toBe("https://media.myotherapp.in/m.jpg");
   });
 });
