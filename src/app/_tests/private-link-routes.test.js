@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import nextConfig, { CLAIM_HEADERS, PRIVATE_LINK_HEADERS } from "../../../next.config.mjs";
+import { rulesFor } from "@/test/headers";
 
 /*
  * The addresses that are themselves a credential: a ticket (its id is the
@@ -10,13 +11,18 @@ import nextConfig, { CLAIM_HEADERS, PRIVATE_LINK_HEADERS } from "../../../next.c
  * The claim and request pages tell other sites the origin alone (their
  * payment needs it); the rest tell them nothing.
  */
-const compile = (source) => new RegExp(`^${source.replace(/:(\w+)/g, "([^/]+)")}$`);
-const headersFor = async (path) => (await nextConfig.headers()).filter((rule) => compile(rule.source).test(path)).flatMap((rule) => rule.headers);
-const valueOf = (headers, key) => {
-  const found = headers.filter((h) => h.key === key);
+/** The headers an address gets, block by block; besides the site-wide one, one block per address. */
+const headersFor = async (path) => {
+  const [site, ...own] = await rulesFor(nextConfig, path);
+  expect(site.source).toBe("/:path*");
+  return { site: site.headers, own: own.flatMap((rule) => rule.headers) };
+};
+/** A header as sent: the address's own block wins over the site-wide one (Next keeps the later). */
+const valueOf = ({ site, own }, key) => {
+  const found = own.filter((h) => h.key === key);
   // One rule per address: two would leave the browser to pick.
   expect(found.length).toBeLessThanOrEqual(1);
-  return found[0]?.value ?? null;
+  return found[0]?.value ?? site.find((h) => h.key === key)?.value ?? null;
 };
 
 describe("addresses that are a credential", () => {
@@ -54,6 +60,8 @@ describe("addresses that are a credential", () => {
   });
 
   it.each(["/", "/events", "/events/hack-night-04", "/me/tickets", "/play/68"])("%s keeps the site's defaults", async (path) => {
-    expect(valueOf(await headersFor(path), "Referrer-Policy")).toBeNull();
+    const h = await headersFor(path);
+    expect(h.own.find((x) => x.key === "Referrer-Policy")).toBeUndefined();
+    expect(valueOf(h, "Referrer-Policy")).toBe("strict-origin-when-cross-origin");
   });
 });

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import nextConfig from "../../../next.config.mjs";
+import { rulesFor } from "@/test/headers";
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn(), revalidatePath: vi.fn() }));
 
@@ -17,10 +18,8 @@ const { POST } = await import("../api/revalidate/route.js");
 
 describe("the find pages at the edge", () => {
   const EDGE = "max-age=60, stale-while-revalidate=300";
-  const compile = (source) => new RegExp(`^${source.replace(/:(\w+)/g, "([^/]+)")}$`);
-  /** The headers Next adds to a path, by next.config's headers(). */
-  const headersFor = async (path) =>
-    (await nextConfig.headers()).filter((rule) => compile(rule.source).test(path)).flatMap((rule) => rule.headers);
+  /** The headers Next adds to a path by next.config's headers(), besides the site-wide block every path has. */
+  const headersFor = async (path) => (await rulesFor(nextConfig, path)).filter((rule) => rule.source !== "/:path*").flatMap((rule) => rule.headers);
   const edgeOf = async (path) => (await headersFor(path)).find((h) => h.key === "Vercel-CDN-Cache-Control")?.value ?? null;
 
   it.each(["/events", "/clubs", "/topics/development", "/topics/arts"])("keeps %s a minute at the edge, then serves it stale for five while it refreshes", async (path) => {

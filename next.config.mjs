@@ -9,6 +9,8 @@
  *   - the find pages (/events, /clubs) and a topic's page (/topics/{slug})
  *     kept a minute at Vercel's edge: they are rendered per request, but
  *     their HTML depends on the address alone;
+ *   - on every address, no framing, no sniffing, the origin alone in a
+ *     Referer, and a report-only script policy (SITE_HEADERS);
  *   - the certificate check (/verify) never framed by another site, and the
  *     addresses that are themselves a credential -- a check's result
  *     (/verify/{number}), a ticket (/tickets/{id}), a guest's certificate
@@ -64,6 +66,69 @@ export const CLAIM_HEADERS = [
   { key: "X-Robots-Tag", value: "noindex, nofollow" },
 ];
 
+/**
+ * Where a report of something the policy below would have blocked goes:
+ * Sentry's security endpoint for the site's project, when Sentry is on
+ * (https://<key>@<host>/<project> → https://<host>/api/<project>/security/?sentry_key=<key>).
+ */
+export function cspReportUri(dsn = sentryDsn()) {
+  if (!dsn) return null;
+  try {
+    const u = new URL(dsn);
+    const project = u.pathname.replace(/^\/+|\/+$/g, "");
+    if (!u.username || !/^\d+$/.test(project)) return null;
+    return `${u.protocol}//${u.host}/api/${project}/security/?sentry_key=${u.username}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The script and connection policy the site is heading for, sent only as
+ * Content-Security-Policy-Report-Only: the browser enforces nothing and
+ * reports what it would have blocked (to Sentry when it is on), so it can
+ * be watched for a while and then enforced. 'unsafe-inline' scripts stay
+ * while pages are kept (ISR) with no per-request nonce; the host lists
+ * still keep a script from loading from, or sending to, anywhere else.
+ * Razorpay's checkout and Google's sign-in are the third parties.
+ */
+export function reportOnlyPolicy({ apiOrigin = process.env.NEXT_PUBLIC_API_BASE_URL, dev = process.env.NODE_ENV === "development", reportUri = cspReportUri() } = {}) {
+  const api = (apiOrigin || "https://api.myotherapp.in").trim().replace(/\/+$/, "");
+  const media = "https://media.myotherapp.in https://*.amazonaws.com";
+  const parts = [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://checkout.razorpay.com https://accounts.google.com/gsi/client`,
+    "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+    `img-src 'self' data: blob: ${media} https://*.googleusercontent.com`,
+    "font-src 'self' data:",
+    `connect-src 'self' ${api} ${media} https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://api.razorpay.com https://lumberjack.razorpay.com https://accounts.google.com/gsi/`,
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com https://accounts.google.com",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://api.razorpay.com",
+  ];
+  if (reportUri) parts.push(`report-uri ${reportUri}`);
+  return parts.join("; ");
+}
+
+/**
+ * Every page and file, listed first so the stricter blocks after it win
+ * (when two blocks set one header, Next keeps the later): no framing by
+ * any site (the register and pay page, "My tickets" with its cancel
+ * button), no sniffing a file into a script, the origin alone told to
+ * other sites, no camera or microphone, and the policy above as a report.
+ * Nothing frames the site: the dashboards' screens are on their own hosts.
+ */
+export const SITE_HEADERS = [
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" },
+  { key: "Content-Security-Policy-Report-Only", value: reportOnlyPolicy() },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Self-hosted (the Oracle box: Dockerfile here, moa_backend ops/server):
@@ -92,6 +157,8 @@ const nextConfig = {
     // that. Client navigations (RSC requests) are told apart by Next's Vary.
     const edge = [{ key: "Vercel-CDN-Cache-Control", value: "max-age=60, stale-while-revalidate=300" }];
     return [
+      // First: every later block that sets the same header wins over it.
+      { source: "/:path*", headers: SITE_HEADERS },
       { source: "/events", headers: edge },
       { source: "/clubs", headers: edge },
       { source: "/topics/:slug", headers: edge },
