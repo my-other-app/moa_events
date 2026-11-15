@@ -9,9 +9,10 @@ import { fullEvent } from "@/test/eventFixture";
  * event's at 1200×630 and at the three sizes its structured data names, and
  * a club's. The API and the pictures it links to are a fake fetch.
  */
-const event = fullEvent();
+// Its pictures on our own storage: the share pictures fetch no other host (src/utils/imagehosts.js).
+const event = JSON.parse(JSON.stringify(fullEvent()).replaceAll("https://cdn.example/", "https://media.myotherapp.in/"));
 const club = {
-  club: { id: 3, name: "Circuit Society", slug: "circuit-society", logo: "https://s3.example/l.png?Expires=1", cover: null, tagline: "We build things that blink", location_name: "Pune", followers: 40, upcoming_events: 1 },
+  club: { id: 3, name: "Circuit Society", slug: "circuit-society", logo: "https://media.myotherapp.in/l.png?Expires=1", cover: null, tagline: "We build things that blink", location_name: "Pune", followers: 40, upcoming_events: 1 },
   upcoming: [{ id: 68, slug: "hack-night-04", name: "Hack Night 04", starts_at: "2026-10-30T12:30:00Z", status: "upcoming" }],
   past: [],
 };
@@ -77,7 +78,7 @@ describe("/og/events/{slug}", () => {
     expect(res.headers.get("cache-control")).toBe(KEPT);
     expect(await drawn(res)).toEqual({ format: "jpeg", width: 1200, height: 630 });
     // The poster at its middle size, and the club has no logo to fetch.
-    expect(calls).toContain("https://cdn.example/p-t.jpg");
+    expect(calls).toContain("https://media.myotherapp.in/p-t.jpg");
   }, 30000);
 
   it.each([
@@ -90,7 +91,7 @@ describe("/og/events/{slug}", () => {
     expect(res.status).toBe(200);
     expect(await drawn(res)).toEqual({ format: "jpeg", width, height });
     // A frame shows the whole poster, so the original.
-    expect(calls).toContain("https://cdn.example/p.jpg");
+    expect(calls).toContain("https://media.myotherapp.in/p.jpg");
   }, 30000);
 
   it("draws the usual picture for a ratio it doesn't know", async () => {
@@ -115,17 +116,17 @@ describe("/og/clubs/{slug}", () => {
     expect(res.headers.get("content-type")).toBe("image/png");
     expect(res.headers.get("cache-control")).toBe(KEPT);
     expect(await drawn(res)).toEqual({ format: "png", width: 1200, height: 630 });
-    expect(calls).toContain("https://s3.example/l.png?Expires=1");
+    expect(calls).toContain("https://media.myotherapp.in/l.png?Expires=1");
   }, 30000);
 
   it("draws its cover in, as a JPEG of the same size", async () => {
     pictures = true;
-    club.club.cover = "https://cdn.example/c.jpg";
+    club.club.cover = "https://media.myotherapp.in/c.jpg";
     try {
       const res = await clubPicture("circuit-society");
       expect(res.headers.get("content-type")).toBe("image/jpeg");
       expect(await drawn(res)).toEqual({ format: "jpeg", width: 1200, height: 630 });
-      expect(calls).toContain("https://cdn.example/c.jpg");
+      expect(calls).toContain("https://media.myotherapp.in/c.jpg");
     } finally {
       club.club.cover = null;
     }

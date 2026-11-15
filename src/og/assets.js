@@ -1,6 +1,7 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isOurImage } from "@/utils/imagehosts";
 
 /**
  * What the share pictures need besides data: the site's fonts (read once
@@ -46,11 +47,16 @@ export function sniffImage(bytes) {
 
 const MAX_BYTES = 6 * 1024 * 1024;
 
-/** A remote picture as a data: URL, or null (missing, too big, slow, or a type the renderer can't draw). */
+/**
+ * A remote picture as a data: URL, or null (missing, too big, slow, or a
+ * type the renderer can't draw). Only from our own storage
+ * (src/utils/imagehosts.js), and never by a redirect: the site's server
+ * fetches no address an image field could point anywhere else.
+ */
 export async function imageDataUrl(url, { timeoutMs = 5000, fetchImpl = globalThis.fetch } = {}) {
-  if (!url || !/^https?:\/\//i.test(url)) return null;
+  if (!isOurImage(url)) return null;
   try {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs), cache: "no-store", redirect: "error" });
     if (!res.ok) return null;
     const buf = new Uint8Array(await res.arrayBuffer());
     if (!buf.length || buf.length > MAX_BYTES) return null;
