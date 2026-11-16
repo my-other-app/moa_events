@@ -116,6 +116,39 @@ describe("the event's tickets", () => {
     expect(ticketingApi.types).toHaveBeenCalledWith("123", { ticketType: 15 });
     expect(await screen.findByText("Shared with you")).toBeInTheDocument();
   });
+
+  it("carries a hidden ticket's key: it is listed with it, and the way to the form keeps it", async () => {
+    const KEY = "3f9c0a1b2c3d4e5f60718293";
+    window.history.replaceState(null, "", `/events/hack-night-04?ticket_type=15&ticket_key=${KEY}&ref=abc`);
+    ticketingApi.types.mockResolvedValue(
+      ticketing({ types: [TT(), TT({ id: 15, name: "Speaker", is_hidden: true, price: 0, is_free: true, available: null })], requires_choice: true }),
+    );
+    show();
+    const form = `/events/hack-night-04/register?ticket_type=15&ticket_key=${KEY}`;
+    await waitFor(() => expect(screen.getByRole("link", { name: "Register" })).toHaveAttribute("href", form));
+    expect(ticketingApi.types).toHaveBeenCalledWith("123", { ticketType: 15, ticketKey: KEY });
+    const section = await screen.findByRole("region", { name: "Tickets" });
+    expect(within(section).getByRole("link", { name: "Register with Speaker" })).toHaveAttribute("href", form);
+    // Another ticket's link doesn't carry this one's key.
+    expect(within(section).getByRole("link", { name: "Register with Early bird" })).toHaveAttribute("href", "/events/hack-night-04/register?ticket_type=12");
+    expect(screen.queryByText(/ask them for a new link/)).toBeNull();
+  });
+
+  it("says when the ticket a link names isn't there (an old link, or a wrong key)", async () => {
+    window.history.replaceState(null, "", "/events/hack-night-04?ticket_type=15&ticket_key=not-the-right-key");
+    ticketingApi.types.mockResolvedValue(ticketing({ types: [TT()], requires_choice: false }));
+    show();
+    expect(await screen.findByText(/The ticket this link was for isn.t available\. If the organisers sent it to you, ask them for a new link\./)).toBeInTheDocument();
+    // The form says so too: the address goes on as it came.
+    expect(screen.getByRole("link", { name: "Register" })).toHaveAttribute("href", "/events/hack-night-04/register?ticket_type=15&ticket_key=not-the-right-key");
+  });
+
+  it("leaves a key that isn't one out", async () => {
+    window.history.replaceState(null, "", "/events/hack-night-04?ticket_type=15&ticket_key=%3Cscript%3E");
+    ticketingApi.types.mockResolvedValue(ticketing({ types: [TT(), TT({ id: 15, name: "Speaker", is_hidden: true })], requires_choice: true }));
+    show();
+    await waitFor(() => expect(ticketingApi.types).toHaveBeenCalledWith("123", { ticketType: 15 }));
+  });
 });
 
 describe("sold out, with a waiting list", () => {

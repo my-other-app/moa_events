@@ -177,7 +177,8 @@ describe("an offer standing", () => {
     fireEvent.change(screen.getByLabelText(/^Discount code/), { target: { value: "early20" } });
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
     expect(await screen.findByRole("button", { name: "Claim and pay ₹149" })).toBeInTheDocument();
-    expect(ticketingApi.checkCode).toHaveBeenCalledWith(7, { code: "early20", ticketTypeId: 12, email: null, phone: null });
+    // The claim link's token goes with it: the proof for its own ticket, a hidden one too.
+    expect(ticketingApi.checkCode).toHaveBeenCalledWith(7, { code: "early20", ticketTypeId: 12, email: null, phone: null, offerToken: TOKEN });
     fireEvent.click(screen.getByRole("button", { name: "Claim and pay ₹149" }));
     await waitFor(() => expect(ticketingApi.claim).toHaveBeenCalledWith(TOKEN, { full_name: "Asha K", discount_code: "EARLY20" }));
   });

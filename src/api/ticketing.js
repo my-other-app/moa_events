@@ -25,20 +25,31 @@ const fail = (error) => {
 };
 
 export const ticketingApi = {
-  /** The event's tickets: `ticketing` as parseTicketing reads it (null from an older server). `ticketType` lists a hidden type a link names. */
-  types: (eventId, { ticketType = null } = {}) =>
+  /**
+   * The event's tickets: `ticketing` as parseTicketing reads it (null from an older server). `ticketType` lists a
+   * hidden type a link names, with the key the link carries (`ticketKey`).
+   */
+  types: (eventId, { ticketType = null, ticketKey = null } = {}) =>
     apiClient
-      .get(`/api/v1/events/${at(eventId)}/ticket-types`, { userOnly: true, params: ticketType ? { ticket_type: ticketType } : undefined })
+      .get(`/api/v1/events/${at(eventId)}/ticket-types`, {
+        userOnly: true,
+        params: ticketType ? { ticket_type: ticketType, ...(ticketKey ? { ticket_key: ticketKey } : {}) } : undefined,
+      })
       .then((r) => parseTicketing(r.data), fail),
 
-  /** What a code does to a ticket's price: {code, ticket_type_id, price, discount, amount, free}. Limited to 10 a minute. */
-  checkCode: (eventId, { code, ticketTypeId = null, email = null, phone = null }) =>
+  /**
+   * What a code does to a ticket's price: {code, ticket_type_id, price, discount, amount, free}. Limited to 10 a
+   * minute. A hidden ticket goes with its link's key (`ticketKey`), or the claim link's token (`offerToken`).
+   */
+  checkCode: (eventId, { code, ticketTypeId = null, email = null, phone = null, ticketKey = null, offerToken = null }) =>
     apiClient
       .post(
         `/api/v1/events/${at(eventId)}/discount-codes/check`,
         {
           code,
           ...(ticketTypeId ? { ticket_type_id: ticketTypeId } : {}),
+          ...(ticketTypeId && ticketKey ? { ticket_key: ticketKey } : {}),
+          ...(ticketTypeId && offerToken ? { offer_token: offerToken } : {}),
           ...(email ? { email } : {}),
           ...(phone ? { phone } : {}),
         },
@@ -46,13 +57,14 @@ export const ticketingApi = {
       )
       .then((r) => r.data, fail),
 
-  /** Joins the line for a sold-out type: the place, {id, ticketTypeId, status, position, created, …}. */
-  joinWaitlist: (eventId, { ticketTypeId = null, name, email = null, phone = null, whatsapp = false }) =>
+  /** Joins the line for a sold-out type: the place, {id, ticketTypeId, status, position, created, …}. A hidden one's takes its link's key. */
+  joinWaitlist: (eventId, { ticketTypeId = null, name, email = null, phone = null, whatsapp = false, ticketKey = null }) =>
     apiClient
       .post(
         `/api/v1/events/${at(eventId)}/waitlist`,
         {
           ...(ticketTypeId ? { ticket_type_id: ticketTypeId } : {}),
+          ...(ticketTypeId && ticketKey ? { ticket_key: ticketKey } : {}),
           full_name: name,
           ...(email ? { email } : {}),
           ...(phone ? { phone } : {}),

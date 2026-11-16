@@ -9,7 +9,7 @@ import { lastRequestNote, payButton, payLine, statusWord } from "@/utils/request
 import { liveEntries, waitlistTypes } from "@/utils/ticketing";
 import { askToJoin } from "./eventtickets";
 import { FinishPaymentButton } from "./finishpayment";
-import { useEventTicketing, useLinkedType } from "./tickets";
+import { ticketQuery, useEventTicketing, useTicketLink } from "./tickets";
 
 /**
  * The event page's register button (inside its server-rendered register
@@ -28,7 +28,8 @@ import { useEventTicketing, useLinkedType } from "./tickets";
  *   sold out, with a waiting list   Join the waiting list (the page's
  *                                   tickets section opens its form)
  *   in line already                 You're on the waiting list
- *   a link naming a hidden type     Register keeps `?ticket_type=`
+ *   a link naming a hidden type     Register keeps `?ticket_type=` (and the
+ *                                   `ticket_key` its link carries)
  *
  * and, signed in, for an event that reviews registrations (registration
  * approval), the viewer's own open registration (`ticketing.viewer_request`):
@@ -52,8 +53,8 @@ export function RegisterGo({ eventId, state, approval = false, eventName = null,
   const [paidNow, setPaidNow] = useState(false);
   const [look, setLook] = useState(0);
   const who = signedIn ? auth.user?.email || "account" : "";
-  const linked = useLinkedType();
-  const { ticketing } = useEventTicketing(eventId, { enabled: state.kind === "open" || state.kind === "full", ticketType: linked });
+  const { type: linked, key: linkedKey } = useTicketLink();
+  const { ticketing } = useEventTicketing(eventId, { enabled: state.kind === "open" || state.kind === "full", ticketType: linked, ticketKey: linkedKey });
 
   useEffect(() => {
     if (!who || ended) {
@@ -206,8 +207,8 @@ export function RegisterGo({ eventId, state, approval = false, eventName = null,
     }
   }
 
-  // A link naming a hidden ticket type: the form opens with it.
-  const href = state.href && linked && state.kind === "open" ? `${state.href}?ticket_type=${linked}` : state.href;
+  // A link naming a hidden ticket type: the form opens with it (and its key).
+  const href = state.href && linked && state.kind === "open" ? `${state.href}?${ticketQuery(linked, { linked, key: linkedKey })}` : state.href;
   return (
     <>
       {href ? (

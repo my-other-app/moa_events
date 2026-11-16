@@ -31,6 +31,12 @@ describe("the payload", () => {
     });
   });
 
+  it("sends a hidden ticket's key with its ticket, and never without one", () => {
+    expect(buildPayload({ ...base, ticketTypeId: 15, ticketKey: "3f9c0a1b2c3d4e5f60718293" })).toMatchObject({ ticket_type_id: 15, ticket_key: "3f9c0a1b2c3d4e5f60718293" });
+    expect(buildPayload({ ...base, ticketTypeId: null, ticketKey: "3f9c0a1b2c3d4e5f60718293" }).ticket_key).toBeUndefined();
+    expect(buildPayload({ ...base, ticketTypeId: 15, ticketKey: null }).ticket_key).toBeUndefined();
+  });
+
   it("is what it always was for one ticket and no code, saying it understands requests", () => {
     const old = buildPayload(base);
     expect(old).toEqual({ full_name: "Asha Rao", email: "asha@example.org", phone: "98765 43210", additional_details: {}, accepts_approval: true });

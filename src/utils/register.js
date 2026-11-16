@@ -290,7 +290,9 @@ export function stepsFor({ questions = [], items = [], chooseTicket = false } = 
  *
  * `ticket_type_id` goes only when a ticket was chosen (or a link named one),
  * and `discount_code` only when one was typed: an event with one ticket and
- * no code sends exactly what it always did.
+ * no code sends exactly what it always did. `ticket_key` goes with the
+ * ticket a hidden ticket's link named (its key; without it the server
+ * doesn't sell that ticket).
  *
  * `accepts_approval: true` always goes: this form understands an event that
  * reviews registrations (registration approval), and is then answered with
@@ -308,6 +310,7 @@ export function buildPayload({
   whatsapp = false,
   clubUpdates = false,
   ticketTypeId = null,
+  ticketKey = null,
   discountCode = null,
 }) {
   let details = {};
@@ -331,7 +334,10 @@ export function buildPayload({
   // Only when ticked: unticked is the server's default, and the form's old shape stays as it was.
   if (wantsWhatsapp(values, whatsapp)) payload.whatsapp_opt_in = true;
   if (wantsWhatsapp(values, clubUpdates)) payload.club_updates_whatsapp = true;
-  if (ticketTypeId !== null && ticketTypeId !== undefined) payload.ticket_type_id = Number(ticketTypeId);
+  if (ticketTypeId !== null && ticketTypeId !== undefined) {
+    payload.ticket_type_id = Number(ticketTypeId);
+    if (typeof ticketKey === "string" && ticketKey) payload.ticket_key = ticketKey;
+  }
   const code = typeof discountCode === "string" ? discountCode.trim() : "";
   if (code) payload.discount_code = code;
   return payload;

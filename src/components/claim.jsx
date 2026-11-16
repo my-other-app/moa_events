@@ -157,6 +157,8 @@ function OfferForm({ offer, token, onOutcome }) {
   const code = useDiscountCode({
     eventId: offer.event.id,
     ticketTypeId: type.id,
+    // The claim link is the proof for its own ticket (a hidden one too).
+    offerToken: token,
     email: offer.needsEmail && isEmail(email) ? email.trim() : null,
   });
   // A registration the club confirmed (registration approval): this is its pay link, not a place from the line.

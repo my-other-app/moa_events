@@ -207,7 +207,67 @@ describe("choosing a ticket", () => {
     go();
     expect(await heading(/You.re in/)).toBeInTheDocument();
     expect(eventsApi.registerForEvent.mock.calls[0][1].ticket_type_id).toBe(15);
+    // A link with no key sends none (an older link, before keys).
+    expect(eventsApi.registerForEvent.mock.calls[0][1].ticket_key).toBeUndefined();
     expect(paymentsApi.createPaymentOrder).not.toHaveBeenCalled();
+  });
+
+  it("a hidden ticket's link: its key lists it, stays in the address through every step, and goes with the code check and the registration", async () => {
+    const KEY = "3f9c0a1b2c3d4e5f60718293";
+    const withStaff = parseTicketing({ ...ONE, types: [TT(), TT({ id: 16, name: "Staff", price: 100, is_hidden: true, available: null })] });
+    ticketingApi.types.mockResolvedValue(withStaff);
+    ticketingApi.checkCode.mockResolvedValue({ code: "CREW10", ticket_type_id: 16, price: 100, discount: 10, amount: 90, free: false });
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA4", pay_amount: 0, event_registration_id: "r4", full_name: "Asha Rao", email: "asha@example.org", ticket_type: { id: 16, name: "Staff" } });
+    show(paid, { ticketing: ONE, path: `/events/hack-night-04/register?ticket_type=16&ticket_key=${KEY}` });
+    expect(await heading(/Choose your ticket/)).toBeInTheDocument();
+    expect(ticketingApi.types).toHaveBeenCalledWith("123", { ticketType: 16, ticketKey: KEY });
+    expect(screen.getByRole("radio", { name: /Staff/ })).toBeChecked();
+    go();
+    await heading(/Your details/);
+    expect(screen.getByTestId("where").textContent).toContain(`ticket_key=${KEY}`);
+    fillDetails();
+    go();
+    await heading(/Review and/);
+    expect(screen.getByTestId("where").textContent).toContain(`ticket_type=16&ticket_key=${KEY}`);
+    fireEvent.change(field(/^Discount code/), { target: { value: "crew10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(ticketingApi.checkCode).toHaveBeenCalledWith("123", { code: "crew10", ticketTypeId: 16, email: "asha@example.org", phone: "98765 43210", ticketKey: KEY }),
+    );
+    expect(await screen.findByText("applied", { exact: false })).toBeInTheDocument();
+    go();
+    await waitFor(() => expect(eventsApi.registerForEvent).toHaveBeenCalled());
+    expect(eventsApi.registerForEvent.mock.calls[0][1]).toMatchObject({ ticket_type_id: 16, ticket_key: KEY, discount_code: "CREW10" });
+    // The draft keeps the ticket chosen, never its key.
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain(KEY);
+  });
+
+  it("a hidden ticket's key goes with that ticket only: another one chosen is sent without it", async () => {
+    const KEY = "3f9c0a1b2c3d4e5f60718293";
+    ticketingApi.types.mockResolvedValue(parseTicketing({ ...SEVERAL, types: [...SEVERAL.types, TT({ id: 15, name: "Sponsor", price: 0, is_free: true, is_hidden: true, available: null })] }));
+    eventsApi.registerForEvent.mockResolvedValue({ ticket_id: "MOA5", pay_amount: 0, event_registration_id: "r5", full_name: "Asha Rao", email: "asha@example.org", ticket_type: { id: 12, name: "Early bird" } });
+    show(paid, { ticketing: SEVERAL, path: `/events/hack-night-04/register?ticket_type=15&ticket_key=${KEY}` });
+    expect(await heading(/Choose your ticket/)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Sponsor/ })).toBeChecked();
+    fireEvent.click(screen.getByRole("radio", { name: /Early bird/ }));
+    go();
+    await heading(/Your details/);
+    fillDetails();
+    go();
+    await heading(/Review and/);
+    go();
+    await waitFor(() => expect(eventsApi.registerForEvent).toHaveBeenCalled());
+    const payload = eventsApi.registerForEvent.mock.calls[0][1];
+    expect(payload.ticket_type_id).toBe(12);
+    expect(payload.ticket_key).toBeUndefined();
+  });
+
+  it("a link to a ticket the list doesn't have says so, and the others can still be chosen", async () => {
+    ticketingApi.types.mockResolvedValue(parseTicketing(SEVERAL));
+    show(paid, { ticketing: SEVERAL, path: "/events/hack-night-04/register?ticket_type=15&ticket_key=an-old-or-wrong-key" });
+    expect(await heading(/Choose your ticket/)).toBeInTheDocument();
+    expect(screen.getByText(/The ticket this link was for isn.t available/)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /VIP/ })).toBeInTheDocument();
   });
 
   it("a ticket that sold out meanwhile sends them back to choose another, and reads the tickets again", async () => {
