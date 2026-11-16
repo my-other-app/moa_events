@@ -4,10 +4,9 @@ import "server-only";
  * Who started a request to the site's gateway or session route. Only the
  * site's own pages use them, so (as the dashboards' gateway does):
  *
- *   - a request the browser says another site started (`Sec-Fetch-Site`
- *     other than same-origin or none) is refused, whatever its method:
- *     club sites on other myotherapp.in hosts are "same-site", and the
- *     cookies' SameSite=Lax would not stop them;
+ *   - a request the browser says anything but this origin started
+ *     (`Sec-Fetch-Site` other than same-origin or none) is refused,
+ *     whatever its method, other myotherapp.in hosts (club sites) included;
  *   - a request that changes something must also name this origin
  *     (`Origin`), and a request with neither header is refused (fail
  *     closed: every browser in use sends one of them).

@@ -6,8 +6,8 @@ import "server-only";
  *
  * The API rotates the refresh token on every refresh: the one sent is
  * spent, still answered for 30 seconds (for a lost reply, or two calls at
- * once), and after that taken as stolen (401 SESSION_REUSED: the session
- * ends everywhere). Every tab of a browser shares the one cookie, so calls
+ * once), and after that taken as used twice (401 SESSION_REUSED: the
+ * session ends everywhere). Every tab of a browser shares the one cookie, so calls
  * arrive here together with the same refresh token. So:
  *
  *   - one refresh at a time per refresh token: calls that need it while it

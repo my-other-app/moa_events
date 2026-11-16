@@ -123,7 +123,7 @@ describe("handing over tokens kept in localStorage", () => {
   });
 
   it("refuses a body that isn't a request it takes", async () => {
-    expect((await ask("POST", { body: { action: "steal" } })).status).toBe(400);
+    expect((await ask("POST", { body: { action: "other" } })).status).toBe(400);
     const raw = await routes.POST(new Request("https://myotherapp.in/api/session", { method: "POST", headers: { origin: "https://myotherapp.in", "sec-fetch-site": "same-origin", host: "myotherapp.in" }, body: "not json" }));
     expect(raw.status).toBe(400);
   });
