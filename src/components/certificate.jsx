@@ -5,13 +5,13 @@ import { Link, useNavigate } from "@/lib/router";
 import Icon from "@/components/discover/icons";
 import { eventsApi } from "@/api/events";
 import { siteHref } from "@/api/account";
-import { getSession, guestToken } from "@/auth/session";
+import { getSession, hasGuest } from "@/auth/session";
 import { API_BASE_URL, SITE_URL } from "@/config";
 import { NUMBER_PATTERN, isCertificatePublicId, verifyPath } from "@/utils/certcode";
 import { formatDate } from "@/utils/format";
 
 /** Someone on this browser may hold the certificate: signed in, or the guest a registration left. */
-const mayHoldIt = () => Boolean(getSession() || guestToken());
+const mayHoldIt = () => Boolean(getSession() || hasGuest());
 
 /** Off to a page the site doesn't serve here (the API's site is another host). */
 const leaveFor = (href) => window.location.replace(href);

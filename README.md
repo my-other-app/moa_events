@@ -42,6 +42,7 @@ Set these on the Vercel project (Production and Preview). `NEXT_PUBLIC_*` values
 | `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | The share of page loads and server requests traced, 0 to 1 | `0.05` |
 | `NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_RATE` | The share of sessions that hit an error recorded as a replay (every word, input and picture masked), 0 to 1 | `0`: no replay |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Build only, all three or none: the source maps (browser and server) are uploaded to Sentry for the release, then deleted from the build so they are never served; a failed upload is logged and the build goes on. The token is an organization auth token (Sentry → Settings → Auth Tokens) | not uploaded |
+| `NEXT_PUBLIC_SESSION_COOKIE` | `on` keeps a visitor's tokens (the account's, and a registration's guest token) in HttpOnly cookies the site's own server reads, instead of in localStorage; calls that need a token go through `/api/gateway` (see "Session cookies" below). Read at build, by the browser bundle and the server alike | off: tokens in localStorage, as before |
 | `CSP_ENFORCE` | Build only. `on` enforces the script policy (`next.config.mjs`, `reportOnlyPolicy`) on every address instead of only reporting it. Watch the reports first (`docker compose logs website \| grep csp-report` on the box, and Sentry when it is on: every report also goes to `POST /api/csp-report`, logged as one line per kind) | off: the policy is sent as `Content-Security-Policy-Report-Only` |
 
 `.env.example` lists them all, for a local `.env.local`.
@@ -153,3 +154,46 @@ within the minute; `curl -sI -H 'RSC: 1' https://myotherapp.in/events` never
 says `HIT`. A change an organiser makes shows on these pages within about a
 minute (six at most, while a stale copy is served); the event's own page is
 refreshed at once by `/api/revalidate`, as before. To undo, turn the rule off.
+
+## Session cookies (`NEXT_PUBLIC_SESSION_COOKIE=on`)
+
+Off by default: the site keeps the visitor's tokens in localStorage and the
+browser sends them to the API itself. With `on` in the build env (and a new
+build), page script never holds a token:
+
+- **Cookies.** `__Host-moa_session` (the account's access and refresh tokens),
+  `__Host-moa_guest` (a registration's guest token) and `__Host-moa_payas` (a
+  waiting-list claim's guest, an hour at most): HttpOnly, Secure,
+  SameSite=Lax, Path=/, no Domain, so no other myotherapp.in host (a club's
+  site) can set or replace them. Plain names on a developer's `http://localhost`.
+- **The gateway.** A call that needs a token goes to
+  `/api/gateway/api/v1/...` (`src/server/session/gateway.js`), which adds the
+  token, renews it when it is about to run out (one renewal at a time per
+  session, shared by every tab's calls), and passes the call to the API over
+  the box's own network (`API_BASE_URL`) with the visitor's address
+  (`X-Forwarded-For`) and user agent: the API limits and records each visitor as
+  their own, as when the browser called it. It never sends the site's
+  `X-Site-Token` (that is for the site's public reads) and never passes the
+  browser's cookies on. A visitor's calls with no token still go straight to the
+  API. Only the site's own pages may use it (`Sec-Fetch-Site` / `Origin`).
+- **Tokens never reach the page.** A sign-in's tokens become the session cookie
+  and the answer says only `{session: {sid, user}}`; a registration's
+  `auth_token` becomes the guest cookie (`{kept: "guest"}`). localStorage keeps
+  only who is signed in (`moa.session`: `{cookie: true, sid, user, profile,
+  claims}`) and whether there is a guest (`moa.guest`), so every tab still shows
+  it.
+- **People signed in before the switch stay signed in.** On their first page load
+  the tokens in localStorage go to `POST /api/session` (`action: adopt`), into the
+  cookies, and are then cleared there. If the site's server can't be reached they
+  stay put for the next load.
+- **Signing out** (`DELETE /api/session`) ends the session on the API too.
+- **Turning it off again** (rebuild without it) signs website visitors out once:
+  the older build can't read the cookies, which then simply run out. The app is
+  not affected.
+
+The API needs no change: the site's server reads the tokens in the API's
+answers and the browser no longer calls it with them. Keep
+`FORWARDED_ALLOW_IPS` believing the website container (it is `*` in
+`ops/server/compose.yml`): the API takes the visitor's address from
+`X-Forwarded-For` only from a proxy it trusts, and otherwise every signed-in
+visitor would share the website container's one address in its rate limits.

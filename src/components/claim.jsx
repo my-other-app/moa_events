@@ -6,7 +6,7 @@ import { ticketingApi } from "@/api/ticketing";
 import { useAuth } from "@/auth/context";
 import { eventPath } from "@/utils/eventpage";
 import { formatWhen } from "@/utils/format";
-import { describePayment, finishPayment } from "@/utils/payment";
+import { describePayment, finishPayment, payAsToken } from "@/utils/payment";
 import { isEmail, orderLines, rupees } from "@/utils/register";
 import { clubName } from "@/utils/requests";
 import { describeClaimError, ticketTypeName } from "@/utils/ticketing";
@@ -227,7 +227,7 @@ function OfferForm({ offer, token, onOutcome }) {
       }
       setPhase("paying");
       // Claimed for another address than the account signed in here: that guest's session pays.
-      const payAs = signedIn && data.auth_token?.access_token ? data.auth_token.access_token : null;
+      const payAs = signedIn ? payAsToken(data.auth_token) : null;
       const result = await finishPayment({
         eventId: offer.event.id,
         registrationId: data.event_registration_id,

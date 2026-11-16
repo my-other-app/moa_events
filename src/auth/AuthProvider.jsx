@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { accountApi } from "@/api/account";
+import { cookieSessionOn } from "./cookiemode";
 import { AuthContext, describeSignInError, userFromSession } from "./context";
 import { cleanEmail, markPasswordResetMissing } from "./email";
 import { cancelOneTap, credentialClaims, forgetGoogleChoice, googleEnabled, promptOneTap, setCredentialHandler } from "./google";
@@ -32,8 +33,15 @@ const noNotice = () => null;
 /** The API says a club's account isn't one this site signs in, whichever way it came. */
 const clubRefusal = (error) => error?.response?.status === 403 && error?.response?.data?.error_code === "CLUB_NOT_VERIFIED";
 
-/** Ends a session on the server too, sent with the token it ends, so its refresh token is dead everywhere. */
+/**
+ * Ends a session on the server too, sent with the token it ends, so its refresh token is dead everywhere.
+ * In cookie mode the site's server does it with the cookie's token (and clears the cookie).
+ */
 function endOnServer(was) {
+  if (cookieSessionOn()) {
+    accountApi.endSession().catch(() => {});
+    return;
+  }
   const sid = jwtClaims(was?.access_token)?.sid;
   if (sid) accountApi.endSession(was.access_token, sid).catch(() => {});
 }
@@ -115,10 +123,16 @@ export function AuthProvider({ children }) {
    * verified yet, and the account may be one this site doesn't sign in.
    */
   const accept = useCallback(async (tokens, { claims = null, password = false } = {}) => {
-    if (!tokens?.access_token || !tokens?.refresh_token) throw Object.assign(new Error("No tokens came back"), { response: { status: 500 } });
+    // In cookie mode the gateway kept the tokens in the session cookie, and the answer says only who signed in.
+    const cookie = cookieSessionOn();
+    const came = cookie ? Boolean(tokens?.session && typeof tokens.session === "object") : Boolean(tokens?.access_token && tokens?.refresh_token);
+    if (!came) throw Object.assign(new Error("No tokens came back"), { response: { status: 500 } });
+    const record = cookie
+      ? { cookie: true, sid: tokens.session.sid ?? null, user: tokens.session.user ?? null }
+      : { access_token: tokens.access_token, refresh_token: tokens.refresh_token };
     let profile = null;
     try {
-      profile = await accountApi.profileWith(tokens.access_token);
+      profile = await accountApi.profileWith(cookie ? null : tokens.access_token);
     } catch (error) {
       if ((password && error?.response?.status === 403) || clubRefusal(error)) {
         // The password was right, but the profile is refused: a club's
@@ -132,10 +146,10 @@ export function AuthProvider({ children }) {
     // Google vouched for the address, and so has a verified password account:
     // the guest's tickets are the account's now, and only its token goes from here on.
     if (!password || profile?.email_verified) forgetGuestTokens();
-    profiled.current = profile ? sessionKey({ ...tokens, profile }) : null;
+    profiled.current = profile ? sessionKey({ ...record, profile }) : null;
     welcome.current = after.current;
     after.current = null;
-    setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, profile, claims });
+    setSession({ ...record, profile, claims });
     return userFromSession(getSession());
   }, []);
 

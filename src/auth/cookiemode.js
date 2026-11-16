@@ -33,16 +33,25 @@ export const SESSION_PATH = "/api/session";
  * What a call to the gateway may go with, in AUTH_HEADER:
  *   auto     the account's token when signed in, else a registration's guest token (the default)
  *   user     the account's token only, never a guest's (a public read that only cares who is reading)
+ *   session  the account's token only, and its refusal passed on as it came (checking a sign-in's profile)
  *   none     no token at all (the sign-ins themselves, public reads)
  *   pay-as   the guest a waiting-list claim made for another address, to pay with
  */
 export const AUTH_HEADER = "X-Moa-Auth";
-export const AUTH_MODES = new Set(["auto", "user", "none", "pay-as"]);
+export const AUTH_MODES = new Set(["auto", "user", "session", "none", "pay-as"]);
 
 /** What the gateway tells the page, on every answer it passes on. */
 export const AS_HEADER = "X-Moa-As"; // user | guest | pay-as | visitor: what the call went with
 export const SESSION_HEADER = "X-Moa-Session"; // ended[; reason=reused|club] | none | started
 export const GUEST_HEADER = "X-Moa-Guest"; // kept | gone | none
+
+/**
+ * Paying as the guest a waiting-list claim made for another address: the
+ * gateway kept that guest's token (the claim's answer says
+ * `auth_token: {kept: "pay_as"}`), and a call made with this as its token
+ * goes with it.
+ */
+export const PAY_AS = "pay-as";
 
 /** The gateway's refusal of a change once the session could not be kept alive (the page says "sign in again"). */
 export const SIGNED_OUT = "SIGNED_OUT";

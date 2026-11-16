@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { accountApi } from "@/api/account";
 import { requestsApi } from "@/api/requests";
 import { useAuth } from "@/auth/context";
-import { guestToken } from "@/auth/session";
+import { hasGuest } from "@/auth/session";
 import { eventPath, whenLine } from "@/utils/eventpage";
 import { imageUrl } from "@/utils/format";
 import { sizeFor } from "@/utils/pictures";
@@ -389,7 +389,7 @@ function WaitingRequests({ who }) {
 function GuestRequests() {
   const [guest, setGuest] = useState(false);
   useEffect(() => {
-    setGuest(Boolean(guestToken()));
+    setGuest(hasGuest());
   }, []);
   return guest ? <WaitingRequests who="guest" /> : null;
 }

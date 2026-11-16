@@ -12,9 +12,9 @@ import { refreshSession } from "./refresh";
  *
  *   /api/gateway/api/v1/...  →  {API_BASE_URL}/api/v1/...
  *
- * The page names what the call may go with (X-Moa-Auth: auto, user, none,
- * pay-as) and the gateway picks the token from the cookies, exactly as the
- * browser's own client did (src/api/client.js):
+ * The page names what the call may go with (X-Moa-Auth: auto, user,
+ * session, none, pay-as) and the gateway picks the token from the cookies,
+ * exactly as the browser's own client did (src/api/client.js):
  *
  *   signed in    the account's token, renewed first when it is about to run
  *                out, and once more if the API refuses it; a guest token is
@@ -115,6 +115,29 @@ export function visitorHeaders(request) {
   return out;
 }
 
+/**
+ * A redirect the API answers with names its own address as the site's
+ * server reached it (the box's internal one): one into /api/v1/ on that
+ * host is pointed at the gateway instead, so the browser follows it here.
+ * Any other address (relative ones resolved first) passes as it came.
+ */
+export function gatewayLocation(location, target, base) {
+  let u;
+  try {
+    u = new URL(location, target);
+  } catch {
+    return location;
+  }
+  let api;
+  try {
+    api = new URL(base);
+  } catch {
+    return location;
+  }
+  if (u.host !== api.host || !u.pathname.startsWith("/api/v1/")) return u.toString();
+  return `${GATEWAY_PATH}${u.pathname}${u.search}`;
+}
+
 const isJson = (type) => Boolean(type) && /^application\/(?:[\w.+-]+\+)?json\b/i.test(type);
 
 /** The API's error_code in a JSON answer, read from a copy (the answer itself may still be passed on). */
@@ -209,6 +232,8 @@ export function createGateway({ fetchImpl = (...a) => globalThis.fetch(...a), ap
     const signals = {};
     const asked = request.headers.get(AUTH_HEADER)?.trim().toLowerCase();
     const mode = AUTH_MODES.has(asked) ? asked : "auto";
+    // `session`: the account's token or nothing, and its refusal passed on as it came, never sent again as a visitor.
+    const fallback = read && mode !== "session";
     const renewWith = visitorHeaders(request);
     let session = jar.session;
 
@@ -274,6 +299,8 @@ export function createGateway({ fetchImpl = (...a) => globalThis.fetch(...a), ap
         headers.set(key, value);
       });
       if (!headers.has("cache-control")) headers.set("cache-control", "private, no-store");
+      const location = headers.get("location");
+      if (location) headers.set("location", gatewayLocation(location, target, base));
       headers.set(AS_HEADER, as);
       if (signals.session) headers.set(SESSION_HEADER, signals.session);
       if (signals.guest) headers.set(GUEST_HEADER, signals.guest);
@@ -312,7 +339,7 @@ export function createGateway({ fetchImpl = (...a) => globalThis.fetch(...a), ap
       if (as === "user" && isExpiring(session.access, now())) {
         const result = await renew();
         if (!result.ok && result.refused) {
-          if (!read) return signedOut();
+          if (!fallback) return signedOut();
           as = "visitor";
         }
       }
@@ -328,13 +355,13 @@ export function createGateway({ fetchImpl = (...a) => globalThis.fetch(...a), ap
             // Refused even fresh: the session was ended elsewhere.
             discard(res);
             endSession();
-            if (!read) return signedOut();
+            if (!fallback) return signedOut();
             as = "visitor";
             res = await send(as);
           }
         } else if (result.refused) {
           discard(res);
-          if (!read) return signedOut();
+          if (!fallback) return signedOut();
           as = "visitor";
           res = await send(as);
         }
@@ -344,7 +371,7 @@ export function createGateway({ fetchImpl = (...a) => globalThis.fetch(...a), ap
         if (code === "CLUB_NOT_VERIFIED") {
           // A club's account: clubs sign in on their dashboard, never here. A read goes on as a visitor.
           endSession(code);
-          if (read) {
+          if (fallback) {
             discard(res);
             as = "visitor";
             res = await send(as);

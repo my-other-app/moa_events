@@ -1,4 +1,5 @@
 import apiClient from "./client";
+import { PAY_AS } from "@/auth/cookiemode";
 
 /**
  * Sent as `?checkout=` with every order: this site opens checkout with the
@@ -63,7 +64,8 @@ export const paymentsApi = {
      * `token`: an access token to pay with instead of the session's. A
      * waiting-list claim made while signed in as another address registers
      * the offer's address as a guest of its own, and only that guest's
-     * token can pay for it.
+     * token can pay for it. PAY_AS (cookie mode): the gateway kept that
+     * token, and pays with it.
      */
     createPaymentOrder: async (eventId, eventRegistrationId, { token = null } = {}) => {
         try {
@@ -76,9 +78,11 @@ export const paymentsApi = {
                         event_registration_id: eventRegistrationId,
                     },
                 },
-                token
-                    ? { params: { checkout: CHECKOUT_VERSION }, skipAuth: true, headers: { Authorization: `Bearer ${token}` } }
-                    : { params: { checkout: CHECKOUT_VERSION } }
+                token === PAY_AS
+                    ? { params: { checkout: CHECKOUT_VERSION }, payAs: true }
+                    : token
+                      ? { params: { checkout: CHECKOUT_VERSION }, skipAuth: true, headers: { Authorization: `Bearer ${token}` } }
+                      : { params: { checkout: CHECKOUT_VERSION } }
             );
             return response.data;
         } catch (error) {

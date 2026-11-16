@@ -1,4 +1,6 @@
 import apiClient from "./client";
+import { cookieSessionOn } from "@/auth/cookiemode";
+import { endCookieSession } from "@/auth/session";
 import { parseClub, parseClubRef, parseComment, parsePoll } from "./discover";
 import { ticketTypeName } from "@/utils/ticketing";
 import { parseAnswersNeeded } from "@/utils/answers";
@@ -95,12 +97,19 @@ const settled = (promise) =>
     (e) => (e?.response?.status === 409 ? false : Promise.reject(e)),
   );
 
+/**
+ * The sign-ins go with no token. `site`: in cookie mode they go through the
+ * site's gateway, which keeps the tokens they hand back in the session
+ * cookie and answers {session: {sid, user}} in their place (auth/cookiemode.js).
+ */
+const SIGN_IN = () => (cookieSessionOn() ? { skipAuth: true, site: true } : { skipAuth: true });
+
 /** The token endpoint is OAuth2's password grant: a form, not JSON. */
-const FORM = { skipAuth: true, headers: { "Content-Type": "application/x-www-form-urlencoded" } };
+const FORM = () => ({ ...SIGN_IN(), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
 
 export const accountApi = {
-  /** Google's ID token for the account's tokens: {access_token, refresh_token, token_type}. */
-  googleSignIn: (idToken) => apiClient.post("/api/v1/auth/google", { id_token: idToken, platform: "web" }, { skipAuth: true }).then((r) => r.data),
+  /** Google's ID token for the account's tokens: {access_token, refresh_token, token_type} (in cookie mode {session}). */
+  googleSignIn: (idToken) => apiClient.post("/api/v1/auth/google", { id_token: idToken, platform: "web" }, SIGN_IN()).then((r) => r.data),
 
   /**
    * An email and password for the account's tokens, the way the app signs in.
@@ -110,12 +119,12 @@ export const accountApi = {
   passwordSignIn: ({ email, password, totpCode = null }) => {
     const form = new URLSearchParams({ username: email, password });
     if (totpCode) form.set("totp_code", totpCode);
-    return apiClient.post("/api/v1/auth/token", form, FORM).then((r) => r.data);
+    return apiClient.post("/api/v1/auth/token", form, FORM()).then((r) => r.data);
   },
 
   /** A new password account: {username, access_token, refresh_token, token_type}. The server mails a six-digit code to the address. */
   signUp: ({ name, email, password }) =>
-    apiClient.post("/api/v1/user/register", { full_name: name, email, password }, { skipAuth: true }).then((r) => r.data),
+    apiClient.post("/api/v1/user/register", { full_name: name, email, password }, SIGN_IN()).then((r) => r.data),
 
   /** Another code to the signed-in account's address: {sent, email, expires_in, retry_after}. */
   sendEmailCode: () => apiClient.post("/api/v1/auth/email/send-code").then((r) => r.data),
@@ -128,18 +137,28 @@ export const accountApi = {
 
   /** The code and a new password for the account's tokens, as a sign-in hands back. */
   resetPassword: ({ email, code, password }) =>
-    apiClient.post("/api/v1/auth/password/reset", { email, code, new_password: password }, { skipAuth: true }).then((r) => r.data),
+    apiClient.post("/api/v1/auth/password/reset", { email, code, new_password: password }, SIGN_IN()).then((r) => r.data),
 
   /** The account (and, on the server, any website guest tickets folded into it). */
   profile: () => apiClient.get("/api/v1/user/profile/me").then((r) => r.data),
 
-  /** The same, for tokens that aren't the session yet: asked before a sign-in is kept, so it arrives whole. */
+  /**
+   * The same, for tokens that aren't the session yet: asked before a sign-in is kept, so it arrives whole.
+   * In cookie mode the sign-in's tokens are already in the cookie: asked with them, and the refusal comes back as it is.
+   */
   profileWith: (accessToken) =>
-    apiClient.get("/api/v1/user/profile/me", { skipAuth: true, headers: { Authorization: `Bearer ${accessToken}` } }).then((r) => r.data),
+    cookieSessionOn()
+      ? apiClient.get("/api/v1/user/profile/me", { strict: true, site: true, quiet: true }).then((r) => r.data)
+      : apiClient.get("/api/v1/user/profile/me", { skipAuth: true, headers: { Authorization: `Bearer ${accessToken}` } }).then((r) => r.data),
 
-  /** Ends this browser's session on the server. Sent with the token it ends, since the session is already gone here. */
+  /**
+   * Ends this browser's session on the server. Sent with the token it ends, since the session is already gone here.
+   * In cookie mode the site's server sends it, with the cookie's token, and clears the cookie.
+   */
   endSession: (accessToken, sid) =>
-    apiClient.delete(`/api/v1/auth/sessions/${encodeURIComponent(sid)}`, { skipAuth: true, headers: { Authorization: `Bearer ${accessToken}` } }),
+    cookieSessionOn()
+      ? endCookieSession()
+      : apiClient.delete(`/api/v1/auth/sessions/${encodeURIComponent(sid)}`, { skipAuth: true, headers: { Authorization: `Bearer ${accessToken}` } }),
 
   /** Upcoming (`ended: false`, soonest first) or past (`ended: true`, latest first) registrations. */
   myEvents: ({ ended, offset = 0, limit = 20 }) =>

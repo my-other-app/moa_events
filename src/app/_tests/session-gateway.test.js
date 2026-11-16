@@ -274,6 +274,26 @@ describe("keeping the session alive", () => {
   });
 });
 
+describe("checking a sign-in (`session` calls)", () => {
+  it("passes a club's refusal on as it came, so the sheet can say so, and ends the session", async () => {
+    on("GET", "/api/v1/user/profile/me", (c) => (c.auth ? Response.json({ message: "Club is not verified", error_code: "CLUB_NOT_VERIFIED" }, { status: 403 }) : Response.json({}, { status: 401 })));
+    const res = await ask("/api/v1/user/profile/me", { auth: "session", cookies: sessionCookie() });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error_code).toBe("CLUB_NOT_VERIFIED");
+    expect(res.headers.get("x-moa-session")).toBe("ended; reason=club");
+    expect(calls).toHaveLength(1);
+  });
+
+  it("never goes on as a visitor when the session can't be renewed", async () => {
+    on("GET", "/api/v1/user/profile/me", () => Response.json({}, { status: 401 }));
+    on("POST", "/api/v1/auth/refresh", () => Response.json({}, { status: 401 }));
+    const res = await ask("/api/v1/user/profile/me", { auth: "session", cookies: sessionCookie() });
+    expect(res.status).toBe(401);
+    expect((await res.json()).error_code).toBe("SIGNED_OUT");
+    expect(calls.map((c) => c.path)).toEqual(["/api/v1/user/profile/me", "/api/v1/auth/refresh"]);
+  });
+});
+
 describe("the guest token", () => {
   it("is forgotten once refused, and the call goes once more as a plain visitor", async () => {
     on("GET", "/api/v1/events/info/68", (c) => (c.auth ? Response.json({}, { status: 401 }) : Response.json({ id: 68 })));
@@ -353,6 +373,17 @@ describe("what passes through", () => {
     expect([...new Uint8Array(await res.arrayBuffer())]).toEqual([1, 2, 3]);
     const again = await ask("/api/v1/events/tickets/MOA1/image", { cookies: sessionCookie(), headers: { "if-none-match": '"v1"' } });
     expect(again.status).toBe(304);
+  });
+
+  it("points a redirect into the API at the gateway, so the browser follows it here; any other passes as it came", async () => {
+    on("GET", "/api/v1/events/list/", () => new Response(null, { status: 307, headers: { location: "https://backend:8000/api/v1/events/list?is_registered=true" } }));
+    const res = await ask("/api/v1/events/list/", { cookies: sessionCookie() });
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("/api/gateway/api/v1/events/list?is_registered=true");
+    on("GET", "/api/v1/certificates/c1/file", () => new Response(null, { status: 307, headers: { location: "https://bucket.s3.amazonaws.com/c1.pdf?X-Amz-Signature=x" } }));
+    expect((await ask("/api/v1/certificates/c1/file")).headers.get("location")).toBe("https://bucket.s3.amazonaws.com/c1.pdf?X-Amz-Signature=x");
+    on("GET", "/api/v1/rel", () => new Response(null, { status: 302, headers: { location: "/api/v1/other" } }));
+    expect((await ask("/api/v1/rel")).headers.get("location")).toBe("/api/gateway/api/v1/other");
   });
 
   it("says plainly when the API takes too long, or can't be reached", async () => {
