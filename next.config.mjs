@@ -7,10 +7,12 @@
  *   - metadata always in <head>, never streamed into <body> (canonical tags
  *     only count in the head);
  *   - the find pages (/events, /clubs) and a topic's page (/topics/{slug})
- *     kept a minute at Vercel's edge: they are rendered per request, but
- *     their HTML depends on the address alone;
+ *     kept a minute at the edge (Vercel's, or Cloudflare's where a Cache
+ *     Rule lets it): they are rendered per request, but their HTML depends
+ *     on the address alone;
  *   - on every address, no framing, no sniffing, the origin alone in a
- *     Referer, and a report-only script policy (SITE_HEADERS);
+ *     Referer, and the script policy (SITE_HEADERS): sent as a report only
+ *     unless the build sets CSP_ENFORCE=on;
  *   - the certificate check (/verify) never framed by another site, and the
  *     addresses that are themselves a credential -- a check's result
  *     (/verify/{number}), a ticket (/tickets/{id}), a guest's certificate
@@ -23,6 +25,75 @@
 import { cityRedirects } from "./src/seo/cities.js";
 import { sentryDsn, sentryEnvironment, sentryRelease } from "./src/sentry/env.js";
 
+/** Where the site itself takes the reports (src/app/api/csp-report): kept as one log line each, whether or not Sentry is on. */
+export const CSP_REPORT_PATH = "/api/csp-report";
+
+/**
+ * Sentry's security endpoint for the site's project, when Sentry is on
+ * (https://<key>@<host>/<project> → https://<host>/api/<project>/security/?sentry_key=<key>).
+ */
+export function cspReportUri(dsn = sentryDsn()) {
+  if (!dsn) return null;
+  try {
+    const u = new URL(dsn);
+    const project = u.pathname.replace(/^\/+|\/+$/g, "");
+    if (!u.username || !/^\d+$/.test(project)) return null;
+    return `${u.protocol}//${u.host}/api/${project}/security/?sentry_key=${u.username}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Where a report of something the policy would block goes: the site's own log, and Sentry when it is on. */
+export function cspReportTargets(dsn = sentryDsn()) {
+  return [CSP_REPORT_PATH, cspReportUri(dsn)].filter(Boolean);
+}
+
+/**
+ * The script and connection policy. Sent as Content-Security-Policy-Report-Only
+ * (the browser enforces nothing and reports what it would have blocked) until
+ * the build sets CSP_ENFORCE=on, after the reports have been watched for a
+ * while; then it is enforced, and still reported. 'unsafe-inline' scripts
+ * stay while pages are kept (ISR) with no per-request nonce; the host lists
+ * still keep a script from loading from, or sending to, anywhere else.
+ * Razorpay's checkout, Google's sign-in and the venue's Google map are the
+ * third parties. `reportUri`: one address, a list, or none.
+ */
+export function reportOnlyPolicy({ apiOrigin = process.env.NEXT_PUBLIC_API_BASE_URL, dev = process.env.NODE_ENV === "development", reportUri = cspReportTargets() } = {}) {
+  const api = (apiOrigin || "https://api.myotherapp.in").trim().replace(/\/+$/, "");
+  const media = "https://media.myotherapp.in https://*.amazonaws.com";
+  const parts = [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://checkout.razorpay.com https://accounts.google.com/gsi/client`,
+    "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+    `img-src 'self' data: blob: ${media} https://*.googleusercontent.com`,
+    "font-src 'self' data:",
+    `connect-src 'self' ${api} ${media} https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://api.razorpay.com https://lumberjack.razorpay.com https://accounts.google.com/gsi/`,
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com https://accounts.google.com https://www.google.com https://maps.google.com",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self' https://api.razorpay.com",
+  ];
+  const targets = (Array.isArray(reportUri) ? reportUri : [reportUri]).filter(Boolean);
+  if (targets.length) parts.push(`report-uri ${targets.join(" ")}`);
+  return parts.join("; ");
+}
+
+/** CSP_ENFORCE=on (read when the site is built): the script policy is enforced, no longer only reported. Off by default. */
+export function cspEnforced(env = process.env) {
+  return /^(on|1|true|yes)$/i.test(String(env.CSP_ENFORCE ?? "").trim());
+}
+
+/**
+ * The Content-Security-Policy an address sends: no framing by any site and,
+ * once enforced, the script policy as well. Every block below that sets the
+ * header uses this, so a stricter path never drops the script policy.
+ */
+export function enforcedPolicy(enforce = cspEnforced()) {
+  return enforce ? `${reportOnlyPolicy()}; frame-ancestors 'none'` : "frame-ancestors 'none'";
+}
+
 /**
  * The certificate check is what a fake site would most like to show inside
  * its own page: no frame anywhere (both headers, for old browsers and new),
@@ -31,7 +102,7 @@ import { sentryDsn, sentryEnvironment, sentryRelease } from "./src/sentry/env.js
  */
 export const VERIFY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Content-Security-Policy", value: enforcedPolicy() },
   { key: "Referrer-Policy", value: "no-referrer" },
   { key: "X-Content-Type-Options", value: "nosniff" },
 ];
@@ -58,7 +129,7 @@ export const VERIFY_RESULT_HEADERS = PRIVATE_LINK_HEADERS;
  */
 export const CLAIM_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Content-Security-Policy", value: enforcedPolicy() },
   { key: "Referrer-Policy", value: "strict-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Cache-Control", value: "no-store, max-age=0" },
@@ -67,66 +138,52 @@ export const CLAIM_HEADERS = [
 ];
 
 /**
- * Where a report of something the policy below would have blocked goes:
- * Sentry's security endpoint for the site's project, when Sentry is on
- * (https://<key>@<host>/<project> → https://<host>/api/<project>/security/?sentry_key=<key>).
- */
-export function cspReportUri(dsn = sentryDsn()) {
-  if (!dsn) return null;
-  try {
-    const u = new URL(dsn);
-    const project = u.pathname.replace(/^\/+|\/+$/g, "");
-    if (!u.username || !/^\d+$/.test(project)) return null;
-    return `${u.protocol}//${u.host}/api/${project}/security/?sentry_key=${u.username}`;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The script and connection policy the site is heading for, sent only as
- * Content-Security-Policy-Report-Only: the browser enforces nothing and
- * reports what it would have blocked (to Sentry when it is on), so it can
- * be watched for a while and then enforced. 'unsafe-inline' scripts stay
- * while pages are kept (ISR) with no per-request nonce; the host lists
- * still keep a script from loading from, or sending to, anywhere else.
- * Razorpay's checkout and Google's sign-in are the third parties.
- */
-export function reportOnlyPolicy({ apiOrigin = process.env.NEXT_PUBLIC_API_BASE_URL, dev = process.env.NODE_ENV === "development", reportUri = cspReportUri() } = {}) {
-  const api = (apiOrigin || "https://api.myotherapp.in").trim().replace(/\/+$/, "");
-  const media = "https://media.myotherapp.in https://*.amazonaws.com";
-  const parts = [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""} https://checkout.razorpay.com https://accounts.google.com/gsi/client`,
-    "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
-    `img-src 'self' data: blob: ${media} https://*.googleusercontent.com`,
-    "font-src 'self' data:",
-    `connect-src 'self' ${api} ${media} https://*.ingest.sentry.io https://*.ingest.de.sentry.io https://*.ingest.us.sentry.io https://api.razorpay.com https://lumberjack.razorpay.com https://accounts.google.com/gsi/`,
-    "frame-src https://api.razorpay.com https://checkout.razorpay.com https://accounts.google.com",
-    "worker-src 'self' blob:",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self' https://api.razorpay.com",
-  ];
-  if (reportUri) parts.push(`report-uri ${reportUri}`);
-  return parts.join("; ");
-}
-
-/**
  * Every page and file, listed first so the stricter blocks after it win
  * (when two blocks set one header, Next keeps the later): no framing by
  * any site (the register and pay page, "My tickets" with its cancel
  * button), no sniffing a file into a script, the origin alone told to
- * other sites, no camera or microphone, and the policy above as a report.
- * Nothing frames the site: the dashboards' screens are on their own hosts.
+ * other sites, no camera or microphone, and the script policy: as a
+ * report, or enforced with CSP_ENFORCE=on. Nothing frames the site: the
+ * dashboards' screens are on their own hosts.
  */
-export const SITE_HEADERS = [
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" },
-  { key: "Content-Security-Policy-Report-Only", value: reportOnlyPolicy() },
+export function siteHeaders(enforce = cspEnforced()) {
+  return [
+    { key: "X-Frame-Options", value: "DENY" },
+    { key: "Content-Security-Policy", value: enforcedPolicy(enforce) },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self), browsing-topics=()" },
+    ...(enforce ? [] : [{ key: "Content-Security-Policy-Report-Only", value: reportOnlyPolicy() }]),
+  ];
+}
+export const SITE_HEADERS = siteHeaders();
+
+/**
+ * The find pages kept a minute at the edge, then served stale for five
+ * while they are made again. Each header is read by one edge alone, and
+ * outranks the "private, no-store" Next gives a dynamic page, which the
+ * browser still gets:
+ *   Vercel-CDN-Cache-Control       Vercel's (previews);
+ *   Cloudflare-CDN-Cache-Control   Cloudflare's, in front of the box, but
+ *                                  only where a Cache Rule makes the page
+ *                                  eligible: Cloudflare keeps no HTML by
+ *                                  default (README, "Edge cache").
+ */
+export const EDGE_CACHE = "max-age=60, stale-while-revalidate=300";
+export const EDGE_HEADERS = [
+  { key: "Vercel-CDN-Cache-Control", value: EDGE_CACHE },
+  { key: "Cloudflare-CDN-Cache-Control", value: EDGE_CACHE },
+];
+/**
+ * A client navigation (an RSC request) answers the same address with
+ * something else, and Cloudflare keys its cache by the address alone (it
+ * ignores Vary): only a full page load is ever marked for an edge to keep.
+ */
+export const PAGE_LOADS_ONLY = [
+  { type: "header", key: "rsc" },
+  { type: "header", key: "next-router-prefetch" },
+  { type: "header", key: "next-router-state-tree" },
+  { type: "query", key: "_rsc" },
 ];
 
 /** @type {import('next').NextConfig} */
@@ -152,16 +209,12 @@ const nextConfig = {
     "/media/**": ["./src/og/fonts/**"],
   },
   async headers() {
-    // Vercel-CDN-Cache-Control is Vercel's alone and outranks the
-    // "private, no-store" Next gives a dynamic page; the browser still gets
-    // that. Client navigations (RSC requests) are told apart by Next's Vary.
-    const edge = [{ key: "Vercel-CDN-Cache-Control", value: "max-age=60, stale-while-revalidate=300" }];
     return [
       // First: every later block that sets the same header wins over it.
       { source: "/:path*", headers: SITE_HEADERS },
-      { source: "/events", headers: edge },
-      { source: "/clubs", headers: edge },
-      { source: "/topics/:slug", headers: edge },
+      { source: "/events", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
+      { source: "/clubs", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
+      { source: "/topics/:slug", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
       { source: "/verify", headers: VERIFY_HEADERS },
       { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
       // A ticket: its id is what the door scans.

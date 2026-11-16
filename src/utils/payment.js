@@ -1,3 +1,4 @@
+import { PAY_AS } from "@/auth/cookiemode";
 import { CONTACT_EMAIL } from "@/config";
 import { loadScript } from "./loadScript";
 import { paymentsApi } from "../api/payments";
@@ -110,6 +111,13 @@ export function payOrder(order, prefill = {}) {
  * `token`: pay as this access token rather than the session (a waiting-list
  * claim's guest, see api/payments.js).
  */
+/**
+ * The token to pay a waiting-list claim with, from the claim's `auth_token`:
+ * the token itself, PAY_AS when the site's gateway kept it (cookie mode), or null.
+ */
+export const payAsToken = (handed) =>
+  typeof handed?.access_token === "string" && handed.access_token ? handed.access_token : handed?.kept === "pay_as" ? PAY_AS : null;
+
 export async function finishPayment({ eventId, registrationId, prefill = {}, token = null }) {
   let order;
   try {

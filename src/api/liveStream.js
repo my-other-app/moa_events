@@ -41,7 +41,7 @@
  * it. It cannot read a refused answer either: when one closes the source,
  * the same address is asked once with fetch to learn the status.
  */
-import { getSession, guestToken } from "@/auth/session";
+import { getSession, hasGuest } from "@/auth/session";
 import { API_BASE_URL } from "@/config";
 import { isBot } from "@/seo/bots";
 import { liveKey } from "@/utils/live";
@@ -54,7 +54,7 @@ import { liveApi } from "./live";
  * snapshots would show the browser's own flags instead: such a visitor's room
  * is polled (each poll carries the token), never streamed.
  */
-const asPerson = () => Boolean(getSession() || guestToken());
+const asPerson = () => Boolean(getSession() || hasGuest());
 
 export const TIMING = Object.freeze({
   /** The stream's `retry:` (EventSource keeps the server's value to itself). */

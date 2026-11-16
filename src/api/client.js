@@ -1,6 +1,20 @@
 import axios from "axios";
+import { AS_HEADER, AUTH_HEADER, GATEWAY_PATH, GUEST_HEADER, SESSION_HEADER, SIGNED_OUT, cookieSessionOn } from "@/auth/cookiemode";
 import { withRefreshLock } from "@/auth/refreshlock";
-import { clearSession, forgetGuestTokens, getSession, guestToken, isExpiring, sameSession, syncSession, updateSession } from "@/auth/session";
+import {
+    clearSession,
+    forgetGuestTokens,
+    getSession,
+    guestToken,
+    hasGuest,
+    isExpiring,
+    noteGuest,
+    sameSession,
+    sessionKey,
+    syncSession,
+    updateSession,
+    whenAdopted,
+} from "@/auth/session";
 import { API_BASE_URL } from "@/config";
 
 const apiClient = axios.create({
@@ -111,16 +125,94 @@ function refreshShared(started) {
     });
 }
 
-/** A fresh access token for the signed-in session; one refresh at a time in this tab, shared, and one at a time across tabs. */
+/** A fresh access token for the signed-in session; one refresh at a time in this tab, shared, and one at a time across tabs. Never in cookie mode: the gateway renews. */
 export function refreshAccess() {
+    if (cookieSessionOn()) return Promise.reject(notSignedIn());
     const session = getSession();
     if (!session) return Promise.reject(notSignedIn());
     if (!refreshing) refreshing = refreshShared(session).finally(() => (refreshing = null));
     return refreshing;
 }
 
+/* ---------- cookie mode: the tokens stay on the site's server ---------- */
+
+/*
+ * When the build keeps tokens in HttpOnly cookies (auth/cookiemode.js),
+ * page script has none to send. A call that would go with one goes to the
+ * site's gateway instead (GATEWAY_PATH + its API path), saying what it may
+ * go with (AUTH_HEADER, the same choice as above: `skipAuth` none,
+ * `userOnly` user, otherwise auto); the gateway adds the token, renews it,
+ * and says what it did. Everything else goes straight to the API with no
+ * token, as a visitor's calls always have:
+ *
+ *   through the gateway   every call with a token: signed in, or holding
+ *                         a guest token; every change (a registration may
+ *                         hand back a guest token, which the gateway
+ *                         keeps); the sign-ins (`site`); paying as a
+ *                         claim's guest (`payAs`)
+ *   straight to the API   reads with no token to go with them, and
+ *                         `skipAuth` calls (public reads, the visit beacon)
+ *
+ * `quiet`: what the gateway says about the session is not acted on (a
+ * sign-in's own profile check, before there is a session to end).
+ */
+
+function throughSite(config) {
+    config._as = null;
+    config._cookie = true;
+    delete config.headers.Authorization;
+    const mode = config.payAs ? "pay-as" : config.skipAuth ? "none" : config.strict ? "session" : config.userOnly ? "user" : "auto";
+    const session = getSession();
+    const withToken = mode === "pay-as" || mode === "session" || (mode !== "none" && (Boolean(session) || (mode === "auto" && hasGuest())));
+    if (!config.site && !withToken && (mode === "none" || isRead(config))) return config;
+    config.baseURL = GATEWAY_PATH;
+    config.headers[AUTH_HEADER] = mode;
+    config._site = true;
+    config._key = sessionKey(session);
+    return config;
+}
+
+const header = (response, name) => {
+    const h = response?.headers;
+    if (!h) return null;
+    const v = typeof h.get === "function" ? h.get(name) : h[name.toLowerCase()];
+    return typeof v === "string" && v ? v : null;
+};
+
+/** What the gateway said: what the call went with, the guest's cookie, and the session ended (or never there). */
+function heard(config, response) {
+    if (!config?._site || !response) return;
+    const as = header(response, AS_HEADER);
+    config._as = as === "user" || as === "guest" ? as : null;
+    noteGuest(header(response, GUEST_HEADER));
+    const said = header(response, SESSION_HEADER);
+    if (!said || config.quiet || !(said === "none" || said.startsWith("ended"))) return;
+    // Only onto the session the call set out with: not one signed in afresh meanwhile.
+    const now = getSession();
+    if (!now || sessionKey(now) !== config._key) return;
+    const reason = /reason=(reused|club)/.exec(said)?.[1] || null;
+    clearSession(reason);
+}
+
+async function cookieRequest(config) {
+    await whenAdopted();
+    return throughSite(config);
+}
+
+function cookieResponse(error) {
+    const config = error?.config;
+    const response = error?.response;
+    heard(config, response);
+    if (config?._site && response?.status === 401 && errorCode(error) === SIGNED_OUT) return Promise.reject(authExpired(config));
+    if (config?._site && response?.status === 403 && errorCode(error) === "CLUB_NOT_VERIFIED" && /ended/.test(header(response, SESSION_HEADER) || "")) {
+        return Promise.reject(Object.assign(error, { clubAccount: true }));
+    }
+    return Promise.reject(error);
+}
+
 apiClient.interceptors.request.use(
     async (config) => {
+        if (cookieSessionOn()) return cookieRequest(config);
         config._as = null;
         if (config.skipAuth) return config;
         let session = getSession();
@@ -160,10 +252,14 @@ const asVisitor = (config) => {
 };
 
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        if (response?.config?._cookie) heard(response.config, response);
+        return response;
+    },
     async (error) => {
         const config = error?.config;
         const status = error?.response?.status;
+        if (config?._cookie) return cookieResponse(error);
         if (!config || config.skipAuth) return Promise.reject(error);
 
         // A club's account is signed in here (an older site let one in): clubs

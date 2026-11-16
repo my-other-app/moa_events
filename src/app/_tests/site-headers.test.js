@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import nextConfig, { SITE_HEADERS, cspReportUri, reportOnlyPolicy } from "../../../next.config.mjs";
+import nextConfig, { CSP_REPORT_PATH, SITE_HEADERS, cspEnforced, cspReportTargets, cspReportUri, enforcedPolicy, reportOnlyPolicy, siteHeaders } from "../../../next.config.mjs";
 import { effectiveHeaders } from "@/test/headers";
 import { isOurImage, ourImage } from "@/utils/imagehosts";
 import { imageDataUrl } from "@/og/assets";
@@ -50,10 +50,21 @@ describe("the site-wide headers", () => {
     const report = reportOnlyPolicy({ apiOrigin: "https://api.myotherapp.in", dev: false, reportUri: null });
     expect(report).toContain("script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://accounts.google.com/gsi/client;");
     expect(report).toContain("connect-src 'self' https://api.myotherapp.in ");
-    expect(report).toContain("frame-src https://api.razorpay.com https://checkout.razorpay.com https://accounts.google.com;");
+    // Razorpay's checkout, Google's sign-in, and the venue's Google map on an event page.
+    expect(report).toContain("frame-src https://api.razorpay.com https://checkout.razorpay.com https://accounts.google.com https://www.google.com https://maps.google.com;");
     expect(report).toContain("object-src 'none'; base-uri 'self'");
     expect(report).not.toContain("unsafe-eval");
     expect(report).not.toContain("report-uri");
+  });
+
+  it("reports to the site's own log, and to Sentry as well when it is on", () => {
+    expect(CSP_REPORT_PATH).toBe("/api/csp-report");
+    expect(cspReportTargets(null)).toEqual(["/api/csp-report"]);
+    expect(cspReportTargets("https://abc123@o42.ingest.de.sentry.io/4507")).toEqual(["/api/csp-report", "https://o42.ingest.de.sentry.io/api/4507/security/?sentry_key=abc123"]);
+    expect(reportOnlyPolicy({ dev: false, reportUri: cspReportTargets(null) })).toMatch(/; report-uri \/api\/csp-report$/);
+    expect(reportOnlyPolicy({ dev: false, reportUri: cspReportTargets("https://abc123@o42.ingest.de.sentry.io/4507") })).toMatch(
+      /; report-uri \/api\/csp-report https:\/\/o42\.ingest\.de\.sentry\.io\/api\/4507\/security\/\?sentry_key=abc123$/,
+    );
   });
 
   it("reports to Sentry's security endpoint when Sentry is on", () => {
@@ -61,6 +72,42 @@ describe("the site-wide headers", () => {
     expect(cspReportUri(null)).toBeNull();
     expect(cspReportUri("not a dsn")).toBeNull();
     expect(reportOnlyPolicy({ reportUri: "https://o42.ingest.de.sentry.io/api/4507/security/?sentry_key=abc123", dev: false })).toMatch(/; report-uri https:\/\/o42\.ingest\.de\.sentry\.io\/api\/4507\/security\/\?sentry_key=abc123$/);
+  });
+});
+
+describe("enforcing the script policy (CSP_ENFORCE=on at build time)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("is off unless the build says on", () => {
+    expect(cspEnforced({})).toBe(false);
+    expect(cspEnforced({ CSP_ENFORCE: "" })).toBe(false);
+    expect(cspEnforced({ CSP_ENFORCE: "off" })).toBe(false);
+    for (const on of ["on", "ON", "1", "true", "yes", " on "]) expect(cspEnforced({ CSP_ENFORCE: on })).toBe(true);
+    expect(SITE_HEADERS).toEqual(siteHeaders(false));
+  });
+
+  it("sends the policy as the enforced header, framing still refused, and no report-only copy", () => {
+    const h = Object.fromEntries(siteHeaders(true).map((x) => [x.key, x.value]));
+    expect(h["Content-Security-Policy-Report-Only"]).toBeUndefined();
+    expect(h["Content-Security-Policy"]).toMatch(/^default-src 'self'; script-src 'self' 'unsafe-inline' /);
+    expect(h["Content-Security-Policy"]).toMatch(/; frame-ancestors 'none'$/);
+    expect(h["Content-Security-Policy"]).toContain("report-uri /api/csp-report");
+    expect(enforcedPolicy(false)).toBe("frame-ancestors 'none'");
+  });
+
+  it("keeps the script policy on the stricter addresses too, which set the header themselves", async () => {
+    vi.stubEnv("CSP_ENFORCE", "on");
+    vi.resetModules();
+    const { default: config } = await import("../../../next.config.mjs");
+    for (const path of ["/", "/events/hack-night-04/register", "/me/tickets", "/verify", "/verify/CERT-AB12CD34", "/tickets/MOA-7K3QF-X9PWM", "/claim/Xy3abcdefghijklmnopqrstuvwxyz012", "/p/ABCD1234"]) {
+      const h = await effectiveHeaders(config, path);
+      expect(h["Content-Security-Policy"]).toMatch(/^default-src 'self'; script-src /);
+      expect(h["Content-Security-Policy"]).toMatch(/frame-ancestors 'none'$/);
+      expect(h["Content-Security-Policy-Report-Only"]).toBeUndefined();
+    }
   });
 });
 
