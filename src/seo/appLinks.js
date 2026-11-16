@@ -47,6 +47,11 @@
  *     read /events/in as an event called "in").
  *   - the home page, the policies, /about and /me: not claimed.
  *
+ * A hidden ticket's link (`/events/{slug}?ticket_type=…&ticket_key=…`) stays
+ * in the browser on iPhone: the apps out now don't send the key on, and
+ * without it the ticket isn't listed or sold (BROWSER_QUERIES). Android can't
+ * leave out a query, so there the app opens it.
+ *
  * The live room and the quiz were left to the browser while the app showed
  * them as this site's page; the app has them as screens of its own now
  * (moa_mobileapp#65), so a QR on the screen opens them there.
@@ -102,7 +107,10 @@ export const BROWSER_PATHS = [
   ["/speakers/me", "Editing a speaker profile"],
 ];
 
-/** /.well-known/apple-app-site-association: the iOS app opens APP_PATHS, less BROWSER_PATHS. */
+/** Links that stay in the browser by their query: [path, {query item: value pattern}, why], checked first of all. */
+export const BROWSER_QUERIES = [["/events/*", { ticket_key: "?*" }, "A hidden ticket's link: the app can't carry its key yet"]];
+
+/** /.well-known/apple-app-site-association: the iOS app opens APP_PATHS, less BROWSER_QUERIES and BROWSER_PATHS. */
 export function appleAppSiteAssociation() {
   return {
     applinks: {
@@ -110,6 +118,7 @@ export function appleAppSiteAssociation() {
         {
           appIDs: [IOS_APP_ID],
           components: [
+            ...BROWSER_QUERIES.map(([path, query, comment]) => ({ "/": path, "?": query, exclude: true, comment })),
             ...BROWSER_PATHS.map(([path, comment]) => ({ "/": path, exclude: true, comment })),
             ...APP_PATHS.map((path) => ({ "/": path })),
           ],
