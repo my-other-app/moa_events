@@ -158,6 +158,34 @@ export function siteHeaders(enforce = cspEnforced()) {
 }
 export const SITE_HEADERS = siteHeaders();
 
+/**
+ * The find pages kept a minute at the edge, then served stale for five
+ * while they are made again. Each header is read by one edge alone, and
+ * outranks the "private, no-store" Next gives a dynamic page, which the
+ * browser still gets:
+ *   Vercel-CDN-Cache-Control       Vercel's (previews);
+ *   Cloudflare-CDN-Cache-Control   Cloudflare's, in front of the box, but
+ *                                  only where a Cache Rule makes the page
+ *                                  eligible: Cloudflare keeps no HTML by
+ *                                  default (README, "Edge cache").
+ */
+export const EDGE_CACHE = "max-age=60, stale-while-revalidate=300";
+export const EDGE_HEADERS = [
+  { key: "Vercel-CDN-Cache-Control", value: EDGE_CACHE },
+  { key: "Cloudflare-CDN-Cache-Control", value: EDGE_CACHE },
+];
+/**
+ * A client navigation (an RSC request) answers the same address with
+ * something else, and Cloudflare keys its cache by the address alone (it
+ * ignores Vary): only a full page load is ever marked for an edge to keep.
+ */
+export const PAGE_LOADS_ONLY = [
+  { type: "header", key: "rsc" },
+  { type: "header", key: "next-router-prefetch" },
+  { type: "header", key: "next-router-state-tree" },
+  { type: "query", key: "_rsc" },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Self-hosted (the Oracle box: Dockerfile here, moa_backend ops/server):
@@ -181,16 +209,12 @@ const nextConfig = {
     "/media/**": ["./src/og/fonts/**"],
   },
   async headers() {
-    // Vercel-CDN-Cache-Control is Vercel's alone and outranks the
-    // "private, no-store" Next gives a dynamic page; the browser still gets
-    // that. Client navigations (RSC requests) are told apart by Next's Vary.
-    const edge = [{ key: "Vercel-CDN-Cache-Control", value: "max-age=60, stale-while-revalidate=300" }];
     return [
       // First: every later block that sets the same header wins over it.
       { source: "/:path*", headers: SITE_HEADERS },
-      { source: "/events", headers: edge },
-      { source: "/clubs", headers: edge },
-      { source: "/topics/:slug", headers: edge },
+      { source: "/events", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
+      { source: "/clubs", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
+      { source: "/topics/:slug", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
       { source: "/verify", headers: VERIFY_HEADERS },
       { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
       // A ticket: its id is what the door scans.

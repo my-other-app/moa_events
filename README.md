@@ -116,3 +116,40 @@ The site also builds as a container for the one-box setup in moa_backend
 - What Vercel's edge did is done there by Cloudflare and Caddy: the
   `www.`/`events.` redirects, the visitor's address (`X-Forwarded-For`) and
   place (Cloudflare's location headers, passed on as `x-vercel-ip-*`).
+
+### Edge cache (Cloudflare, in front of the box)
+
+`/events`, `/clubs` and `/topics/{slug}` are rendered per request, but their
+HTML depends on the address alone, so an edge may keep each address a minute
+(and serve it stale for five while it is made again). Next marks full page
+loads of exactly those paths with `Cloudflare-CDN-Cache-Control` (and
+`Vercel-CDN-Cache-Control` for previews); a client navigation (an RSC request,
+`RSC: 1` or `?_rsc=`) is never marked, because Cloudflare keys its cache by the
+address alone. Cloudflare keeps no HTML unless a Cache Rule says it may, so the
+header does nothing until this rule exists (Cloudflare dashboard → the
+`myotherapp.in` zone → Caching → Cache Rules → Create rule):
+
+- **Name:** Site find pages, one minute
+- **Expression** (Edit expression):
+
+  ```
+  (http.host eq "myotherapp.in"
+    and (http.request.uri.path in {"/events" "/clubs"}
+         or (starts_with(http.request.uri.path, "/topics/") and not ends_with(http.request.uri.path, ".xml")))
+    and not any(http.request.headers.names[*] eq "rsc")
+    and not any(http.request.headers.names[*] eq "next-router-prefetch")
+    and not any(http.request.headers.names[*] eq "next-router-state-tree")
+    and not http.request.uri.query contains "_rsc=")
+  ```
+- **Cache eligibility:** Eligible for cache.
+- **Edge TTL:** Use cache-control header if present, bypass cache if not.
+- **Browser TTL:** Respect origin (the browser keeps getting `private, no-store`).
+- **Cache key:** the default (the query string is part of it: `/events?city=pune` is its own copy).
+
+No cookie needs to bypass it: these pages never read one, and a signed-in
+visitor's own lists are read in the browser. Check it: `curl -sI
+https://myotherapp.in/events | grep -i cf-cache-status` says `MISS`, then `HIT`
+within the minute; `curl -sI -H 'RSC: 1' https://myotherapp.in/events` never
+says `HIT`. A change an organiser makes shows on these pages within about a
+minute (six at most, while a stale copy is served); the event's own page is
+refreshed at once by `/api/revalidate`, as before. To undo, turn the rule off.

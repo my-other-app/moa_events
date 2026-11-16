@@ -19,16 +19,30 @@ const { POST } = await import("../api/revalidate/route.js");
 describe("the find pages at the edge", () => {
   const EDGE = "max-age=60, stale-while-revalidate=300";
   /** The headers Next adds to a path by next.config's headers(), besides the site-wide block every path has. */
-  const headersFor = async (path) => (await rulesFor(nextConfig, path)).filter((rule) => rule.source !== "/:path*").flatMap((rule) => rule.headers);
-  const edgeOf = async (path) => (await headersFor(path)).find((h) => h.key === "Vercel-CDN-Cache-Control")?.value ?? null;
+  const headersFor = async (path, request) => (await rulesFor(nextConfig, path, request)).filter((rule) => rule.source !== "/:path*").flatMap((rule) => rule.headers);
+  const edgeOf = async (path, request, key = "Vercel-CDN-Cache-Control") => (await headersFor(path, request)).find((h) => h.key === key)?.value ?? null;
 
   it.each(["/events", "/clubs", "/topics/development", "/topics/arts"])("keeps %s a minute at the edge, then serves it stale for five while it refreshes", async (path) => {
     expect(await edgeOf(path)).toBe(EDGE);
+    // Cloudflare in front of the box reads its own header (where a Cache Rule makes the page eligible).
+    expect(await edgeOf(path, {}, "Cloudflare-CDN-Cache-Control")).toBe(EDGE);
   });
 
-  it("sets it for Vercel's edge alone, never as the browser's Cache-Control", async () => {
+  it("sets it for the edges alone, never as the browser's Cache-Control", async () => {
     for (const path of ["/events", "/clubs", "/topics/development"]) {
-      expect((await headersFor(path)).map((h) => h.key)).toEqual(["Vercel-CDN-Cache-Control"]);
+      expect((await headersFor(path)).map((h) => h.key)).toEqual(["Vercel-CDN-Cache-Control", "Cloudflare-CDN-Cache-Control"]);
+    }
+  });
+
+  it.each([
+    ["a client navigation", { headers: { rsc: "1" } }],
+    ["a prefetch", { headers: { rsc: "1", "next-router-prefetch": "1" } }],
+    ["a router state", { headers: { "next-router-state-tree": "%5B%5D" } }],
+    ["Next's cache-busting query", { query: { _rsc: "abc12" } }],
+  ])("never marks %s for an edge to keep: only a full page load is", async (_, request) => {
+    for (const path of ["/events", "/clubs", "/topics/development"]) {
+      expect(await edgeOf(path, request)).toBeNull();
+      expect(await edgeOf(path, request, "Cloudflare-CDN-Cache-Control")).toBeNull();
     }
   });
 

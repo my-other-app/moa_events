@@ -13,12 +13,27 @@ export const sourcePattern = (source) =>
       .replace(/:(\w+)/g, "([^/]+)")}$`,
   );
 
-/** The blocks that apply to `path`, in the order next.config lists them. */
-export const rulesFor = async (config, path) => (await config.headers()).filter((rule) => sourcePattern(rule.source).test(path));
+/**
+ * Whether a block's `has` / `missing` conditions hold for a request:
+ * `request` is {headers: {name: value}, query: {name: value}} (names of
+ * headers in lower case). Only the `header` and `query` types next.config
+ * uses, matched by presence (and by `value` when the condition gives one).
+ */
+const present = (request, { type, key, value }) => {
+  const bag = type === "header" ? request.headers || {} : type === "query" ? request.query || {} : {};
+  const name = type === "header" ? key.toLowerCase() : key;
+  if (!(name in bag)) return false;
+  return value === undefined || new RegExp(`^(?:${value})$`).test(String(bag[name]));
+};
+const holds = (rule, request) => (rule.has || []).every((c) => present(request, c)) && (rule.missing || []).every((c) => !present(request, c));
+
+/** The blocks that apply to `path` (asked as `request`; a plain page load by default), in the order next.config lists them. */
+export const rulesFor = async (config, path, request = {}) =>
+  (await config.headers()).filter((rule) => sourcePattern(rule.source).test(path) && holds(rule, request));
 
 /** The headers `path` is answered with: {key: value}, later blocks winning. */
-export async function effectiveHeaders(config, path) {
+export async function effectiveHeaders(config, path, request = {}) {
   const out = {};
-  for (const rule of await rulesFor(config, path)) for (const h of rule.headers) out[h.key] = h.value;
+  for (const rule of await rulesFor(config, path, request)) for (const h of rule.headers) out[h.key] = h.value;
   return out;
 }
