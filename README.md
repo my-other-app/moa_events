@@ -42,6 +42,7 @@ Set these on the Vercel project (Production and Preview). `NEXT_PUBLIC_*` values
 | `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | The share of page loads and server requests traced, 0 to 1 | `0.05` |
 | `NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_RATE` | The share of sessions that hit an error recorded as a replay (every word, input and picture masked), 0 to 1 | `0`: no replay |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Build only, all three or none: the source maps (browser and server) are uploaded to Sentry for the release, then deleted from the build so they are never served; a failed upload is logged and the build goes on. The token is an organization auth token (Sentry → Settings → Auth Tokens) | not uploaded |
+| `CSP_ENFORCE` | Build only. `on` enforces the script policy (`next.config.mjs`, `reportOnlyPolicy`) on every address instead of only reporting it. Watch the reports first (`docker compose logs website \| grep csp-report` on the box, and Sentry when it is on: every report also goes to `POST /api/csp-report`, logged as one line per kind) | off: the policy is sent as `Content-Security-Policy-Report-Only` |
 
 `.env.example` lists them all, for a local `.env.local`.
 
