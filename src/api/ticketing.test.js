@@ -70,6 +70,12 @@ describe("the event's tickets", () => {
     expect(t.waitlist.offerHours).toBe(12);
   });
 
+  it("ask for a hidden type with the key its link carries", async () => {
+    serve((config) => reply(config, 200, TYPES));
+    await ticketingApi.types("hack-night-04", { ticketType: 15, ticketKey: "3f9c0a1b2c3d4e5f60718293" });
+    expect(seen[0]).toMatchObject({ params: { ticket_type: 15, ticket_key: "3f9c0a1b2c3d4e5f60718293" } });
+  });
+
   it("go with the account's token when signed in (its own places in line come back)", async () => {
     const token = accessToken();
     signedIn({ access: token });
@@ -96,6 +102,18 @@ describe("checking a code", () => {
     expect(r.amount).toBe(159.2);
   });
 
+  it("sends a hidden ticket's key, or the claim link's token, with its ticket", async () => {
+    serve((config) => reply(config, 200, { code: "CREW10", ticket_type_id: 16, price: 100, discount: 10, amount: 90, free: false }));
+    await ticketingApi.checkCode(7, { code: "crew10", ticketTypeId: 16, ticketKey: "3f9c0a1b2c3d4e5f60718293" });
+    await ticketingApi.checkCode(7, { code: "crew10", ticketTypeId: 16, offerToken: "Xy3abc" });
+    await ticketingApi.checkCode(7, { code: "crew10", ticketKey: "3f9c0a1b2c3d4e5f60718293" });
+    expect(seen.map((s) => s.data)).toEqual([
+      { code: "crew10", ticket_type_id: 16, ticket_key: "3f9c0a1b2c3d4e5f60718293" },
+      { code: "crew10", ticket_type_id: 16, offer_token: "Xy3abc" },
+      { code: "crew10" },
+    ]);
+  });
+
   it("is refused with the code's reason, and a 429 with how long to wait", async () => {
     serve((config) => reply(config, 409, { message: "Expired", error_code: "DISCOUNT_CODE_EXPIRED", errors: { discount_code: "Expired" } }));
     await expect(ticketingApi.checkCode(7, { code: "OLD" })).rejects.toMatchObject({ status: 409, code: "DISCOUNT_CODE_EXPIRED", network: false });
@@ -115,6 +133,12 @@ describe("the waiting list", () => {
       data: { ticket_type_id: 12, full_name: "Asha Rao", email: "asha@example.org", whatsapp_opt_in: false },
     });
     expect(entry).toMatchObject({ id: "w1", position: 3, created: true });
+  });
+
+  it("is joined for a hidden type with the key its link carries", async () => {
+    serve((config) => reply(config, 201, { id: "w2", ticket_type_id: 16, status: "waiting", position: 1, created: true }));
+    await ticketingApi.joinWaitlist(7, { ticketTypeId: 16, name: "Asha Rao", email: "asha@example.org", ticketKey: "3f9c0a1b2c3d4e5f60718293" });
+    expect(seen[0].data).toMatchObject({ ticket_type_id: 16, ticket_key: "3f9c0a1b2c3d4e5f60718293" });
   });
 
   it("is read and left as the signed-in person", async () => {

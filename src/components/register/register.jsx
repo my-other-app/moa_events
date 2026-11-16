@@ -66,7 +66,17 @@ import MerchPicker from "./merchpicker";
 import { Lines, Summary } from "./summary";
 import Requested from "./requested";
 import Success from "./success";
-import { DiscountCodeField, linkedTypeFrom, TicketPicker, useDiscountCode, useEventTicketing, WaitlistPanel } from "./tickets";
+import {
+  DiscountCodeField,
+  keyFor,
+  LinkedTicketGone,
+  linkedKeyFrom,
+  linkedTypeFrom,
+  TicketPicker,
+  useDiscountCode,
+  useEventTicketing,
+  WaitlistPanel,
+} from "./tickets";
 
 /**
  * Registering for an event, at /events/{slug}/register. The page's server
@@ -666,11 +676,12 @@ function useEventInfo(eventId, enabled, who) {
  * The event's tickets for the form (docs/TICKETING.md): `ticketing` from
  * GET /events/info/{id}, which the form reads anyway; with `?ticket_type=`
  * in the address, GET /events/{id}/ticket-types?ticket_type= instead, which
- * lists that hidden type too. Null from a server without ticket types: the
- * form is then exactly what it was. `reload()` after the server refused a
- * ticket (sold out meanwhile, off sale) or after joining a waiting list.
+ * lists that hidden type too (with `ticket_key`, the key its link carries).
+ * Null from a server without ticket types: the form is then exactly what it
+ * was. `reload()` after the server refused a ticket (sold out meanwhile, off
+ * sale) or after joining a waiting list.
  */
-function useFlowTicketing(eventId, info, linked) {
+function useFlowTicketing(eventId, info, linked, linkedKey = null) {
   const [own, setOwn] = useState({ status: "idle", data: null });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -678,7 +689,7 @@ function useFlowTicketing(eventId, info, linked) {
     let alive = true;
     setOwn((s) => (s.status === "ready" ? s : { status: "loading", data: null }));
     Promise.resolve()
-      .then(() => ticketingApi.types(eventId, { ticketType: linked }))
+      .then(() => ticketingApi.types(eventId, { ticketType: linked, ...(linkedKey ? { ticketKey: linkedKey } : {}) }))
       .then(
         (data) => alive && setOwn({ status: "ready", data }),
         () => alive && setOwn({ status: "error", data: null }),
@@ -686,7 +697,7 @@ function useFlowTicketing(eventId, info, linked) {
     return () => {
       alive = false;
     };
-  }, [eventId, linked, attempt]);
+  }, [eventId, linked, linkedKey, attempt]);
   const fromInfo = useMemo(() => parseTicketing(info.data?.ticketing), [info.data]);
   const { retry } = info;
   const reload = useCallback(() => (linked ? setAttempt((a) => a + 1) : retry()), [linked, retry]);
@@ -735,8 +746,10 @@ function Flow({ event, club, info, onDone, earlier = null }) {
   const openedFrom = useRef({});
 
   // The ticket: a link's hidden type, the one chosen before (the draft), or the only one.
+  // A hidden ticket's link carries its key (`ticket_key`): kept in the address through every step, never in the draft.
   const linked = useMemo(() => linkedTypeFrom(params.toString()), [params]);
-  const tix = useFlowTicketing(eventId, info, linked);
+  const linkedKey = useMemo(() => linkedKeyFrom(params.toString()), [params]);
+  const tix = useFlowTicketing(eventId, info, linked, linkedKey);
   // The club reviews every registration (registration approval): it goes in under review, and nothing is paid yet.
   // `reviewedNow`: the server refused add-ons because the club turned reviewing on after the form loaded.
   const [reviewedNow, setReviewedNow] = useState(false);
@@ -810,6 +823,7 @@ function Flow({ event, club, info, onDone, earlier = null }) {
   const code = useDiscountCode({
     eventId,
     ticketTypeId: chosen?.id ?? null,
+    ticketKey: keyFor(linked, linkedKey, chosen?.id ?? null),
     email: isEmail(values.email) ? values.email.trim() : null,
     phone: values.phone.trim() && values.phone.trim().length <= 20 ? values.phone.trim() : null,
   });
@@ -1117,6 +1131,7 @@ function Flow({ event, club, info, onDone, earlier = null }) {
       whatsapp,
       clubUpdates: byClubUpdates,
       ticketTypeId: sendType,
+      ticketKey: keyFor(linked, linkedKey, sendType),
       discountCode: showCode ? code.toSend : null,
     });
     let stage = "register";
@@ -1262,6 +1277,8 @@ function Flow({ event, club, info, onDone, earlier = null }) {
 
           {/* Signed in, registered before and cancelled (or it expired): said once, on the first step. */}
           {earlier && index === 0 ? <EarlierNote note={earlier} /> : null}
+          {/* A link to a ticket the list doesn't have (an old link, or the ticket is gone): said on the first step. */}
+          {index === 0 ? <LinkedTicketGone ticketing={ticketing} linked={linked} className="rg-tt-note" /> : null}
 
           {step.id === "ticket" ? (
             <div className="rg-fields">
@@ -1277,7 +1294,15 @@ function Flow({ event, club, info, onDone, earlier = null }) {
                 onWaitlist={approval ? null : (id) => setWaitFor({ typeId: id })}
               />
               {waitFor || liveEntries(ticketing.viewerWaitlist).length ? (
-                <WaitlistPanel eventId={eventId} ticketing={ticketing} open={waitFor} onChanged={tix.reload} headingLevel={2} approval={approval} />
+                <WaitlistPanel
+                  eventId={eventId}
+                  ticketing={ticketing}
+                  open={waitFor}
+                  onChanged={tix.reload}
+                  headingLevel={2}
+                  approval={approval}
+                  ticketLink={{ type: linked, key: linkedKey }}
+                />
               ) : null}
             </div>
           ) : null}
@@ -1547,6 +1572,7 @@ function Flow({ event, club, info, onDone, earlier = null }) {
                     fallbackTypes={chosen ? [chosen] : []}
                     onChanged={tix.reload}
                     headingLevel={2}
+                    ticketLink={{ type: linked, key: linkedKey }}
                   />
                 ) : null
               }

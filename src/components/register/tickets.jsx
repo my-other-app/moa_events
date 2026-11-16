@@ -28,6 +28,15 @@ import { Spinner } from "./finishpayment";
 
 /* ---------- a hidden type a link names ---------- */
 
+/*
+ * A hidden ticket (comp, speaker, staff) is sold only through its own link:
+ * `?ticket_type=15&ticket_key=…`, the key the server made for that ticket
+ * (copied from the club's dashboard). The key goes with every call about
+ * that ticket -- its listing, a code's check, the registration, the waiting
+ * list -- and with every link into the form, and nowhere else. It is never
+ * kept in the draft: the address carries it.
+ */
+
 /** `?ticket_type=12` → 12; null when the address names none (or nonsense). */
 export function linkedTypeFrom(search) {
   try {
@@ -39,13 +48,62 @@ export function linkedTypeFrom(search) {
   }
 }
 
+const KEY_SHAPE = /^[A-Za-z0-9_-]{8,64}$/;
+
+/** `?ticket_key=…` → the key a hidden ticket's link carries; null for none (or nonsense). */
+export function linkedKeyFrom(search) {
+  try {
+    const v = (new URLSearchParams(search || "").get("ticket_key") || "").trim();
+    return KEY_SHAPE.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The key, for a call about `typeId`: only when it is the linked ticket's. */
+export function keyFor(linked, key, typeId) {
+  return key && linked !== null && linked !== undefined && typeId !== null && typeId !== undefined && Number(typeId) === Number(linked) ? key : null;
+}
+
+/** The query that opens the form on a ticket: `ticket_type=15`, and its key when the link had one for it. */
+export function ticketQuery(typeId, { linked = null, key = null } = {}) {
+  const q = new URLSearchParams({ ticket_type: String(typeId) });
+  const k = keyFor(linked, key, typeId);
+  if (k) q.set("ticket_key", k);
+  return q.toString();
+}
+
+function readAddress(read) {
+  return read(typeof window === "undefined" ? "" : window.location.search);
+}
+
 /** The type the page's address names, read once the page is up (never in the first paint). */
 export function useLinkedType() {
   const [id, setId] = useState(null);
   useEffect(() => {
-    setId(linkedTypeFrom(typeof window === "undefined" ? "" : window.location.search));
+    setId(readAddress(linkedTypeFrom));
   }, []);
   return id;
+}
+
+/** The type and key the page's address carries ({type, key}), read once the page is up. */
+export function useTicketLink() {
+  const [link, setLink] = useState({ type: null, key: null });
+  useEffect(() => {
+    setLink({ type: readAddress(linkedTypeFrom), key: readAddress(linkedKeyFrom) });
+  }, []);
+  return link;
+}
+
+/** A link named a ticket the list doesn't have (no key, an old link, or the ticket is gone): say so. */
+export function LinkedTicketGone({ ticketing, linked, className = "ep-tt-note" }) {
+  if (!ticketing || linked === null || linked === undefined) return null;
+  if (ticketing.types.some((t) => t.id === linked)) return null;
+  return (
+    <p className={`${className} is-warn`} role="status">
+      The ticket this link was for isn&rsquo;t available. If the organisers sent it to you, ask them for a new link.
+    </p>
+  );
 }
 
 /* ---------- the event's tickets, read once for the page ---------- */
@@ -54,11 +112,12 @@ const TTL = 30 * 1000;
 const cache = new Map();
 
 /** GET /events/{id}/ticket-types, shared by the page's islands for half a minute (per reader). */
-export function loadTicketing(eventId, { ticketType = null, who = "", fresh = false } = {}) {
-  const key = `${eventId}|${ticketType ?? ""}|${who}`;
+export function loadTicketing(eventId, { ticketType = null, ticketKey = null, who = "", fresh = false } = {}) {
+  const k = keyFor(ticketType, ticketKey, ticketType);
+  const key = `${eventId}|${ticketType ?? ""}|${k ?? ""}|${who}`;
   const hit = cache.get(key);
   if (!fresh && hit && Date.now() - hit.at < TTL) return hit.promise;
-  const promise = Promise.resolve().then(() => ticketingApi.types(eventId, { ticketType }));
+  const promise = Promise.resolve().then(() => ticketingApi.types(eventId, { ticketType, ...(k ? { ticketKey: k } : {}) }));
   cache.set(key, { at: Date.now(), promise });
   promise.catch(() => {
     if (cache.get(key)?.promise === promise) cache.delete(key);
@@ -76,23 +135,23 @@ export function forgetTicketing() {
  * with them when signed in). `ticketing` is null until they arrive, and from
  * a server without ticket types.
  */
-export function useEventTicketing(eventId, { enabled = true, ticketType = null } = {}) {
+export function useEventTicketing(eventId, { enabled = true, ticketType = null, ticketKey = null } = {}) {
   const auth = useAuth();
   const who = auth.ready ? (auth.status === "signed-in" ? auth.user?.email || "account" : "") : null;
-  const key = `${eventId}|${ticketType ?? ""}|${who}`;
+  const key = `${eventId}|${ticketType ?? ""}|${ticketKey ?? ""}|${who}`;
   const [state, setState] = useState({ key: null, data: null });
   const [fresh, setFresh] = useState(0);
   useEffect(() => {
     if (!enabled || who === null) return undefined;
     let alive = true;
-    loadTicketing(eventId, { ticketType, who, fresh: fresh > 0 }).then(
+    loadTicketing(eventId, { ticketType, ticketKey, who, fresh: fresh > 0 }).then(
       (data) => alive && setState({ key, data }),
       () => {},
     );
     return () => {
       alive = false;
     };
-  }, [eventId, enabled, who, ticketType, fresh, key]);
+  }, [eventId, enabled, who, ticketType, ticketKey, fresh, key]);
   const reload = useCallback(() => setFresh((n) => n + 1), []);
   return { ticketing: state.key === key ? state.data : null, reload };
 }
@@ -163,8 +222,10 @@ const AUTO_CHECK_MS = 900;
  * it was refused. Checked 0.9 s after typing stops and on Apply; the check
  * is limited to 10 a minute, so typing pauses its checks for a minute after
  * a 429 (Apply still asks). A change of ticket asks again for the new one.
+ * `ticketKey`: a hidden ticket's key (its link's); `offerToken`: the claim
+ * link's, for the ticket its offer is for. Either only for that ticket.
  */
-export function useDiscountCode({ eventId, ticketTypeId = null, email = null, phone = null }) {
+export function useDiscountCode({ eventId, ticketTypeId = null, email = null, phone = null, ticketKey = null, offerToken = null }) {
   const [text, setTextState] = useState("");
   const [applied, setApplied] = useState(null);
   const [error, setError] = useState(null);
@@ -185,7 +246,14 @@ export function useDiscountCode({ eventId, ticketTypeId = null, email = null, ph
       setBusy(true);
       setError(null);
       try {
-        const r = await ticketingApi.checkCode(eventId, { code, ticketTypeId, email, phone });
+        const r = await ticketingApi.checkCode(eventId, {
+          code,
+          ticketTypeId,
+          email,
+          phone,
+          ...(ticketKey ? { ticketKey } : {}),
+          ...(offerToken ? { offerToken } : {}),
+        });
         if (id !== seq.current) return null;
         const next = {
           code: typeof r?.code === "string" && r.code ? r.code : code.toUpperCase(),
@@ -207,7 +275,7 @@ export function useDiscountCode({ eventId, ticketTypeId = null, email = null, ph
         if (id === seq.current) setBusy(false);
       }
     },
-    [eventId, ticketTypeId, email, phone],
+    [eventId, ticketTypeId, email, phone, ticketKey, offerToken],
   );
 
   const setText = useCallback((v) => {
@@ -356,7 +424,7 @@ function joinErrors({ types, typeId, name, email, phone, whatsapp }) {
  * if they want it there too. Not a <form>: it may sit inside the
  * registration's, so Enter is caught here and sends this alone.
  */
-export function WaitlistJoin({ eventId, types, typeId: firstType = null, account = null, offerHours = 24, onJoined, onCancel = null }) {
+export function WaitlistJoin({ eventId, types, typeId: firstType = null, account = null, offerHours = 24, onJoined, onCancel = null, ticketLink = null }) {
   const [typeId, setTypeId] = useState(firstType ?? (types.length === 1 ? types[0].id : null));
   const [name, setName] = useState(account?.name || "");
   const [email, setEmail] = useState(account?.email || "");
@@ -381,12 +449,15 @@ export function WaitlistJoin({ eventId, types, typeId: firstType = null, account
     }
     setBusy(true);
     try {
+      const forType = typeId ?? (types.length === 1 ? types[0].id : null);
+      const ticketKey = keyFor(ticketLink?.type ?? null, ticketLink?.key ?? null, forType);
       const entry = await ticketingApi.joinWaitlist(eventId, {
-        ticketTypeId: typeId ?? (types.length === 1 ? types[0].id : null),
+        ticketTypeId: forType,
         name: name.trim(),
         email: email.trim() || null,
         phone: phone.trim() || null,
         whatsapp: whatsapp && Boolean(phone.trim()),
+        ...(ticketKey ? { ticketKey } : {}),
       });
       onJoined(entry, { email: email.trim() || null, phone: phone.trim() || null });
     } catch (error) {
@@ -600,7 +671,7 @@ const openTypeOf = (open) => (open && typeof open === "object" ? (open.typeId ??
  * so) offers no waiting list at all: only places someone already holds in
  * line are shown.
  */
-export function WaitlistPanel({ eventId, ticketing, open: openWith = null, fallbackTypes = null, onChanged = null, headingLevel = 2, approval = false }) {
+export function WaitlistPanel({ eventId, ticketing, open: openWith = null, fallbackTypes = null, onChanged = null, headingLevel = 2, approval = false, ticketLink = null }) {
   const auth = useAuth();
   const signedIn = auth.ready && auth.status === "signed-in";
   const account = signedIn ? auth.user : null;
@@ -697,6 +768,7 @@ export function WaitlistPanel({ eventId, ticketing, open: openWith = null, fallb
             offerHours={ticketing?.waitlist.offerHours ?? 24}
             onJoined={joined}
             onCancel={() => setOpen(false)}
+            ticketLink={ticketLink}
           />
         ) : (
           <div className="wl-offer">

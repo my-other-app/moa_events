@@ -23,11 +23,23 @@ async function answer(file) {
   return { route, res, body: await res.json() };
 }
 
-/** Apple's matching of a path against the components: the first match wins; * is any run of characters, ? one. */
-function opensInApp(components, path) {
+/** One of Apple's patterns as a RegExp: * is any run of characters, ? one. */
+function patternOf(text) {
+  return new RegExp(`^${text.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".")}$`);
+}
+
+/**
+ * Apple's matching of a link against the components: the first match wins. A
+ * component with "?" matches only when each query item it names is there, with
+ * a value its pattern matches (other query items don't matter).
+ */
+function opensInApp(components, link) {
+  const [path, search = ""] = link.split("?");
+  const query = new URLSearchParams(search);
   for (const c of components) {
-    const pattern = new RegExp(`^${c["/"].replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".")}$`);
-    if (pattern.test(path)) return !c.exclude;
+    if (!patternOf(c["/"]).test(path)) continue;
+    if (c["?"] && !Object.entries(c["?"]).every(([name, value]) => query.has(name) && patternOf(value).test(query.get(name)))) continue;
+    return !c.exclude;
   }
   return false;
 }
@@ -63,6 +75,11 @@ describe(AASA, () => {
     ["/events/hack-night-04", true],
     ["/events/123", true],
     ["/events/hack-night-04/register", true],
+    // A hidden ticket's link carries its key, which the apps out now don't send on: the browser.
+    ["/events/hack-night-04?ticket_type=15&ticket_key=3f9c0a1b2c3d4e5f60718293", false],
+    ["/events/hack-night-04/register?ticket_type=15&ticket_key=3f9c0a1b2c3d4e5f60718293&step=details", false],
+    ["/events/hack-night-04?ticket_type=15", true],
+    ["/events/hack-night-04?ticket_key=", true],
     ["/clubs/circuit-society", true],
     ["/threads/7d0f3c2a-1111-4c4c-9a9a-000000000001", true],
     ["/tickets/abc-123", true],

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { liveEntries, onSale, typeNote, typePrice, waitlistTypes } from "@/utils/ticketing";
-import { useEventTicketing, useLinkedType, WaitlistPanel } from "./tickets";
+import { LinkedTicketGone, ticketQuery, useEventTicketing, useTicketLink, WaitlistPanel } from "./tickets";
 
 /**
  * The event page's tickets (a client island in the server-rendered page):
@@ -17,7 +17,9 @@ import { useEventTicketing, useLinkedType, WaitlistPanel } from "./tickets";
  *
  * and nothing at all for an event with one ticket and no line, an ended or
  * cancelled event, or a server without ticket types. A hidden type named by
- * the page's address (`?ticket_type=`) is listed too.
+ * the page's address (`?ticket_type=`, with the `ticket_key` its link
+ * carries) is listed too, and its "Choose" keeps the key. A link naming a
+ * ticket the list doesn't have says so.
  *
  * The register card's button (registercta.jsx) asks to join with
  * askToJoin(): this opens the form and comes into view.
@@ -38,9 +40,9 @@ export function askToJoin(eventId, typeId = null) {
 }
 
 export function EventTickets({ eventId, kind, registerHref = null, approval = false }) {
-  const linked = useLinkedType();
+  const { type: linked, key: linkedKey } = useTicketLink();
   const enabled = kind !== "ended" && kind !== "cancelled";
-  const { ticketing, reload } = useEventTicketing(eventId, { enabled, ticketType: linked });
+  const { ticketing, reload } = useEventTicketing(eventId, { enabled, ticketType: linked, ticketKey: linkedKey });
   const [open, setOpen] = useState(null);
   const box = useRef(null);
 
@@ -63,8 +65,10 @@ export function EventTickets({ eventId, kind, registerHref = null, approval = fa
   const noLine = approval || ticketing.requiresApproval;
   const joinable = noLine ? [] : waitlistTypes(ticketing);
   const inLine = liveEntries(ticketing.viewerWaitlist);
-  if (!several && !joinable.length && !inLine.length) return null;
-  const choose = (t) => (registerHref && onSale(t) && (kind === "open" || kind === "live") ? `${registerHref}?ticket_type=${t.id}` : null);
+  const gone = linked !== null && !ticketing.types.some((t) => t.id === linked);
+  if (!several && !joinable.length && !inLine.length && !gone) return null;
+  const choose = (t) =>
+    registerHref && onSale(t) && (kind === "open" || kind === "live") ? `${registerHref}?${ticketQuery(t.id, { linked, key: linkedKey })}` : null;
 
   return (
     <section id="tickets" ref={box} className="ep-section ep-tickets" aria-labelledby="tickets-title">
@@ -73,6 +77,7 @@ export function EventTickets({ eventId, kind, registerHref = null, approval = fa
           Tickets
         </h2>
       </div>
+      <LinkedTicketGone ticketing={ticketing} linked={linked} />
       {several ? (
         <ul className="ep-tt-list">
           {ticketing.types.map((t) => {
@@ -101,7 +106,15 @@ export function EventTickets({ eventId, kind, registerHref = null, approval = fa
           })}
         </ul>
       ) : null}
-      <WaitlistPanel eventId={String(eventId)} ticketing={ticketing} open={open} onChanged={reload} headingLevel={3} approval={noLine} />
+      <WaitlistPanel
+        eventId={String(eventId)}
+        ticketing={ticketing}
+        open={open}
+        onChanged={reload}
+        headingLevel={3}
+        approval={noLine}
+        ticketLink={{ type: linked, key: linkedKey }}
+      />
     </section>
   );
 }
