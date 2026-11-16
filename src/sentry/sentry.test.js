@@ -264,6 +264,16 @@ describe("what an event may carry", () => {
     expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("app:///_next/server/app/answers/[eventId]/[ref]/page.js");
   });
 
+  it("masks a hidden ticket's key in the page's address and the API's calls", async () => {
+    const { options } = await fresh();
+    expect(options.maskText("https://myotherapp.in/events/devfest/register?ticket_type=14&ticket_key=3f9c0a1b2c3d4e5f60718293&step=details")).toBe(
+      "https://myotherapp.in/events/devfest/register?ticket_type=14&ticket_key=[code]&step=details"
+    );
+    expect(options.maskText("GET https://api.myotherapp.in/api/v1/events/7/ticket-types?ticket_type=14&ticket_key=3f9c0a1b2c3d4e5f60718293")).toBe(
+      "GET https://api.myotherapp.in/api/v1/events/7/ticket-types?ticket_type=14&ticket_key=[code]"
+    );
+  });
+
   it("leaves numbers that are not phones alone", async () => {
     const { options } = await fresh();
     expect(options.maskText("at 1729771234567, order 12345, ₹799, 2026-10-24T19:40:58+05:30, /verify")).toBe(

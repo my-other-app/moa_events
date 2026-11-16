@@ -47,6 +47,8 @@ const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration
 // /tickets/cancel/{token}. The token is the link's only credential.
 const CANCEL = /\/tickets\/cancel(\/|\?(?:[^#\s"'<>]*?&)?t=)(?!\[)[^&#/?\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
+// A hidden ticket's link: `ticket_key` is what sells that ticket (on the site's pages and the API's calls alike).
+const TICKET_KEY = /([?&]ticket_key=)(?!\[)[^&#\s"'<>]+/g;
 // A missing-answers link names the person: the site's /answers/{eventId}/{ref}
 // and the API's /events/{eventId}/answers/{ref} (a registration's UUID, or "q" and a request's).
 const ANSWERS = /\/answers\/(\d+\/)?q?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\w-])/gi;
@@ -61,7 +63,8 @@ export function maskText(text) {
     .replace(MOBILE, "$1[phone]")
     .replace(INTL, "$1[phone]")
     .replace(CODED, "/$1/[code]")
-    .replace(FEEDBACK, "/feedback/$1/[code]");
+    .replace(FEEDBACK, "/feedback/$1/[code]")
+    .replace(TICKET_KEY, "$1[code]");
 }
 
 // Stack frames (file names, code around the line) are left as they are:
