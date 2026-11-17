@@ -38,10 +38,20 @@ describe("the store badges", () => {
     expect(screen.queryByText(/Coming soon/)).toBeNull();
   });
 
-  it("say the App Store is coming soon, as text and not a link, while it isn't set", async () => {
+  it("link to MyOtherApp's App Store listing when the build sets no address", async () => {
     vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "");
     const { StoreButtons } = await load();
-    const { container } = render(<StoreButtons tone="light" />);
+    render(<StoreButtons />);
+    expect(screen.getByRole("link", { name: "Download on the App Store" })).toHaveAttribute(
+      "href",
+      "https://apps.apple.com/in/app/myotherapp/id6827996489"
+    );
+    expect(screen.queryByText(/Coming soon/)).toBeNull();
+  });
+
+  it("say the App Store is coming soon, as text and not a link, when given no address", async () => {
+    const { StoreButtons } = await load();
+    const { container } = render(<StoreButtons tone="light" appStoreUrl={null} />);
     expect(screen.getByRole("link", { name: "Get it on Google Play" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /App Store/ })).toBeNull();
     const soon = container.querySelector(".dc-store.is-soon");
@@ -72,7 +82,7 @@ describe("the store badges", () => {
     expect(within(apps).getByRole("link", { name: "iPhone app" })).toHaveAttribute("href", "https://apps.apple.com/app/id1");
   });
 
-  it("show the iPhone app as coming soon in the footer while it isn't out", async () => {
+  it("link both apps in the footer, the iPhone one to the App Store listing by default", async () => {
     vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "");
     const { SiteFooter } = await load();
     render(
@@ -81,8 +91,12 @@ describe("the store badges", () => {
       </MemoryRouter>
     );
     const apps = screen.getByRole("navigation", { name: "Get the app" });
-    expect(within(apps).getAllByRole("link")).toHaveLength(1);
-    expect(within(apps).getByText("Coming soon")).toBeInTheDocument();
+    expect(within(apps).getAllByRole("link")).toHaveLength(2);
+    expect(within(apps).getByRole("link", { name: "iPhone app" })).toHaveAttribute(
+      "href",
+      "https://apps.apple.com/in/app/myotherapp/id6827996489"
+    );
+    expect(within(apps).queryByText("Coming soon")).toBeNull();
     // And the site's own pages are one click away.
     expect(screen.getByRole("link", { name: "About" })).toHaveAttribute("href", "/about");
     expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");

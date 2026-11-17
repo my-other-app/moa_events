@@ -97,7 +97,7 @@ describe("one post", () => {
     // Without sign-in the app is the only way, and the prompt says plainly that iPhone has to wait.
     fireEvent.click(screen.getByRole("button", { name: "Comment (2 comments)" }));
     dialog = screen.getByRole("dialog", { name: "Do this in the app" });
-    expect(within(dialog).getByText(/^For now, comments are written in the MyOtherApp app for Android.*The iPhone app is on its way\.$/)).toBeInTheDocument();
+    expect(within(dialog).getByText("For now, comments are written in the MyOtherApp app, where the club reads and replies. It's free.")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Sign in/ })).toBeNull();
     // No box to write in, and nothing offers signing in.
     expect(screen.queryByRole("textbox")).toBeNull();
