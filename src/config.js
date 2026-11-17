@@ -12,9 +12,9 @@ const clean = (v) => (typeof v === "string" && v.trim() ? v.trim().replace(/\/+$
 export const DEFAULT_API_BASE_URL = "https://api.myotherapp.in";
 export const API_BASE_URL = clean(process.env.NEXT_PUBLIC_API_BASE_URL) || DEFAULT_API_BASE_URL;
 
-/** Where "Get the app" sends people. The App Store button shows only once its link is set. */
+/** Where "Get the app" sends people: the two store listings (a build setting can point elsewhere). */
 export const PLAY_STORE_URL = clean(process.env.NEXT_PUBLIC_PLAY_STORE_URL) || "https://play.google.com/store/apps/details?id=app.myotherapp.in";
-export const APP_STORE_URL = clean(process.env.NEXT_PUBLIC_APP_STORE_URL) || null;
+export const APP_STORE_URL = clean(process.env.NEXT_PUBLIC_APP_STORE_URL) || "https://apps.apple.com/in/app/myotherapp/id6827996489";
 
 /** The clubs' own dashboard, for "For clubs". */
 export const CLUBS_URL = "https://club-dashboard.myotherapp.in";
