@@ -35,6 +35,17 @@
  *                                   sign-up (missing answers: the app's
  *                                   own answers screen, and its Android
  *                                   intent filter lists /answers/ too)
+ *   /u/{handle}                     a person's profile (Feature 4: the
+ *                                   app's profile screen)
+ *   /p/{code}                       a person's QR: the app's save flow.
+ *                                   The app's Android intent filter must
+ *                                   list /u/ and /p/ too. Without the app
+ *                                   the site sends /p/ on to
+ *                                   /u/{handle}?save=1
+ *   /network?event={id}             the Network tab, by event: the link in
+ *                                   the morning-after recap (push and
+ *                                   email). Without the app, the site's
+ *                                   /network page says where it lives.
  *
  * What stays in the browser, and why:
  *   - the feeds (rss.xml) under /events, /clubs and /topics: a feed reader's
@@ -83,6 +94,9 @@ export const APP_PATHS = [
   "/claim/*",
   "/requests/*",
   "/answers/*",
+  "/u/*",
+  "/p/*",
+  "/network",
 ];
 
 /** The paths that stay in the browser, checked first (the first match wins). */

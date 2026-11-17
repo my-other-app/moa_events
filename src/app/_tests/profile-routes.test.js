@@ -5,6 +5,7 @@ import { fakeFetch, outcome } from "@/test/next";
 import { html } from "@/test/html";
 import { PRIVATE_PROFILE, PUBLIC_PROFILE } from "@/test/profileFixture";
 import { RESERVED, isLegacyRef } from "@/seo/legacy";
+import { appleAppSiteAssociation } from "@/seo/appLinks";
 import { parseSitemapName, staticEntries } from "@/seo/sitemap";
 
 /*
@@ -355,6 +356,14 @@ describe("/network", () => {
 });
 
 describe("profiles and the rest of the site", () => {
+  it("open in the app: /u/*, /p/* and the recap's /network are claimed for universal links", () => {
+    const components = appleAppSiteAssociation().applinks.details[0].components;
+    expect(components).toContainEqual({ "/": "/u/*" });
+    expect(components).toContainEqual({ "/": "/p/*" });
+    expect(components).toContainEqual({ "/": "/network" });
+    expect(isLegacyRef("network")).toBe(false);
+  });
+
   it("are words of the site's own, never an old event address", () => {
     expect(RESERVED.has("u")).toBe(true);
     expect(RESERVED.has("p")).toBe(true);
