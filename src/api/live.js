@@ -97,6 +97,22 @@ export const liveApi = {
     joinQuiz: async (code, name, team) =>
         (await apiClient.post("/api/v1/live/quiz/join", { code, name, player_key: liveKey(), ...(team ? { team } : {}) }, { headers: V2 })).data,
 
+    /**
+     * The round running with a join code, before joining (CONTRACT 5.2, v1.3):
+     * its teams (to pick one), whether names are the registered ones, whether
+     * it has started and takes late players. null for an unknown code, and
+     * on an API from before the lookup.
+     */
+    lookupQuiz: async (code) => {
+        try {
+            return (await apiClient.get("/api/v1/live/quiz/lookup", { params: { code }, skipAuth: true, headers: V2 })).data;
+        } catch (error) {
+            const status = error?.response?.status;
+            if (status === 404 || status === 405 || status === 422) return null;
+            throw error;
+        }
+    },
+
     playState: async (eventId, playerKey) => (await apiClient.get(`${base(eventId)}/quiz/play`, played(playerKey))).data,
 
     answer: async (eventId, playerKey, response) => (await apiClient.post(`${base(eventId)}/quiz/answer`, answerBody(response), played(playerKey))).data,

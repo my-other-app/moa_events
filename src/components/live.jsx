@@ -48,12 +48,41 @@ const Happening = ({ feed }) => {
   );
 };
 
+/** How long the code box rests before the round behind the code is looked up. */
+const LOOKUP_AFTER_MS = 400;
+
 /**
- * The door to the quiz: the code on the screen and a name. What the round
- * asks of a new player, when the room says (CONTRACT 3.1 `players`,
- * `teams`): a team to pick, or the registered name instead of a nickname.
- * Every refusal is the API's own sentence; one that needs the guest signed
- * in offers the sign-in.
+ * The round behind a typed join code (CONTRACT 5.2, v1.3): looked up once
+ * the box holds 4 to 8 digits and rests, the answer for the code as it now
+ * stands. null while there is none (an unknown code, an API from before).
+ */
+function useRoundLookup(code) {
+  const [found, setFound] = useState(null);
+  const wanted = /^\d{4,8}$/.test(code) ? code : null;
+  useEffect(() => {
+    setFound(null);
+    if (!wanted) return undefined;
+    let gone = false;
+    const timer = setTimeout(() => {
+      Promise.resolve()
+        .then(() => liveApi.lookupQuiz(wanted))
+        .then((round) => !gone && setFound(round ? { ...round, code: wanted } : null))
+        .catch(() => !gone && setFound(null));
+    }, LOOKUP_AFTER_MS);
+    return () => {
+      gone = true;
+      clearTimeout(timer);
+    };
+  }, [wanted]);
+  return found && found.code === wanted ? found : null;
+}
+
+/**
+ * The door to the quiz: the code on the screen and a name. Once the code is
+ * typed, what the round asks of a new player (CONTRACT 3.1 `players`,
+ * `teams`): a team to pick, or the registered name instead of a nickname,
+ * and a word when it has started and takes no one new. Every refusal is the
+ * API's own sentence; one that needs the guest signed in offers the sign-in.
  */
 const JoinQuiz = ({ eventId, quiz }) => {
   const router = useRouter();
@@ -65,8 +94,12 @@ const JoinQuiz = ({ eventId, quiz }) => {
   const [signIn, setSignIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const player = currentPlayer(eventId);
-  const list = quiz?.teams?.mode === "pick" && Array.isArray(quiz.teams.list) && quiz.teams.list.length >= 2 ? quiz.teams.list : null;
-  const registered = quiz?.names === "registered";
+  const round = useRoundLookup(code.trim());
+  const list = round?.teams?.mode === "pick" && Array.isArray(round.teams.list) && round.teams.list.length >= 2 ? round.teams.list : null;
+  const registered = round?.players?.names === "registered";
+  const late = Boolean(round?.started && round?.players?.late_join === false);
+  // A team picked for another code's round is not this one's.
+  const picked = list && list.some((t) => t.key === team) ? team : null;
   const join = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -74,7 +107,7 @@ const JoinQuiz = ({ eventId, quiz }) => {
     setSignIn(false);
     const who = registered ? name.trim() || auth.user?.name || "Guest" : name.trim();
     try {
-      const p = team ? await liveApi.joinQuiz(code.trim(), who, team) : await liveApi.joinQuiz(code.trim(), who);
+      const p = picked ? await liveApi.joinQuiz(code.trim(), who, picked) : await liveApi.joinQuiz(code.trim(), who);
       rememberPlayer(p.event_id, p);
       router.push(`/play/${p.event_id}`);
     } catch (err) {
@@ -105,13 +138,18 @@ const JoinQuiz = ({ eventId, quiz }) => {
             <fieldset className="lt-teams-pick">
               <legend>Pick your team</legend>
               {list.map((t) => (
-                <label key={t.key} className={`lt-team-choice${team === t.key ? " is-on" : ""}`}>
-                  <input type="radio" name="quiz-team" value={t.key} checked={team === t.key} onChange={() => setTeam(t.key)} />
+                <label key={t.key} className={`lt-team-choice${picked === t.key ? " is-on" : ""}`}>
+                  <input type="radio" name="quiz-team" value={t.key} checked={picked === t.key} onChange={() => setTeam(t.key)} />
                   <span className="lt-swatch" style={{ background: t.color }} aria-hidden="true" />
                   <span>{t.name}</span>
                 </label>
               ))}
             </fieldset>
+          )}
+          {late && (
+            <p className="live-note" role="status">
+              This round has started and takes no new players. If you were already playing, join again to carry on.
+            </p>
           )}
           <button type="submit" className="live-btn live-btn--block" disabled={busy || code.trim().length < 4 || (!registered && !name.trim())}>
             Join the quiz

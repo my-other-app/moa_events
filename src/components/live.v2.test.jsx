@@ -16,6 +16,7 @@ vi.mock("@/api/live", () => ({
     playState: vi.fn(),
     answer: vi.fn(),
     fetchTheme: vi.fn(),
+    lookupQuiz: vi.fn(),
   },
 }));
 
@@ -71,6 +72,18 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   sessionStorage.clear();
+  liveApi.lookupQuiz.mockResolvedValue(null);
+});
+
+/** The round behind a code, as GET /live/quiz/lookup answers (CONTRACT 5.2, v1.3). */
+const round = (over = {}) => ({
+  event_id: 68,
+  quiz_id: "qz1",
+  title: "Round 1",
+  started: false,
+  teams: { mode: "off", score: "total", list: [] },
+  players: { names: "nickname", late_join: true },
+  ...over,
 });
 
 describe("the room's theme", () => {
@@ -125,13 +138,16 @@ describe("joining a round", () => {
     fireEvent.change(await screen.findByLabelText("Join code"), { target: { value: "483921" } });
   };
 
-  it("offers the round's teams to pick from, and joins with the one picked", async () => {
-    liveApi.fetchFeed.mockResolvedValue(feed({ quiz: { live: true, title: "Round 1", teams: { mode: "pick", list: [{ key: "red", name: "Red Rockets", color: "#E11D48" }, { key: "blue", name: "Blue Whales", color: "#2563EB" }] } } }));
+  it("looks up the round behind the code, offers its teams to pick from, and joins with the one picked", async () => {
+    liveApi.fetchFeed.mockResolvedValue(feed());
+    liveApi.lookupQuiz.mockResolvedValue(round({ teams: { mode: "pick", score: "total", list: [{ key: "red", name: "Red Rockets", color: "#E11D48" }, { key: "blue", name: "Blue Whales", color: "#2563EB" }] } }));
     liveApi.joinQuiz.mockResolvedValue({ event_id: 68, quiz_id: "qz1", title: "Round 1", player_id: "pl1", player_key: "pk1", name: "Sneha", team: { key: "blue", name: "Blue Whales", color: "#2563EB" }, tag: "7F2" });
     room();
     await fill();
     fireEvent.change(screen.getByLabelText("Your name for the quiz"), { target: { value: "Sneha" } });
-    const group = screen.getByRole("group", { name: "Pick your team" });
+    const group = await screen.findByRole("group", { name: "Pick your team" });
+    expect(liveApi.lookupQuiz).toHaveBeenCalledTimes(1);
+    expect(liveApi.lookupQuiz).toHaveBeenCalledWith("483921");
     fireEvent.click(within(group).getByRole("radio", { name: "Blue Whales" }));
     fireEvent.click(screen.getByRole("button", { name: "Join the quiz" }));
     await waitFor(() => expect(liveApi.joinQuiz).toHaveBeenCalledWith("483921", "Sneha", "blue"));
@@ -139,15 +155,38 @@ describe("joining a round", () => {
     expect(JSON.parse(localStorage.getItem("moa.live.player.68")).team.key).toBe("blue");
   });
 
+  it("offers no team picker for an unknown code or an API without the lookup, and joins without a team", async () => {
+    liveApi.fetchFeed.mockResolvedValue(feed());
+    liveApi.joinQuiz.mockResolvedValue({ event_id: 68, quiz_id: "qz1", title: "Round 1", player_id: "pl1", player_key: "pk1", name: "Sneha" });
+    room();
+    await fill();
+    fireEvent.change(screen.getByLabelText("Your name for the quiz"), { target: { value: "Sneha" } });
+    await waitFor(() => expect(liveApi.lookupQuiz).toHaveBeenCalled());
+    expect(screen.queryByRole("group", { name: "Pick your team" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Join the quiz" }));
+    await waitFor(() => expect(liveApi.joinQuiz).toHaveBeenCalledWith("483921", "Sneha"));
+  });
+
   it("asks for no nickname in a round played under registered names", async () => {
-    liveApi.fetchFeed.mockResolvedValue(feed({ quiz: { live: true, title: "Round 1", names: "registered" } }));
+    liveApi.fetchFeed.mockResolvedValue(feed());
+    liveApi.lookupQuiz.mockResolvedValue(round({ players: { names: "registered", late_join: true } }));
     liveApi.joinQuiz.mockResolvedValue({ event_id: 68, quiz_id: "qz1", title: "Round 1", player_id: "pl1", player_key: "pk1", name: "Sneha Joseph" });
     room();
     await fill();
+    expect(await screen.findByText(/You play under the name you registered with/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Your name for the quiz")).toBeNull();
-    expect(screen.getByText(/You play under the name you registered with/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Join the quiz" }));
     await waitFor(() => expect(liveApi.joinQuiz).toHaveBeenCalledWith("483921", "Guest"));
+  });
+
+  it("says when a round that has started takes no new players, and still lets one already in carry on", async () => {
+    liveApi.fetchFeed.mockResolvedValue(feed());
+    liveApi.lookupQuiz.mockResolvedValue(round({ started: true, players: { names: "nickname", late_join: false } }));
+    room();
+    await fill();
+    expect(await screen.findByText(/This round has started and takes no new players/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Your name for the quiz"), { target: { value: "Sneha" } });
+    expect(screen.getByRole("button", { name: "Join the quiz" })).toBeEnabled();
   });
 
   it("offers to sign in when the round is for registered guests and the visitor is signed out", async () => {

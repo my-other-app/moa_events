@@ -152,4 +152,20 @@ describe("this release's live room (X-Live-Version: 2)", () => {
     serve((config) => reply(config, 500, { message: "Boom" }));
     await expect(liveApi.fetchTheme(68)).rejects.toMatchObject({ response: { status: 500 } });
   });
+
+  it("looks up the round behind a join code as a visitor, and takes an unknown code or an API without the lookup as none", async () => {
+    localStorage.setItem("access_token", "guest-token");
+    const found = { event_id: 68, quiz_id: "qz1", title: "Round 1", started: false, teams: { mode: "pick", score: "total", list: [] }, players: { names: "nickname", late_join: true } };
+    const calls = [];
+    apiClient.defaults.adapter = vi.fn(async (config) => {
+      calls.push({ url: config.url, params: config.params, auth: config.headers.Authorization, version: config.headers["X-Live-Version"] });
+      return reply(config, 200, found);
+    });
+    expect(await liveApi.lookupQuiz("483921")).toEqual(found);
+    expect(calls).toEqual([{ url: "/api/v1/live/quiz/lookup", params: { code: "483921" }, auth: undefined, version: "2" }]);
+    serve((config) => reply(config, 404, { message: "No quiz is running with that code." }));
+    expect(await liveApi.lookupQuiz("000000")).toBeNull();
+    serve((config) => reply(config, 500, { message: "Boom" }));
+    await expect(liveApi.lookupQuiz("483921")).rejects.toMatchObject({ response: { status: 500 } });
+  });
 });
