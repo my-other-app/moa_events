@@ -55,14 +55,15 @@ afterEach(() => {
 });
 
 describe("snapshots", () => {
-  it("opens the room's stream with the browser's key and hands every snapshot over, without polling", async () => {
+  it("opens the room's stream with the browser's key and this release's version, and hands every snapshot over, without polling", async () => {
     const id = nextEvent();
     const seen = [];
     follow("room", { eventId: id }, (body) => seen.push(body));
     expect(sources()).toHaveLength(1);
     const key = localStorage.getItem("moa.live.key");
     expect(key).toBeTruthy();
-    expect(last().url).toBe(`${API_BASE_URL}/api/v1/events/${id}/live/stream?view=room&key=${key}`);
+    // v=2: the customisable room's bodies (the theme, the poll kinds); an API from before ignores it.
+    expect(last().url).toBe(`${API_BASE_URL}/api/v1/events/${id}/live/stream?view=room&key=${key}&v=2`);
 
     last().snapshot(feed({ banner: { text: "Doors at 6" } }), 11);
     last().snapshot(feed({ banner: { text: "Doors at 7" } }), 12);
@@ -82,13 +83,14 @@ describe("snapshots", () => {
     follow("quiz", { eventId: id, player: "secret-key" }, (s) => seen.push(s));
     expect(last().query.get("view")).toBe("quiz");
     expect(last().query.get("player")).toBe("secret-key");
+    expect(last().query.get("v")).toBe("2");
     expect(last().query.has("key")).toBe(false);
     last().snapshot({ status: "live", name: "Sneha", score: 930 }, 3);
     expect(seen).toEqual([{ status: "live", name: "Sneha", score: 930 }]);
     expect(liveApi.playState).not.toHaveBeenCalled();
   });
 
-  it("opens the strip's stream with no key, and polls the strip every 30 s where there is none", async () => {
+  it("opens the strip's stream with no key (and no version: the strip is unchanged), and polls the strip every 30 s where there is none", async () => {
     const id = nextEvent();
     const seen = [];
     follow("banner", { eventId: id }, (s) => seen.push(s));

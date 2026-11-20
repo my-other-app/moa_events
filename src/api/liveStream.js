@@ -5,6 +5,9 @@
  *
  *   GET /api/v1/events/{id}/live/stream?view=room|quiz|banner
  *
+ * (`v=2` on the room and the quiz: the bodies of the customisable room, as
+ * the polls' X-Live-Version: 2 asks for; CONTRACT.md 9.3.)
+ *
  * Every `snapshot` is exactly the JSON body the view's poll returns right
  * now, for this browser (its own `voted` / `mine` / `my_response`; the
  * player's own score and answer), with a version as its `id`. A `ping` comes
@@ -44,7 +47,7 @@
 import { getSession, hasGuest } from "@/auth/session";
 import { API_BASE_URL } from "@/config";
 import { isBot } from "@/seo/bots";
-import { liveKey } from "@/utils/live";
+import { LIVE_VERSION, liveKey } from "@/utils/live";
 import { liveApi } from "./live";
 
 /**
@@ -80,7 +83,7 @@ const VIEWS = {
   room: {
     interval: 5000,
     poll: ({ eventId }) => liveApi.fetchFeed(eventId),
-    query: () => ({ key: liveKey() }),
+    query: () => ({ key: liveKey(), v: LIVE_VERSION }),
     who: () => "",
     streamable: () => !asPerson(),
   },
@@ -94,7 +97,7 @@ const VIEWS = {
   quiz: {
     interval: 2000,
     poll: ({ eventId, player }) => liveApi.playState(eventId, player),
-    query: ({ player }) => ({ player }),
+    query: ({ player }) => ({ player, v: LIVE_VERSION }),
     who: ({ player }) => player,
   },
 };
