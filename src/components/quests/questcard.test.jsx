@@ -126,8 +126,9 @@ describe("entering a code", () => {
     expect(await within(box).findByText("Done: Keynote secret word (+5 points).")).toBeInTheDocument();
     expect(questsApi.code).toHaveBeenCalledWith("77", "cloud 24");
     expect(within(box).getByText("15", { selector: ".qs-score strong" })).toBeInTheDocument();
-    // Every code task done: the box stays (with what it said), and says there are none left to find.
-    expect(within(box).getByText("You've entered every code.")).toBeInTheDocument();
+    // Every code task done: the box stays, with what it said.
+    expect(within(box).getByLabelText("Enter a code")).toHaveValue("");
+    expect(within(box).getByText("Done: Keynote secret word (+5 points).")).toBeInTheDocument();
   });
 
   it("a wrong one says how many tries are left", async () => {

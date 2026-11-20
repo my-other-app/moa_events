@@ -55,7 +55,7 @@ const CLAIM_STATES = new Set(["reserved", "waitlisted", "sold_out", "collected",
 function readMe(v) {
   const m = obj(v);
   if (!m) return null;
-  return { count: whole(m.count), done: m.done === true, doneAt: iso(m.done_at), source: str(m.source) };
+  return { count: whole(m.count), done: m.done === true, doneAt: iso(m.done_at), source: str(m.source), revoked: m.revoked === true && m.done !== true };
 }
 
 function readTask(v) {
@@ -271,6 +271,10 @@ function actionFor(task, ctx) {
   }
 }
 
+/** A line that only says the title again ("Make your poster" / "Make your poster.") isn't worth saying. */
+const plainWords = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const sameWords = (line, title) => (line && plainWords(line) === plainWords(title) ? null : line);
+
 function howLine(task, ctx) {
   if (task.kind === "feedback" && !ctx.links?.feedback) return task.description || "The feedback form opens near the end: its link comes by email.";
   if (task.description) return task.description;
@@ -346,6 +350,8 @@ export function questView(card, ctx = {}, now = Date.now()) {
 
   const tasks = card.tasks.map((t) => {
     const done = Boolean(me && t.me?.done);
+    // Taken back by the organisers: it stays undone until they give it back, whatever the guest does.
+    const revoked = Boolean(me && t.me?.revoked);
     const shut = !done && outsideWindow(t.startsAt, t.endsAt, now);
     return {
       id: t.id,
@@ -354,11 +360,11 @@ export function questView(card, ctx = {}, now = Date.now()) {
       points: t.points,
       required: t.required,
       done,
-      count: me && !done && t.target > 1 ? { have: Math.min(t.target, t.me?.count || 0), need: t.target, unit: t.kind === "network" ? (t.target === 1 ? "person" : "people") : null } : null,
-      how: done || status === "ended" ? null : howLine(t, c),
+      count: me && !done && t.target > 1 && status !== "upcoming" ? { have: Math.min(t.target, t.me?.count || 0), need: t.target, unit: t.kind === "network" ? (t.target === 1 ? "person" : "people") : null } : null,
+      how: revoked ? "The organisers took this one back. Ask them if you think that's a mistake." : done || status === "ended" ? null : sameWords(howLine(t, c), t.title),
       when: done || status === "ended" ? null : windowLine(t.startsAt, t.endsAt, now),
       locked: shut,
-      action: me && open && !done && !shut ? actionFor(t, c) : null,
+      action: me && open && !done && !shut && !revoked ? actionFor(t, c) : null,
       doneLine: done && t.me?.doneAt && whenShort(t.me.doneAt, now) ? `Done ${atWhen(t.me.doneAt, now)}` : null,
     };
   });
@@ -371,7 +377,7 @@ export function questView(card, ctx = {}, now = Date.now()) {
       atLine: milestoneAt(card.mode, m.threshold),
       unlocked: Boolean(me) && m.unlocked,
       need,
-      needLine: need > 0 ? `${unitWord(card.mode, need)} to go` : null,
+      needLine: need > 0 && status === "open" ? `${unitWord(card.mode, need)} to go` : null,
       rewards: m.rewards.map((r) => {
         const state = me ? rewardState(r, m) : r.soldOut ? "sold_out" : "locked";
         const sizes = sizesFor(r.claim);
@@ -415,7 +421,7 @@ export function questView(card, ctx = {}, now = Date.now()) {
 
   /* The bar, and the line under it. */
   let next = null;
-  if (me && status !== "upcoming" && card.milestones.length) {
+  if (me && status === "open" && card.milestones.length) {
     if (me.requiredLeft > 0) {
       const names = card.tasks.filter((t) => t.required && !t.me?.done).map((t) => `“${t.title}”`);
       next = `Rewards unlock once the required ${me.requiredLeft === 1 ? "task is" : "tasks are"} done: ${rewardList(names) || plural(me.requiredLeft, "task")}.`;
@@ -450,7 +456,7 @@ export function questView(card, ctx = {}, now = Date.now()) {
     codeLock: codesLeft && attempts === 0 ? "No tries left for now: wrong codes are limited each hour. Try again later." : null,
     codeHint: !codesLeft ? "You've entered every code." : attempts !== null && attempts > 0 && attempts <= 3 ? `${plural(attempts, "try", "tries")} left this hour.` : null,
     milestones,
-    leaderboard: card.leaderboard && Boolean(me),
+    leaderboard: card.leaderboard && Boolean(me) && status !== "upcoming",
   };
 }
 
@@ -494,6 +500,8 @@ export function describeCodeRefusal(error, now = Date.now()) {
       return { tone: "bad", line: "Codes count for guests with a ticket. Sign in with the account you registered with, or open your ticket from its email." };
     case "QUEST_CLOSED":
       return { tone: "bad", line: "The quest isn't open right now, so codes don't count.", reload: true };
+    case "QUEST_TASK_REVOKED":
+      return { tone: "bad", line: "Right code, but the organisers took that task back for you, so it doesn't count." };
     default:
       break;
   }
@@ -516,6 +524,8 @@ export function describeSizeRefusal(error) {
       .filter(Boolean);
     return { tone: "bad", line: choices.length ? "That size just ran out. Pick another." : "That size just ran out, and no other is free right now.", choices };
   }
+  // Not one of the item's sizes (422, with the sizes there are).
+  if (f.status === 422 && arr(obj(f.errors)?.choices).length) return { ...describeSizeRefusal({ response: { status: 409, data: { error_code: "QUEST_SIZE_GONE", errors: f.errors } } }), line: "That isn't one of the sizes. Pick one of these." };
   if (f.code === "QUEST_CLAIM_NOT_RESERVED" || f.status === 404) return { tone: "bad", line: "This reward changed meanwhile: here it is as it stands now.", reload: true };
   if (f.code === "QUEST_CLOSED") return { tone: "bad", line: "The quest isn't open right now.", reload: true };
   if (f.status === 429) return { tone: "bad", line: "Too many tries in a row. Wait a minute, then try again." };

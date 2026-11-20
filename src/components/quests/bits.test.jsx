@@ -13,7 +13,7 @@ import { QuestMeter } from "./meter.jsx";
 describe("the progress bar", () => {
   it("is a progressbar with its words, filled by transform, with the milestones marked", () => {
     const { container } = render(<QuestMeter value={6} max={20} marks={[5, 10, 20]} label="6 of 20 points" />);
-    const bar = screen.getByRole("progressbar", { name: "" });
+    const bar = screen.getByRole("progressbar", { name: "Quest progress" });
     expect(bar).toHaveAttribute("aria-valuenow", "6");
     expect(bar).toHaveAttribute("aria-valuemax", "20");
     expect(bar).toHaveAttribute("aria-valuetext", "6 of 20 points");
@@ -75,6 +75,15 @@ describe("entering a code", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     await act(async () => done({ tone: "bad", line: "No." }));
     expect(screen.getByRole("button", { name: "Check" })).toBeEnabled();
+  });
+
+  it("shows the card's word until it has said something of its own", async () => {
+    render(<CodeEntry hint="2 tries left this hour." onSubmit={async () => ({ tone: "bad", line: "That isn't one of this quest's codes. 1 try left this hour." })} />);
+    expect(screen.getByText("2 tries left this hour.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Enter a code"), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("1 try left this hour."));
+    expect(screen.queryByText("2 tries left this hour.")).toBeNull();
   });
 
   it("can't be sent while locked, and says why", () => {

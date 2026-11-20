@@ -189,7 +189,9 @@ describe("what the card says", () => {
     expect(v.score).toBeNull();
     expect(v.meter).toBeNull();
     expect(v.hasCodes).toBe(false);
-    expect(v.tasks.every((t) => t.action === null)).toBe(true);
+    expect(v.tasks.every((t) => t.action === null && t.count === null)).toBe(true);
+    expect(v.milestones.every((m) => m.needLine === null)).toBe(true);
+    expect(v.leaderboard).toBe(false);
   });
 
   it("after the end: when it ended, what to collect still, and nothing to do", () => {
@@ -198,6 +200,22 @@ describe("what the card says", () => {
     expect(v.notes.map((n) => n.line)).toEqual(["The quest ended at 6:00 PM.", "You've unlocked Sticker pack: collect it at Swag desk."]);
     expect(v.hasCodes).toBe(false);
     expect(v.tasks.every((t) => t.action === null && t.how === null)).toBe(true);
+    // Nothing more counts: no "more to unlock", no "to go"; the leaderboard stays (the final standings).
+    expect(v.next).toBeNull();
+    expect(v.milestones.every((m) => m.needLine === null)).toBe(true);
+    expect(v.leaderboard).toBe(true);
+  });
+
+  it("a task the organisers took back: said so, with nothing to do", () => {
+    const card = questCard();
+    card.tasks[2].me = { count: 1, done: false, done_at: null, source: null, revoked: true };
+    expect(task(view(card), "t-booth")).toMatchObject({ done: false, action: null, how: "The organisers took this one back. Ask them if you think that's a mistake." });
+  });
+
+  it("never says a task's title over again as what to do", () => {
+    const card = questCard();
+    card.tasks[6] = { ...card.tasks[6], title: "Make your “I'm attending” poster", me: { count: 0, done: false } };
+    expect(task(view(card), "t-poster").how).toBeNull();
   });
 
   it("without a ticket: no ticks or buttons, and how to take part", () => {
@@ -317,6 +335,7 @@ describe("codes", () => {
     expect(describeCodeRefusal(new Error("offline")).line).toBe("We couldn't check the code. Check your connection and try again.");
     expect(describeCodeRefusal({ authExpired: true }).line).toMatch(/sign-in has expired/);
     expect(describeCodeRefusal(fail(500, {})).line).toBe("That didn't go through. Try again in a moment.");
+    expect(describeCodeRefusal(fail(409, { error_code: "QUEST_TASK_REVOKED" })).line).toMatch(/took that task back/);
   });
 });
 
@@ -332,6 +351,7 @@ describe("sizes", () => {
     });
     expect(describeSizeRefusal(fail(409, { error_code: "QUEST_SIZE_GONE", errors: {} })).line).toBe("That size just ran out, and no other is free right now.");
     expect(describeSizeRefusal(fail(409, { error_code: "QUEST_CLAIM_NOT_RESERVED" }))).toMatchObject({ reload: true });
+    expect(describeSizeRefusal(fail(422, { errors: { choices: [{ label: "S", free: 1 }] } }))).toEqual({ tone: "bad", line: "That isn't one of the sizes. Pick one of these.", choices: [{ label: "S", free: 1 }] });
     expect(describeSizeRefusal(new Error("offline")).line).toMatch(/connection/);
   });
 });

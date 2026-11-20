@@ -19,6 +19,7 @@ export function CodeEntry({ onSubmit, lockedLine = null, disabled = false, hint 
   const [said, setSaid] = useState(null);
   const locked = Boolean(lockedLine);
   const off = disabled || locked;
+  const line = locked ? { tone: "bad", line: lockedLine } : said;
 
   const send = async (e) => {
     e.preventDefault();
@@ -40,14 +41,14 @@ export function CodeEntry({ onSubmit, lockedLine = null, disabled = false, hint 
     }
   };
 
-  const line = locked ? { tone: "bad", line: lockedLine } : said;
   return (
     <form className="qs-code" onSubmit={send} noValidate>
       <label className="qs-code-label" htmlFor={`${id}-code`}>
         <QuestIcon name="key" size={16} />
         Enter a code
       </label>
-      {hint ? (
+      {/* The card's word (tries left, every code in) until this box has said something of its own. */}
+      {hint && !line ? (
         <p className="qs-code-hint" id={`${id}-hint`}>
           {hint}
         </p>
@@ -68,7 +69,7 @@ export function CodeEntry({ onSubmit, lockedLine = null, disabled = false, hint 
           onChange={(e) => setCode(e.target.value)}
           disabled={off}
           aria-invalid={line?.tone === "bad" ? true : undefined}
-          aria-describedby={[hint ? `${id}-hint` : null, `${id}-said`].filter(Boolean).join(" ")}
+          aria-describedby={[hint && !line ? `${id}-hint` : null, `${id}-said`].filter(Boolean).join(" ")}
         />
         <button type="submit" className="dc-btn dc-btn--sm qs-code-go" disabled={off || busy}>
           {busy ? "Checking…" : "Check"}
