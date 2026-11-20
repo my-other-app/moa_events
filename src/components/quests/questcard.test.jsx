@@ -299,6 +299,16 @@ describe("on the event's page", () => {
     await waitFor(() => expect(questsApi.card).toHaveBeenCalledTimes(1));
   });
 
+  it("asks nothing when a crawler reads the page", async () => {
+    const ua = vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)");
+    questsApi.card.mockResolvedValue(parseQuestCard(overviewCard()));
+    const { container } = onEvent();
+    await act(async () => {});
+    expect(questsApi.card).not.toHaveBeenCalled();
+    expect(container).toBeEmptyDOMElement();
+    ua.mockRestore();
+  });
+
   it("shows nothing for an event without a quest", async () => {
     questsApi.card.mockResolvedValue(null);
     const { container } = onEvent();

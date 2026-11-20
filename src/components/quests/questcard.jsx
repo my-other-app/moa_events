@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { questsApi } from "@/api/quests";
 import { useAuth } from "@/auth/context";
 import { hasGuest } from "@/auth/session";
+import { isBot } from "@/seo/bots";
 import { codeDoneLine, describeCodeRefusal, describeSizeRefusal, questView, whatsNew, withChoices, withClaim } from "@/utils/quests";
 import { minutesWord } from "@/utils/questwords";
 import { useAndroid } from "../profiles/openinapp";
@@ -178,22 +179,25 @@ export function TicketQuests({ ticketId, event, skip = false }) {
  * else, what the quest is and how to take part. Read in the browser (the
  * page's HTML is the same for everyone). Nothing for a called-off event,
  * and nothing for an ended one unless someone who may have taken part is
- * reading (signed in, or holding a registration's guest token).
+ * reading (signed in, or holding a registration's guest token). Crawlers
+ * running the page's script aren't asked for one either.
  */
 export function EventQuests({ event, clubSlug = null, canRegister = false }) {
   const auth = useAuth();
   const android = useAndroid();
   const signedIn = auth.ready && auth.status === "signed-in";
   const who = signedIn ? auth.user?.email || "account" : "";
-  // Whether this browser holds a registration's guest token: known once the page is in the browser.
+  // Whether this browser holds a registration's guest token, and whether a crawler is reading: known once the page is in the browser.
   const [guest, setGuest] = useState(null);
+  const [bot, setBot] = useState(false);
   useEffect(() => {
     setGuest(hasGuest());
+    setBot(isBot(window.navigator?.userAgent));
   }, [who]);
   const cancelled = event.status === "cancelled";
   const ended = event.status === "ended";
-  // Wait for the browser to say who is reading, so the card is read once, with the right token.
-  const skip = cancelled || (auth.enabled && !auth.ready) || guest === null || (ended && !signedIn && !guest);
+  // Wait for the browser to say who is reading, so the card is read once, with the right token. Crawlers aren't asked for one.
+  const skip = cancelled || bot || (auth.enabled && !auth.ready) || guest === null || (ended && !signedIn && !guest);
   const eventId = String(event.id);
   const { card, setCard, reload, fresh } = useQuestCard(eventId, { skip, who: `${who}|${guest ? "g" : ""}` });
   const ctx = useMemo(
