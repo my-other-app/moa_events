@@ -323,7 +323,7 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
         setView({ status: "ready", format: key, url: cached.url, blob: cached.blob, caption: cached.caption || now.moment.caption, message: null, network: false });
         return;
       }
-      setView((v) => ({ ...v, status: "loading", format: key, url: v.format === key ? v.url : null, blob: v.format === key ? v.blob : null, message: null, network: false }));
+      setView((v) => ({ ...v, status: "loading", format: key, url: v.format === key ? v.url : null, blob: v.format === key ? v.blob : null, message: null, network: false, drawing: my }));
       try {
         let st = fmt.render;
         let asked = false;
@@ -376,15 +376,14 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // "Drawing your poster…" says so when it takes a while.
+  // "Drawing your poster…" says so when it takes a while. Each new drawing
+  // starts its own clock, even one asked for while another was still drawn.
   useEffect(() => {
-    if (view.status !== "loading") {
-      setSlow(false);
-      return undefined;
-    }
+    setSlow(false);
+    if (view.status !== "loading") return undefined;
     const t = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
     return () => clearTimeout(t);
-  }, [view.status, view.format]);
+  }, [view.status, view.format, view.drawing]);
 
   // Back online after a failed try: try again by itself.
   useEffect(() => {
