@@ -154,7 +154,7 @@
 .lt-on .play-clock.is-out {
   color: var(--lt-on-accent);
 }
-.lt-on .play-clock.is-urgent {
+.lt-on .play-clock.is-urgent:not(.is-out) {
   text-decoration: underline;
   text-underline-offset: 4px;
 }
