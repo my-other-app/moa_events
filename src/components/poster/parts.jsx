@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { canShareFile, copyText, downloadBlob, fileFor, shareFile } from "@/utils/sharefile";
-import { Spinner } from "../register/finishpayment";
 
 /**
  * The poster page's parts that don't talk to the API: the format picker,
  * the preview, the share / download / copy buttons and the caption.
  */
+
+/** The site's spinner (styles/register.css), here rather than imported with the payment button it lives beside. */
+export const Spinner = () => <span className="rg-spin" aria-hidden="true" />;
 
 /** The three formats: name, size, and the shape drawn on its button. */
 export const FORMATS = {

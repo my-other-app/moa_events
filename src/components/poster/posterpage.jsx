@@ -12,10 +12,9 @@ import { copyText } from "@/utils/sharefile";
 import { ErrorState } from "../discover/bits";
 import { SitePage } from "../discover/chrome";
 import Icon from "../discover/icons";
-import { Spinner } from "../register/finishpayment";
 import { PosterIcon } from "./cta";
 import PhotoFramer from "./framer";
-import { CaptionBox, FORMATS, FormatPicker, PosterPreview, ShareActions } from "./parts";
+import { CaptionBox, FORMATS, FormatPicker, PosterPreview, ShareActions, Spinner } from "./parts";
 
 /**
  * /posters/{ticket}: the guest's "I'm attending" poster
