@@ -40,8 +40,9 @@ export const RESERVED = new Set([
   "claim",
   "requests",
   "answers",
-  // A ticket's poster (/posters/{ticket}).
+  // A ticket's poster (/posters/{ticket}), and the tracking links it prints (/l/{code}).
   "posters",
+  "l",
   // People's profiles (/u/{handle}) and their QR codes (/p/{code}).
   "u",
   "p",

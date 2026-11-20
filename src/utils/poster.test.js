@@ -112,6 +112,7 @@ describe("when a poster can't be made", () => {
     expect(describePosterError(fail(409, { error_code: "POSTER_NOT_AVAILABLE", reason: "moment_off" }))).toMatchObject({ kind: "unavailable", reason: "moment_off" });
     expect(describePosterError(fail(503, { error_code: "POSTER_RENDER_BUSY" }))).toMatchObject({ kind: "busy", message: "Your poster couldn’t be drawn just now. Try again in a moment." });
     expect(describePosterError(fail(413, {}))).toMatchObject({ kind: "too_big" });
+    expect(describePosterError(fail(404, { error_code: "POSTER_NOT_READY" }))).toMatchObject({ kind: "busy" });
     expect(describePosterError({ message: "Network Error" })).toMatchObject({ kind: "network" });
   });
 

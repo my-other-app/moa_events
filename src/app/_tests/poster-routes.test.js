@@ -76,9 +76,36 @@ describe("/posters/{ticket}", () => {
     expect(out).not.toContain(S);
   });
 
-  it("takes the email's address (/tickets/{ticket}/poster) to it, the query kept by Next", async () => {
-    const r = (await nextConfig.redirects()).find((x) => x.source === "/tickets/:ticketid/poster");
-    expect(r).toEqual({ source: "/tickets/:ticketid/poster", destination: "/posters/:ticketid", permanent: false });
+  describe("the older email address, /tickets/{ticket}/poster", () => {
+    const redirect = async (path, method = "GET") => {
+      const r = await import("../tickets/[ticketid]/poster/route.js");
+      const url = new URL(path, "https://myotherapp.in");
+      const ticketid = decodeURIComponent(url.pathname.split("/")[2]);
+      return r[method](new Request(url, { method }), { params: Promise.resolve({ ticketid }) });
+    };
+    const privateHeaders = (res) => {
+      expect(res.headers.get("cache-control")).toBe("no-store, max-age=0");
+      expect(res.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(res.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    };
+
+    it("goes on to the poster page with the key, never kept or named to another site", async () => {
+      const res = await redirect(`/tickets/${T}/poster?s=${S}&utm_source=email`);
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toBe(`/posters/${T}?s=${S}`);
+      privateHeaders(res);
+      expect((await redirect(`/tickets/${T}/poster`, "HEAD")).headers.get("location")).toBe(`/posters/${T}`);
+    });
+
+    it.each([
+      ["a key that isn't one", `/tickets/${T}/poster?s=abc`],
+      ["a ticket that isn't one", `/tickets/MOA%3Cx%3E/poster?s=${S}`],
+    ])("is a 404 for %s", async (_, path) => {
+      const res = await redirect(path);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("location")).toBeNull();
+      privateHeaders(res);
+    });
   });
 
   it("is kept from crawlers, sitemaps and old event addresses; the apps leave it to the browser", () => {

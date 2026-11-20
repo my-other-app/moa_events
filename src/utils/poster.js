@@ -223,7 +223,7 @@ const minutes = (seconds) => {
  *   {kind: "off"}                  404 without a code: an API without posters
  *   {kind: "unavailable", reason}  409 POSTER_NOT_AVAILABLE: switched off or closed meanwhile
  *   {kind: "limit", message}       429: too many in a row
- *   {kind: "busy", message}        503 POSTER_RENDER_BUSY: the drawing failed; try again
+ *   {kind: "busy", message}        503 POSTER_RENDER_BUSY: the drawing failed; 404 POSTER_NOT_READY: try again
  *   {kind: "too_big", message}     413: the photo is over the limit
  *   {kind: "bad_photo", message}   422 on an upload: not a picture the server could read
  *   {kind: "network", message}     no answer
@@ -236,6 +236,8 @@ export function describePosterError(error, { upload = false } = {}) {
   if (f.status === 401 || f.status === 403) return { kind: "not_yours", message: null };
   if (f.status === 404 && f.code === "TICKET_NOT_FOUND") return { kind: "missing", message: null };
   if (f.status === 404 && !f.code) return { kind: "off", message: null };
+  // The PNG asked for isn't the one for what the poster holds now (it changed meanwhile): draw it again.
+  if (f.status === 404 && f.code === "POSTER_NOT_READY") return { kind: "busy", message: "Your poster isn’t ready yet. Try again in a moment." };
   if (f.status === 400) return { kind: "missing", message: null };
   if (f.status === 409 && f.code === "POSTER_NOT_AVAILABLE") return { kind: "unavailable", reason: str(f.errors?.reason) || str(obj(error?.data)?.reason) || str(obj(error?.response?.data)?.reason) || "off", message: null };
   if (f.status === 429) {

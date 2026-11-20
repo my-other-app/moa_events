@@ -2,9 +2,7 @@
  * The public site at https://myotherapp.in, on Next.js (App Router).
  *
  * Routing lives in src/app. What is configured here:
- *   - /me → /me/tickets, a ticket's poster link (/tickets/{id}/poster) to
- *     its page (/posters/{id}), and /events/{id} handed to the old-address
- *     page;
+ *   - /me → /me/tickets, and /events/{id} handed to the old-address page;
  *   - a city's other names to its page (/events/in/cochin → /events/in/kochi);
  *   - metadata always in <head>, never streamed into <body> (canonical tags
  *     only count in the head);
@@ -222,7 +220,7 @@ const nextConfig = {
       // A ticket: its id is what the door scans.
       { source: "/tickets/:ticketid", headers: PRIVATE_LINK_HEADERS },
       // A ticket's poster page: the same id in its address (and the poster link's key), and the
-      // address the API's {{poster_url}} names, which redirects to it.
+      // older poster link, which redirects to it (src/app/tickets/[ticketid]/poster/route.js).
       { source: "/posters/:ticketid", headers: PRIVATE_LINK_HEADERS },
       { source: "/tickets/:ticketid/poster", headers: PRIVATE_LINK_HEADERS },
       // A guest's certificate, by the id in the link the API hands out.
@@ -246,12 +244,7 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    return [
-      { source: "/me", destination: "/me/tickets", permanent: false },
-      // The poster link in a ticket email (CONTRACT.md §12) to the poster page, `?s=` kept (Next keeps the query).
-      { source: "/tickets/:ticketid/poster", destination: "/posters/:ticketid", permanent: false },
-      ...cityRedirects(),
-    ];
+    return [{ source: "/me", destination: "/me/tickets", permanent: false }, ...cityRedirects()];
   },
   async rewrites() {
     return {
