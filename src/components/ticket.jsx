@@ -16,6 +16,8 @@ import { AnswersNeededNote } from "./answersneeded";
 import { CancelledNote, ownState, useEventStates } from "./cancelled";
 import { RevokedNote } from "./revoked";
 import { useRenderedTicket } from "./ticketrender";
+import { usePosterOffer } from "./poster/offer";
+import PosterCta from "./poster/cta";
 
 /**
  * The ticket's type (docs/TICKETING.md), when the event sells more than one:
@@ -191,6 +193,15 @@ const Ticket = ({ ticketid }) => {
   const design = useRenderedTicket(ticketid, { skip: cancelled || revoked, attempt: retryCount });
   const rendered = design.state === "shown";
 
+  /*
+   * "Make your poster" ("I'm attending" posters: components/poster): only
+   * when the API says this ticket has one to make -- the event's posters
+   * switched on, a moment open, the ticket sent and still good. Never for a
+   * called-off event or a revoked ticket, and nothing at all from an API
+   * without posters.
+   */
+  const posterOffer = usePosterOffer(ticketid, { skip: !ticketData || cancelled || revoked });
+
   if (problem) {
     return <TicketProblem problem={problem} onRetry={() => setRetryCount((c) => c + 1)} />;
   }
@@ -333,6 +344,8 @@ const Ticket = ({ ticketid }) => {
       ) : (
         drawnTicket
       )}
+
+      {posterOffer ? <PosterCta href={`/posters/${encodeURIComponent(ticketid)}`} phrase={posterOffer.phrase} made={posterOffer.made} /> : null}
 
       {competition?.enabled && ticketData.event?.id && !cancelled && !revoked ? (
         <Link href={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>

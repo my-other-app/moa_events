@@ -25,6 +25,8 @@ export const DISALLOW = [
   "/claim/",
   "/requests/",
   "/answers/",
+  "/posters/",
+  "/l/",
   "/developers/",
 ];
 

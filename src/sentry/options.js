@@ -42,13 +42,16 @@ const INTL = /(^|[^\w+])\+\d[\d\s-]{6,16}\d(?!\d)/g;
 // status link, /requests/{token}, and the API's /registration-requests/{token};
 // and a support survey's, the site's /help/survey/{token} and the API's
 // /support/survey/{token}).
-const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests|survey)\/(?!\[|cancel(?![\w-]))[^/?#\s"'<>]+/g;
+// A ticket's poster page, /posters/{ticket}, and the API's /posters/{ticket}/…: the door's code again.
+const CODED = /\/(tickets|certificates|verify|claim|offers|requests|registration-requests|survey|posters)\/(?!\[|cancel(?![\w-]))[^/?#\s"'<>]+/g;
 // "Give your ticket back": the site's /tickets/cancel?t={token} and the API's
 // /tickets/cancel/{token}. The token is the link's only credential.
 const CANCEL = /\/tickets\/cancel(\/|\?(?:[^#\s"'<>]*?&)?t=)(?!\[)[^&#/?\s"'<>]+/g;
 const FEEDBACK = /\/feedback\/([^/?#\s"'<>]+)\/(?!\[)[^/?#\s"'<>]+/g;
 // A hidden ticket's link: `ticket_key` is what sells that ticket (on the site's pages and the API's calls alike).
 const TICKET_KEY = /([?&]ticket_key=)(?!\[)[^&#\s"'<>]+/g;
+// A signed link's key (`?s=`): the poster link from a ticket email, and the API's signed file links.
+const LINK_KEY = /([?&]s=)(?!\[)[^&#\s"'<>]+/g;
 // A missing-answers link names the person: the site's /answers/{eventId}/{ref}
 // and the API's /events/{eventId}/answers/{ref} (a registration's UUID, or "q" and a request's).
 const ANSWERS = /\/answers\/(\d+\/)?q?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?![\w-])/gi;
@@ -64,7 +67,8 @@ export function maskText(text) {
     .replace(INTL, "$1[phone]")
     .replace(CODED, "/$1/[code]")
     .replace(FEEDBACK, "/feedback/$1/[code]")
-    .replace(TICKET_KEY, "$1[code]");
+    .replace(TICKET_KEY, "$1[code]")
+    .replace(LINK_KEY, "$1[code]");
 }
 
 // Stack frames (file names, code around the line) are left as they are:

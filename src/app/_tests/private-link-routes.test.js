@@ -28,6 +28,8 @@ const valueOf = ({ site, own }, key) => {
 describe("addresses that are a credential", () => {
   it.each([
     ["/tickets/MOA-7K3QF-X9PWM", "no-referrer"],
+    ["/posters/MOA-7K3QF-X9PWM", "no-referrer"],
+    ["/tickets/MOA-7K3QF-X9PWM/poster", "no-referrer"],
     ["/certificates/MOA-7K3QF-X9PWM", "no-referrer"],
     ["/certificates/q7Hb2_kLm9Zx-41PwT0aRe", "no-referrer"],
     ["/feedback/68/0b6e1f9a-4c1d-4d7e-9a51-1f2b3c4d5e6f", "no-referrer"],
@@ -47,7 +49,7 @@ describe("addresses that are a credential", () => {
   });
 
   it("the ticket and the survey say no-referrer in the head too", async () => {
-    for (const file of ["../tickets/[ticketid]/page.jsx", "../feedback/[eventId]/[registrationId]/page.jsx", "../certificates/[id]/page.jsx", "../answers/[eventId]/[ref]/page.jsx"]) {
+    for (const file of ["../tickets/[ticketid]/page.jsx", "../feedback/[eventId]/[registrationId]/page.jsx", "../certificates/[id]/page.jsx", "../answers/[eventId]/[ref]/page.jsx", "../posters/[ticketid]/page.jsx"]) {
       const { metadata } = await import(/* @vite-ignore */ file);
       expect(metadata.referrer).toBe("no-referrer");
       expect(metadata.robots).toMatchObject({ index: false });

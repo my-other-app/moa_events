@@ -83,6 +83,9 @@ describe(AASA, () => {
     ["/clubs/circuit-society", true],
     ["/threads/7d0f3c2a-1111-4c4c-9a9a-000000000001", true],
     ["/tickets/abc-123", true],
+    // A ticket's poster: the app has no poster screen yet; the email's link and the page stay in the browser.
+    ["/tickets/abc-123/poster", false],
+    ["/posters/abc-123", false],
     ["/certificates/abc-123", true],
     ["/topics/development", true],
     ["/events/hack-night-04/compete", true],

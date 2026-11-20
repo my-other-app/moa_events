@@ -115,6 +115,8 @@ export const BROWSER_PATHS = [
   ["/pricing", "Pricing"],
   // "Give your ticket back" from the ticket emails: the site's page (the app has none), under the claimed /tickets/*.
   ["/tickets/cancel", "Giving a ticket back"],
+  // A ticket's poster link from its email (it redirects to /posters/{id}, which no app claims): the app has no poster screen yet.
+  ["/tickets/*/poster", "Making a poster"],
   // Speakers' pages aren't claimed yet (the app's Speaker screen ships later); claiming and editing a
   // profile stay in the browser even then (signing in and claiming are the site's).
   ["/speakers/claim/*", "Claiming a speaker profile"],

@@ -219,6 +219,10 @@ const nextConfig = {
       { source: "/verify/:code", headers: VERIFY_RESULT_HEADERS },
       // A ticket: its id is what the door scans.
       { source: "/tickets/:ticketid", headers: PRIVATE_LINK_HEADERS },
+      // A ticket's poster page: the same id in its address (and the poster link's key), and the
+      // older poster link, which redirects to it (src/app/tickets/[ticketid]/poster/route.js).
+      { source: "/posters/:ticketid", headers: PRIVATE_LINK_HEADERS },
+      { source: "/tickets/:ticketid/poster", headers: PRIVATE_LINK_HEADERS },
       // A guest's certificate, by the id in the link the API hands out.
       { source: "/certificates/:id", headers: PRIVATE_LINK_HEADERS },
       // The survey after an event: the registration and the link's key.
