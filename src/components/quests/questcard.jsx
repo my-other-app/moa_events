@@ -140,6 +140,10 @@ function useQuestActions(eventId, card, setCard, reload) {
 /** The card laid out, with its actions; nothing at all for no card. */
 function QuestCardBody({ card, ctx, eventId, setCard, reload, fresh }) {
   const { onCode, onPickSize, locked } = useQuestActions(eventId, card, setCard, reload);
+  // A link to the card (…#quests, from an email or a push) lands on it once it's there: it comes after the page.
+  useEffect(() => {
+    if (window.location.hash === "#quests") document.getElementById("quests")?.scrollIntoView?.({ block: "start" });
+  }, []);
   const loadBoard = useCallback(() => questsApi.leaderboard(eventId), [eventId]);
   const view = useMemo(() => questView(card, ctx), [card, ctx]);
   const shownView = locked ? { ...view, codeLock: view.codeLock || locked } : view;

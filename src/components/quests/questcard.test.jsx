@@ -83,6 +83,18 @@ describe("under the ticket", () => {
     expect(within(box).getByRole("button", { name: "Leaderboard" })).toBeInTheDocument();
   });
 
+  it("a link to #quests lands on the card once it's there", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    window.location.hash = "#quests";
+    questsApi.card.mockResolvedValue(parseQuestCard(questCard()));
+    onTicket();
+    await card();
+    expect(scroll).toHaveBeenCalledWith({ block: "start" });
+    window.location.hash = "";
+    delete Element.prototype.scrollIntoView;
+  });
+
   it("shows nothing for a quest that's off, a card that isn't the holder's, or a ticket that doesn't count", async () => {
     questsApi.card.mockResolvedValue(null);
     const { container, unmount } = onTicket();
