@@ -1,0 +1,423 @@
+/*
+ * "I'm attending" posters: the guest's poster page (/posters/{ticket}) and
+ * the way to it from the ticket. The site's look: DM Sans, Bebas Neue for
+ * headings and buttons, slate buttons, the pale yellow for what is chosen.
+ * Phone first; the preview and the controls sit side by side from 960 px.
+ */
+
+/* ---------- the way in, on the ticket ---------- */
+
+.ticket-poster-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff;
+  color: #111827;
+  font-family: var(--font-dm-sans), "DM Sans", sans-serif;
+  text-decoration: none;
+  box-shadow: 0 10px 24px -14px rgba(17, 24, 39, 0.5);
+  transition: var(--motion-colors), transform var(--motion-fast) var(--motion-ease-out);
+}
+.ticket-poster-cta:hover {
+  background: #fdffd6;
+}
+.ticket-poster-cta:active {
+  transform: scale(var(--motion-press));
+}
+.ticket-poster-cta:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+.ticket-poster-cta-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #f9ffa1;
+}
+.ticket-poster-cta-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.ticket-poster-cta-title {
+  font-family: var(--font-bebas-neue), "Bebas Neue", sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.03em;
+}
+.ticket-poster-cta-text {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #4b5563;
+}
+.ticket-poster-cta-go {
+  flex: 0 0 auto;
+  color: #2c3440;
+}
+
+/* ---------- the page ---------- */
+
+.pp {
+  padding-top: 8px;
+  padding-bottom: 48px;
+}
+.pp-head {
+  margin: 10px 0 22px;
+}
+.pp-lede {
+  max-width: 54ch;
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--dc-text);
+}
+.pp-layout {
+  display: grid;
+  gap: 24px;
+}
+@media (min-width: 960px) {
+  .pp-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+    align-items: start;
+    gap: 40px;
+  }
+  .pp-preview-col {
+    position: sticky;
+    top: 88px;
+  }
+}
+
+.pp-card {
+  padding: 18px 16px 20px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+}
+.pp-card + .pp-card {
+  margin-top: 16px;
+}
+.pp-card-title {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--dc-ink);
+}
+.pp-card-text {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dc-text);
+}
+.pp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* The file field, as a button. */
+.pp-file {
+  position: relative;
+  display: inline-flex;
+}
+.pp-file input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.pp-file input:disabled {
+  cursor: default;
+}
+.pp-file:focus-within .dc-btn {
+  outline: 3px solid var(--dc-link);
+  outline-offset: 2px;
+}
+
+.pp-note {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-muted);
+}
+.pp-problem {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.pp-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--dc-text);
+}
+.pp-busy .rg-spin {
+  border-color: rgba(44, 52, 64, 0.2);
+  border-top-color: var(--dc-primary);
+}
+
+/* The formats: three choices, side by side. */
+.pp-formats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+}
+.pp-format {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px 6px 10px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--dc-line);
+  background: #fff;
+  color: var(--dc-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--motion-colors);
+}
+.pp-format input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.pp-format:hover {
+  background: var(--dc-sunken);
+}
+.pp-format.is-on {
+  background: var(--rg-pick, #fdffd6);
+  box-shadow: inset 0 0 0 2px var(--dc-primary);
+}
+.pp-format:focus-within {
+  outline: 3px solid var(--dc-link);
+  outline-offset: 2px;
+}
+.pp-format-shape {
+  display: block;
+  width: 26px;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+}
+.pp-format-size {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dc-muted);
+}
+
+/* The preview: the server's picture, or its shape while it is drawn. */
+.pp-preview {
+  position: relative;
+  width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--dc-sunken);
+  box-shadow: 0 18px 40px -24px rgba(17, 24, 39, 0.45);
+}
+.pp-preview--story {
+  max-width: 340px;
+}
+.pp-preview--portrait {
+  max-width: 420px;
+}
+.pp-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pp-preview.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #eef0f3 25%, #f6f7f9 37%, #eef0f3 63%);
+  background-size: 400% 100%;
+  animation: dc-shimmer 1.4s ease infinite;
+}
+.pp-preview.is-stale img {
+  opacity: 0.45;
+  transition: opacity var(--motion-base) var(--motion-ease-out);
+}
+.pp-preview-wait {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.pp-preview-wait .rg-spin {
+  border-color: rgba(44, 52, 64, 0.2);
+  border-top-color: var(--dc-primary);
+}
+.pp-preview-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--dc-text);
+}
+
+.pp-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.pp-actions .pp-share {
+  grid-column: 1 / -1;
+}
+.pp-said {
+  min-height: 1.4em;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--dc-text);
+  text-align: center;
+}
+
+.pp-caption {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+}
+.pp-caption-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.pp-caption-text {
+  margin-top: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--dc-ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pp-caption .dc-btn {
+  margin-top: 10px;
+}
+
+.pp-privacy {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dc-muted);
+}
+
+/* ---------- the framing editor ---------- */
+
+.pf {
+  margin-top: 14px;
+}
+.pf-frame {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+  /* The page scrolls everywhere but here: here a finger moves the photo. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+  box-shadow: inset 0 0 0 1px var(--dc-line);
+}
+.pf-frame:active {
+  cursor: grabbing;
+}
+.pf-frame.is-round {
+  border-radius: 999px;
+}
+.pf-frame.is-disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.pf-frame:focus-visible {
+  outline: 3px solid var(--dc-link);
+  outline-offset: 3px;
+}
+.pf-photo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none !important;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+.pf-hint {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dc-muted);
+  text-align: center;
+}
+.pf-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  margin: 12px auto 0;
+}
+.pf-zoom {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.pf-zoom-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.pf-zoom input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  accent-color: var(--dc-primary);
+}

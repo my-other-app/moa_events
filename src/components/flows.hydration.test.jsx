@@ -48,6 +48,7 @@ const RequestStatus = (await import("./request.jsx")).default;
 const Answers = (await import("./answers.jsx")).default;
 const { default: Certificate, OldCertificateAddress } = await import("./certificate.jsx");
 const TicketCancel = (await import("./ticketcancel.jsx")).default;
+const PosterPage = (await import("./poster/posterpage.jsx")).default;
 const SpeakerClaim = (await import("./speakers/claim.jsx")).default;
 const MySpeakerProfile = (await import("./speakers/myprofile.jsx")).default;
 const { SpeakerFollow } = await import("./speakers/speakerislands.jsx");
@@ -140,6 +141,9 @@ describe("the event's live room, competition, quiz, survey, ticket and certifica
     // Giving a ticket back: the link is read in the browser; a missing token is said at once.
     ["/tickets/cancel?t=eyJyIjoxMjN9.c2lnbmF0dXJlLXZhbHVl", () => <TicketCancel token="eyJyIjoxMjN9.c2lnbmF0dXJlLXZhbHVl" />, "Loading your ticket"],
     ["/tickets/cancel", () => <TicketCancel token={null} />, "This link isn"],
+    // A ticket's poster: read in the browser, with the token or the email link's key.
+    ["/posters/MOA-1", () => <PosterPage ticketid="MOA-1" />, "Loading your poster"],
+    ["/posters/MOA-1?s=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7", () => <PosterPage ticketid="MOA-1" s="3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7" />, "Loading your poster"],
     // A certificate's page, as the server checked it; and an older address, read in the browser.
     [
       "/certificates/q7Hb2_kLm9Zx-41PwT0aReXy",

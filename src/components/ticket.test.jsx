@@ -19,6 +19,8 @@ vi.mock("@/api/events", () => {
   return { eventsApi: { fetchTicketDetails, fetchTicket, fetchTicketImage: vi.fn() } };
 });
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn() } }));
+// Whether the ticket has an "I'm attending" poster to make: none unless a test says so.
+vi.mock("@/api/posters", () => ({ postersApi: { availability: vi.fn() } }));
 // The event's public page, which says whether it was cancelled: not found unless a test says otherwise.
 vi.mock("@/api/discover", () => ({ discoverApi: { event: vi.fn(() => Promise.reject(Object.assign(new Error("No such event"), { notFound: true }))) } }));
 vi.mock("qrcode.react", async (importOriginal) => {
@@ -29,6 +31,8 @@ vi.mock("qrcode.react", async (importOriginal) => {
 
 const { eventsApi } = await import("@/api/events");
 const { competitionApi } = await import("@/api/competition");
+const { postersApi } = await import("@/api/posters");
+const { parsePoster } = await import("@/utils/poster");
 const { QRCodeCanvas } = await import("qrcode.react");
 const { default: Ticket, SHOW_AT_VENUE, TICKET_PROBLEMS, ticketKind } = await import("./ticket.jsx");
 const { AuthContext } = await import("@/auth/context");
@@ -110,6 +114,7 @@ beforeEach(() => {
    * from an older server, a failed render, or a ticket it may not read.
    */
   eventsApi.fetchTicketImage.mockResolvedValue(null);
+  postersApi.availability.mockResolvedValue(null);
 });
 
 describe("the ticket page", () => {
@@ -573,5 +578,71 @@ describe("details the club asked for", () => {
     open();
     await screen.findByText("This ticket was revoked by the organiser");
     expect(screen.queryByText(/details needed/)).toBeNull();
+  });
+});
+
+/*
+ * "Make your poster" ("I'm attending" posters, feature-register/posters/
+ * CONTRACT.md §6.1): under the ticket only when the API says this ticket
+ * has a poster to make.
+ */
+describe("the poster button", () => {
+  const available = (over = {}) =>
+    parsePoster({
+      available: true,
+      reason: null,
+      key: "3f9a0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+      event: { id: 68, name: "Hack Night 04", slug: "hack-night-04" },
+      guest: { name: "Asha Rao", first_name: "Asha", initials: "AR", role: "attendee", role_label: "Attendee" },
+      moment: { key: "before", phrase: "I'm attending", caption: "I'm attending Hack Night 04!" },
+      share_url: "https://api.myotherapp.in/l/x7k2m9pq",
+      photo: null,
+      formats: [{ key: "square", width: 1080, height: 1080, variant: "default", frame: null, framing: { zoom: 1, x: 0.5, y: 0.5 }, render: { status: "none" } }],
+      ...over,
+    });
+
+  it("is offered when the API says the ticket has a poster to make", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    postersApi.availability.mockResolvedValue(available());
+    open();
+    const link = await screen.findByRole("link", { name: /Make your poster/ });
+    expect(link).toHaveAttribute("href", "/posters/MOA77");
+    expect(link).toHaveTextContent("An “I'm attending” poster with your photo, to share.");
+    expect(postersApi.availability).toHaveBeenCalledWith("MOA77");
+  });
+
+  it("says “Your poster” once one is made", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    postersApi.availability.mockResolvedValue(available({ photo: { width: 1600, height: 2000, uploaded_at: "2026-11-22T10:01:00+05:30" } }));
+    open();
+    expect(await screen.findByRole("link", { name: /Your poster/ })).toHaveAttribute("href", "/posters/MOA77");
+  });
+
+  it("isn't there when posters are off or not open, or the API has none to say", async () => {
+    for (const answer of [parsePoster({ available: false, reason: "off" }), parsePoster({ available: false, reason: "not_sent", event: { id: 68, name: "Hack Night 04" } }), null]) {
+      eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+      postersApi.availability.mockResolvedValue(answer);
+      const page = open();
+      await screen.findByRole("heading", { level: 1, name: "Hack Night 04" });
+      await waitFor(() => expect(postersApi.availability).toHaveBeenCalled());
+      expect(screen.queryByRole("link", { name: /poster/i })).toBeNull();
+      page.unmount();
+      postersApi.availability.mockClear();
+    }
+  });
+
+  it("is never asked for on a revoked ticket or a called-off event", async () => {
+    postersApi.availability.mockResolvedValue(available());
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({ ticket_revoked: true }));
+    const page = open();
+    await screen.findByText("This ticket was revoked by the organiser");
+    expect(screen.queryByRole("link", { name: /poster/i })).toBeNull();
+    expect(postersApi.availability).not.toHaveBeenCalled();
+    page.unmount();
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({}, { status: "cancelled", cancellation: { reason: "Rain.", cancelled_at: "2026-10-12T10:00:00+05:30" } }));
+    open();
+    await screen.findByText("This event was cancelled");
+    expect(screen.queryByRole("link", { name: /poster/i })).toBeNull();
+    expect(postersApi.availability).not.toHaveBeenCalled();
   });
 });
