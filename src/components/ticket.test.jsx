@@ -21,6 +21,8 @@ vi.mock("@/api/events", () => {
 vi.mock("@/api/competition", () => ({ competitionApi: { leaderboard: vi.fn() } }));
 // Whether the ticket has an "I'm attending" poster to make: none unless a test says so.
 vi.mock("@/api/posters", () => ({ postersApi: { availability: vi.fn() } }));
+// The event's quest for the holder: none unless a test says so.
+vi.mock("@/api/quests", () => ({ questsApi: { card: vi.fn(), code: vi.fn(), size: vi.fn(), leaderboard: vi.fn() } }));
 // The event's public page, which says whether it was cancelled: not found unless a test says otherwise.
 vi.mock("@/api/discover", () => ({ discoverApi: { event: vi.fn(() => Promise.reject(Object.assign(new Error("No such event"), { notFound: true }))) } }));
 vi.mock("qrcode.react", async (importOriginal) => {
@@ -33,6 +35,9 @@ const { eventsApi } = await import("@/api/events");
 const { competitionApi } = await import("@/api/competition");
 const { postersApi } = await import("@/api/posters");
 const { parsePoster } = await import("@/utils/poster");
+const { questsApi } = await import("@/api/quests");
+const { parseQuestCard } = await import("@/utils/quests");
+const { questCard } = await import("@/test/questFixture");
 const { QRCodeCanvas } = await import("qrcode.react");
 const { default: Ticket, SHOW_AT_VENUE, TICKET_PROBLEMS, ticketKind } = await import("./ticket.jsx");
 const { AuthContext } = await import("@/auth/context");
@@ -115,6 +120,7 @@ beforeEach(() => {
    */
   eventsApi.fetchTicketImage.mockResolvedValue(null);
   postersApi.availability.mockResolvedValue(null);
+  questsApi.card.mockResolvedValue(null);
 });
 
 describe("the ticket page", () => {
@@ -644,5 +650,60 @@ describe("the poster button", () => {
     await screen.findByText("This event was cancelled");
     expect(screen.queryByRole("link", { name: /poster/i })).toBeNull();
     expect(postersApi.availability).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * The holder's quest for the event (feature-register/quests/CONTRACT.md §8),
+ * under the ticket and the poster button: only when the event runs one.
+ */
+describe("the quest card", () => {
+  it("is under the ticket, beside the poster button, when the event runs a quest", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    postersApi.availability.mockResolvedValue(
+      parsePoster({
+        available: true,
+        reason: null,
+        key: "3f9a0c1d2e3f4a5b6c7d8e9f0a1b2c3d",
+        event: { id: 68, name: "Hack Night 04", slug: "hack-night-04" },
+        guest: { name: "Asha Rao", first_name: "Asha", initials: "AR", role: "attendee", role_label: "Attendee" },
+        moment: { key: "before", phrase: "I'm attending", caption: "I'm attending Hack Night 04!" },
+        share_url: "https://api.myotherapp.in/l/x7k2m9pq",
+        photo: null,
+        formats: [{ key: "square", width: 1080, height: 1080, variant: "default", frame: null, framing: { zoom: 1, x: 0.5, y: 0.5 }, render: { status: "none" } }],
+      }),
+    );
+    questsApi.card.mockResolvedValue(parseQuestCard(questCard()));
+    open();
+    const card = await screen.findByRole("region", { name: "DevDays Quest" });
+    expect(questsApi.card).toHaveBeenCalledWith("68");
+    // The poster button stays, above the card (the card's own poster task is done, so it has no button).
+    const poster = await screen.findByRole("link", { name: /Make your poster/ });
+    expect(poster.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Outside #ticket: the PDF never carries it.
+    expect(document.getElementById("ticket").contains(card)).toBe(false);
+    expect(card).toHaveTextContent("You've unlocked Sticker pack: collect it at Swag desk.");
+  });
+
+  it("isn't there without a quest", async () => {
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket());
+    open();
+    await screen.findByRole("heading", { level: 1, name: "Hack Night 04" });
+    await waitFor(() => expect(questsApi.card).toHaveBeenCalled());
+    expect(document.querySelector(".qs")).toBeNull();
+  });
+
+  it("is never asked for on a revoked ticket or a called-off event", async () => {
+    questsApi.card.mockResolvedValue(parseQuestCard(questCard()));
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({ ticket_revoked: true }));
+    const page = open();
+    await screen.findByText("This ticket was revoked by the organiser");
+    expect(questsApi.card).not.toHaveBeenCalled();
+    page.unmount();
+    eventsApi.fetchTicketDetails.mockResolvedValue(ticket({}, { status: "cancelled", cancellation: { reason: "Rain.", cancelled_at: "2026-10-12T10:00:00+05:30" } }));
+    open();
+    await screen.findByText("This event was cancelled");
+    expect(questsApi.card).not.toHaveBeenCalled();
+    expect(screen.queryByRole("region", { name: "DevDays Quest" })).toBeNull();
   });
 });

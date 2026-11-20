@@ -457,3 +457,28 @@
     }
   }
 }
+
+/* ---------- quests (components/quests) ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The progress bar fills; a size, a task's link and the leaderboard's fold press and turn. */
+  .qs-meter-fill {
+    transition: transform var(--motion-slow) var(--motion-ease-out);
+  }
+  :is(.qs-act, .qs-size, .qs-board-toggle) {
+    transition:
+      var(--motion-colors),
+      transform var(--motion-fast) var(--motion-ease-out);
+  }
+  :is(.qs-act, .qs-size):active:not(:disabled) {
+    transform: scale(var(--motion-press));
+  }
+  :is(.qs-board-chev, .qs-more-chev) {
+    transition: transform var(--motion-base) var(--motion-ease-out);
+  }
+  /* A task just done or a reward just unlocked, while the card is open: the tick pops once. */
+  .qs-tick.is-new,
+  .qs-pill.is-new {
+    animation: motion-pop var(--motion-base) var(--motion-ease-pop);
+  }
+}

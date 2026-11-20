@@ -329,16 +329,24 @@ export function ProfileCodeProblem({ state }) {
  * event it was about). The Network is the app's alone; this page, for
  * someone without the app, says so: open it there (Android: OpenInApp), or
  * get it.
+ *
+ * `scan` (?scan=1): a quest's "Open the app to scan" (components/quests):
+ * the same page, saying where the scanner is (Network, then Scan).
  */
-export function NetworkInApp({ eventId = null }) {
-  const path = eventId ? `/network?event=${encodeURIComponent(eventId)}` : "/network";
+export function NetworkInApp({ eventId = null, scan = false }) {
+  const query = [eventId ? `event=${encodeURIComponent(eventId)}` : null, scan ? "scan=1" : null].filter(Boolean).join("&");
+  const path = query ? `/network?${query}` : "/network";
   return (
     <div className="dc-wrap">
       <div className="dc-section">
         <EmptyState
           as="h1"
-          title="Your Network lives in the MyOtherApp app"
-          message="Everyone you've saved at events, with your notes and tags, is in the app's Network tab. Open it there, or get the app: it's free."
+          title={scan ? "Scan people's QR in the MyOtherApp app" : "Your Network lives in the MyOtherApp app"}
+          message={
+            scan
+              ? "Meeting people counts when you scan their personal QR in the app: open the Network tab, then Scan. You both need to be checked in at the event. No app yet? It's free."
+              : "Everyone you've saved at events, with your notes and tags, is in the app's Network tab. Open it there, or get the app: it's free."
+          }
         >
           <OpenInApp path={path} />
           <StoreButtons />

@@ -332,6 +332,19 @@ describe("/network", () => {
     expect(fetched.calls).toEqual([]);
   });
 
+  it("with ?scan=1 (a quest's “Open the app to scan”), says where the scanner is", async () => {
+    const route = await load({}, N);
+    const out = html(await route.default({ searchParams: sp({ event: "12", scan: "1" }) }), "/network?event=12&scan=1");
+    const text = textOf(out);
+    expect(text).toContain("Scan people&#x27;s QR in the MyOtherApp app");
+    expect(text).toContain("open the Network tab, then Scan");
+    expect(text).toContain("Google Play");
+    expect(fetched.calls).toEqual([]);
+    const scanOf = async (q) => (await route.default({ searchParams: sp(q) })).props.children.props.scan;
+    expect(await scanOf({ scan: "1" })).toBe(true);
+    for (const scan of [undefined, "", "0", "yes", ["2", "1"]]) expect(await scanOf({ scan })).toBe(false);
+  });
+
   it("keeps only an event's id, and works without one", async () => {
     const route = await load({}, N);
     const eventOf = async (q) => (await route.default({ searchParams: sp(q) })).props.children.props.eventId;
