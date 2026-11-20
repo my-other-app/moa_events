@@ -22,6 +22,11 @@ describe("the tracking ref", () => {
     expect(currentRef()).toBe("p0sterqr");
   });
 
+  it("remembers a guest poster's link as it lands (the API's /l/{code}: utm_*, ref and via=l)", () => {
+    rememberRef("?utm_source=poster&utm_medium=guest_share&utm_campaign=im_attending&ref=x7k2m9pq&via=l");
+    expect(currentRef()).toBe("x7k2m9pq");
+  });
+
   it("ignores anything that is not a code", () => {
     rememberRef("?ref=<script>alert(1)</script>");
     expect(currentRef()).toBeNull();

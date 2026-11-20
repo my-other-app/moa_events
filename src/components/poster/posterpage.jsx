@@ -279,6 +279,7 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
       for (const hit of kept.values()) revokeUrl(hit.url);
       kept.clear();
       revokeUrl(photoUrl.current);
+      photoUrl.current = null;
     };
   }, []);
 

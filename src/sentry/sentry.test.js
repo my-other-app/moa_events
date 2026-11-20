@@ -220,6 +220,21 @@ describe("what an event may carry", () => {
     expect(out.contexts.nextjs.request_path).toBe("/certificates/[code]");
   });
 
+  it("masks a ticket's poster: its code and the email link's key, on the site's pages and in the API's addresses", async () => {
+    const out = await send({
+      request: { url: "https://myotherapp.in/posters/MOA-7K3QF-X9PWM?s=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7" },
+      breadcrumbs: [
+        { message: "GET https://api.myotherapp.in/api/v1/posters/MOA-7K3QF-X9PWM/image/square?v=a1b2&s=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7" },
+        { message: "GET https://myotherapp.in/tickets/MOA-7K3QF-X9PWM/poster?s=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7" },
+      ],
+      exception: { values: [{ value: "x", stacktrace: { frames: [{ filename: "app:///_next/server/app/posters/[ticketid]/page.js" }] } }] },
+    });
+    expect(out.request.url).toBe("https://myotherapp.in/posters/[code]?s=[code]");
+    expect(out.breadcrumbs[0].message).toBe("GET https://api.myotherapp.in/api/v1/posters/[code]/image/square?v=a1b2&s=[code]");
+    expect(out.breadcrumbs[1].message).toBe("GET https://myotherapp.in/tickets/[code]/poster?s=[code]");
+    expect(out.exception.values[0].stacktrace.frames[0].filename).toBe("app:///_next/server/app/posters/[ticketid]/page.js");
+  });
+
   it("masks a waiting list's claim token, on the site's page and in the API's address", async () => {
     const out = await send({
       request: { url: "https://myotherapp.in/claim/Xy3abcdefghijklmnopqrstuvwxyz012" },

@@ -123,6 +123,9 @@ describe("which file answers which address", () => {
     ["/tickets/abc-123", "tickets/[ticketid]/page.jsx"],
     // "Give your ticket back": a word of its own, never read as a ticket's id.
     ["/tickets/cancel?t=eyJyIjoxMjN9.c2lnbmF0dXJl", "tickets/cancel/page.jsx"],
+    // A ticket's "I'm attending" poster.
+    ["/posters/MOA-7K3QF-X9PWM", "posters/[ticketid]/page.jsx"],
+    ["/posters/MOA-7K3QF-X9PWM?s=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7", "posters/[ticketid]/page.jsx"],
     ["/claim/Xy3abcdefghijklmnopqrstuvwxyz012", "claim/[token]/page.jsx"],
     ["/requests/Rq7abcdefghijklmnopqrstuvwxyz012", "requests/[token]/page.jsx"],
     ["/certificates/abc-123", "certificates/[id]/page.jsx"],
@@ -178,6 +181,13 @@ describe("which file answers which address", () => {
 
   it("sends /me to the tickets, for now", async () => {
     expect(await resolve("/me")).toEqual({ redirect: "/me/tickets", permanent: false });
+  });
+
+  it("sends a ticket email's poster link to the poster page", async () => {
+    expect(await resolve("/tickets/MOA-7K3QF-X9PWM/poster?s=3f2a9c0d4e5b6a7f8091a2b3c4d5e6f7")).toEqual({ redirect: "/posters/:ticketid", permanent: false });
+    // The ticket itself, and giving it back, are untouched.
+    expect((await resolve("/tickets/MOA-7K3QF-X9PWM")).file).toBe("tickets/[ticketid]/page.jsx");
+    expect((await resolve("/tickets/cancel?t=x")).file).toBe("tickets/cancel/page.jsx");
   });
 
   it("has no route for deeper nonsense (the 404 page answers)", async () => {
