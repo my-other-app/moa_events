@@ -6,7 +6,7 @@ import { postersApi } from "@/api/posters";
 import { useAuth } from "@/auth/context";
 import { cookieSessionOn } from "@/auth/cookiemode";
 import { describePosterError, frameAspect, frameRadius, formatOf, posterFilename, unavailableWords } from "@/utils/poster";
-import { CENTRED, sameFraming } from "@/utils/posterframe";
+import { CENTRED, clampFraming, sameFraming } from "@/utils/posterframe";
 import { ACCEPT, preparePhoto } from "@/utils/posterphoto";
 import { copyText } from "@/utils/sharefile";
 import { ErrorState } from "../discover/bits";
@@ -416,7 +416,14 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
   const fmt = formatOf(poster, format) || poster.formats[0];
   const serverFraming = fmt?.framing || CENTRED;
   const framing = draft || serverFraming;
-  const dirty = Boolean(draft) && !sameFraming(draft, serverFraming);
+  /*
+   * Changed by the guest: compared as drawn in this format's frame, so a
+   * framing the frame itself pulls in (the server crops the same way) is
+   * not a change nobody made.
+   */
+  const photoSize = poster.photo ? { w: poster.photo.width, h: poster.photo.height } : null;
+  const frameSize = fmt?.frame ? { w: fmt.frame.width, h: fmt.frame.height } : null;
+  const dirty = Boolean(draft) && !sameFraming(clampFraming(draft, photoSize, frameSize), clampFraming(serverFraming, photoSize, frameSize));
 
   /** Keep the framing being edited (every format), then draw `key`. */
   const apply = async (key = format) => {

@@ -343,6 +343,21 @@ describe("the photo", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Download" })).toBeEnabled());
   });
 
+  it("asks for no update when the frame only pulls the saved framing in (a wide photo, the default framing)", async () => {
+    postersApi.read.mockResolvedValue(
+      BODY({ photo: { width: 1600, height: 1000, uploaded_at: "2026-11-22T10:01:00+05:30" }, formats: [FORMAT("square", { framing: { zoom: 1, x: 0.5, y: 0.45 }, render: { status: "ready", fingerprint: "a1" } })] }),
+    );
+    open();
+    await poster();
+    const frame = await screen.findByRole("group", { name: "Your photo in the poster's frame" });
+    await waitFor(() => expect(frame.querySelector("img")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Update my poster" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download" })).toBeEnabled();
+    // A real change still asks.
+    fireEvent.keyDown(frame, { key: "+" });
+    expect(await screen.findByRole("button", { name: "Update my poster" })).toBeInTheDocument();
+  });
+
   it("is removed, and the poster goes back to the initials", async () => {
     postersApi.read.mockResolvedValue(BODY({ photo: PHOTO, formats: [FORMAT("square", { render: { status: "ready", fingerprint: "a1" } })] }));
     postersApi.removePhoto.mockResolvedValue(BODY());
