@@ -79,14 +79,16 @@ const withRender = (poster, key, render) => ({
 
 function Skeleton() {
   return (
-    <div className="pp-layout" role="status" aria-label="Loading your poster">
-      <div>
-        <span className="dc-skel rg-skel-title" style={{ display: "block", height: 44, width: "70%" }} />
-        <span className="dc-skel dc-skel-line" style={{ display: "block", width: "90%" }} />
-        <span className="dc-skel" style={{ display: "block", height: 220, marginTop: 24, borderRadius: 16 }} />
-      </div>
-      <div className="pp-preview-col">
-        <span className="dc-skel" style={{ display: "block", aspectRatio: "1 / 1", borderRadius: 14 }} />
+    <div role="status" aria-label="Loading your poster">
+      <span className="dc-skel rg-skel-title" style={{ display: "block", height: 44, width: "60%" }} />
+      <span className="dc-skel dc-skel-line" style={{ display: "block", width: "90%", marginBottom: 22 }} />
+      <div className="pp-layout">
+        <div className="pp-preview-col">
+          <span className="dc-skel" style={{ display: "block", aspectRatio: "1 / 1", borderRadius: 14 }} />
+        </div>
+        <div className="pp-controls">
+          <span className="dc-skel" style={{ display: "block", height: 220, borderRadius: 16 }} />
+        </div>
       </div>
     </div>
   );
@@ -487,6 +489,25 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
     }
   };
 
+  /*
+   * On a phone the poster sits above the controls: after "Update my poster"
+   * or a new size, it is brought back into view (when it is out of it), so
+   * the guest sees the new one being drawn.
+   */
+  const previewRef = useRef(null);
+  const showPreview = () => {
+    const el = previewRef.current;
+    if (!el || typeof el.getBoundingClientRect !== "function" || typeof window === "undefined") return;
+    const r = el.getBoundingClientRect();
+    if (r.top >= 0 && r.top < window.innerHeight * 0.5) return;
+    const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    try {
+      el.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+    } catch {
+      /* an old browser: the poster stays where it is */
+    }
+  };
+
   const note = (action) => postersApi.note(ticketid, cred, action, format);
   const caption = view.caption || poster.moment.caption || "";
   const phrase = poster.moment.phrase || "I’m attending";
@@ -502,30 +523,7 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
         </p>
       </header>
       <div className="pp-layout">
-        <div>
-          <PhotoCard
-            poster={poster}
-            fmt={fmt}
-            photoView={photoView}
-            framing={framing}
-            onFraming={setDraft}
-            dirty={dirty}
-            busy={busy}
-            said={said}
-            onFile={onFile}
-            onRemove={onRemove}
-            onApply={() => apply(format)}
-          />
-          {offered.length > 1 ? (
-            <section className="pp-card" aria-labelledby="pp-format-title">
-              <h2 id="pp-format-title" className="pp-card-title">
-                Size
-              </h2>
-              <FormatPicker offered={offered} value={format} onChange={pick} disabled={busy !== null} />
-            </section>
-          ) : null}
-        </div>
-        <div className="pp-preview-col">
+        <div className="pp-preview-col" ref={previewRef}>
           <PosterPreview
             format={format}
             state={view.format === format ? view.status : "loading"}
@@ -544,6 +542,42 @@ function Maker({ initial, ticketid, linkKey, onUnavailable, onRefused }) {
             title={poster.event?.name || ""}
             onDone={note}
           />
+        </div>
+        <div className="pp-controls">
+          <PhotoCard
+            poster={poster}
+            fmt={fmt}
+            photoView={photoView}
+            framing={framing}
+            onFraming={setDraft}
+            dirty={dirty}
+            busy={busy}
+            said={said}
+            onFile={onFile}
+            onRemove={onRemove}
+            onApply={() => {
+              apply(format);
+              showPreview();
+            }}
+          />
+          {offered.length > 1 ? (
+            <section className="pp-card" aria-labelledby="pp-format-title">
+              <h2 id="pp-format-title" className="pp-card-title">
+                Size
+              </h2>
+              <FormatPicker
+                offered={offered}
+                value={format}
+                onChange={(k) => {
+                  pick(k);
+                  showPreview();
+                }}
+                disabled={busy !== null}
+              />
+            </section>
+          ) : null}
+        </div>
+        <div className="pp-extras">
           <CaptionBox caption={caption} />
           {poster.shareUrl ? <LinkLine url={poster.shareUrl} onCopied={() => note("copy_link")} /> : null}
           <p className="pp-privacy">On iPhone, use Share, then &ldquo;Save Image&rdquo;, to put your poster in Photos.</p>

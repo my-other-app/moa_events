@@ -12,7 +12,7 @@ import { Spinner } from "../register/finishpayment";
 /** The three formats: name, size, and the shape drawn on its button. */
 export const FORMATS = {
   square: { label: "Square", w: 1080, h: 1080, hint: "Feeds" },
-  portrait: { label: "Portrait", w: 1080, h: 1350, hint: "Instagram, LinkedIn" },
+  portrait: { label: "Portrait", w: 1080, h: 1350, hint: "Instagram" },
   story: { label: "Story", w: 1080, h: 1920, hint: "Stories, Status" },
 };
 export const FORMAT_ORDER = ["square", "portrait", "story"];

@@ -10,6 +10,17 @@
   font-family: Arial, sans-serif;
 }
 
+/*
+ * On a phone, Download is a bar fixed to the bottom of the screen
+ * (.mobile-register-container): room under the last thing on the page (the
+ * poster button, the competition link) so the bar never covers it.
+ */
+@media (max-width: 767px) {
+  .ticket-container {
+    padding-bottom: 104px;
+  }
+}
+
 /* Ticket styling */
 .ticket {
   width: 360px;
