@@ -16,7 +16,7 @@ vi.mock("@/api/live", () => ({
 }));
 
 const { liveApi } = await import("@/api/live");
-const Play = (await import("./play.jsx")).default;
+const { default: Play, teamLabel } = await import("./play.jsx");
 
 /**
  * The quiz page against this release's API (X-Live-Version: 2): every
@@ -287,6 +287,27 @@ describe("teams and rounds", () => {
     expect(screen.getByRole("heading", { name: "You are in, Sneha" })).toBeInTheDocument();
     expect(screen.getByText("Team Red Rockets")).toBeInTheDocument();
     expect(screen.getByText("Round 2 of 3 · 5 questions tonight")).toBeInTheDocument();
+  });
+
+  it("says a team whose name already starts with Team once, never “Team Team Flutter”", async () => {
+    const flutter = { key: "flutter", name: "Team Flutter", color: "#4285F4" };
+    liveApi.playState.mockResolvedValue(state({ team: flutter, teams: [{ ...flutter, players: 3, score: 1728, rank: 3 }] }));
+    play();
+    await step();
+    expect(screen.getByText("Team Flutter", { selector: ".lt-team-chip" })).toBeInTheDocument();
+    expect(screen.queryByText(/Team Team/)).toBeNull();
+  });
+
+  it.each([
+    ["Red Rockets", "Team Red Rockets"],
+    ["Team Flutter", "Team Flutter"],
+    ["team kotlin", "team kotlin"],
+    ["TEAM-A", "TEAM-A"],
+    ["  Team Android ", "Team Android"],
+    // A name that only begins with the letters is still named as a team.
+    ["Teamsters", "Team Teamsters"],
+  ])("names %j as %j", (name, said) => {
+    expect(teamLabel(name)).toBe(said);
   });
 
   it("shows the teams' board with the board, the player's team marked", async () => {

@@ -94,12 +94,21 @@ export const TeamBoard = ({ teams, mine = null }) => {
   );
 };
 
+/**
+ * A team's name as the chip says it: "Team Red Rockets", but a name that
+ * already says it ("Team Flutter", "team-a") as it is, never "Team Team Flutter".
+ */
+export const teamLabel = (name) => {
+  const n = String(name ?? "").trim();
+  return /^team(?![a-z])/i.test(n) ? n : `Team ${n}`;
+};
+
 /** The player's team, beside their name. */
 const TeamChip = ({ team }) =>
   team ? (
     <span className="lt-team-chip">
       <span className="lt-swatch" style={{ background: team.color }} aria-hidden="true" />
-      Team {team.name}
+      {teamLabel(team.name)}
     </span>
   ) : null;
 
