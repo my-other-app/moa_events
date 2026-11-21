@@ -212,6 +212,20 @@
   object-fit: contain;
   border-radius: 4px;
 }
+/* Beside a logo on a phone the title has a third of the row: the logo gives a little and the title steps down, then takes two lines. */
+@media (max-width: 480px) {
+  .lt-logo {
+    height: 28px;
+    max-width: 72px;
+  }
+  .live-top:has(.lt-logo) {
+    gap: 10px;
+  }
+  .live-top:has(.lt-logo) h1 {
+    font-size: 17px;
+    line-height: 1.12;
+  }
+}
 
 /* ---------- the clock: a ring, a big number, paused ---------- */
 
@@ -852,10 +866,13 @@
   color: var(--dc-text);
   overflow-wrap: anywhere;
 }
+/* The legend beside the ring while it has room for its words; on a phone it takes its own row under the ring rather than wrap word by word. */
 .lt-donut {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
   margin-top: 14px;
 }
 .lt-donut svg {
@@ -867,7 +884,7 @@
   stroke-width: 18;
 }
 .lt-legend {
-  flex: 1;
+  flex: 1 1 240px;
   min-width: 0;
   display: grid;
   gap: 6px;
@@ -885,7 +902,7 @@
 .lt-legend-label {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .lt-legend-num {
   flex: 0 0 auto;
