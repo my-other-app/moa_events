@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { discoverApi } from "@/api/discover";
 import { errorLine, liveApi } from "@/api/live";
 import { subscribe } from "@/api/liveStream";
 import { useAuth } from "@/auth/context";
@@ -278,15 +279,112 @@ const Waiting = () => (
   </section>
 );
 
+/** The top of the room: the way back to the event, the organiser's logo, the event's name. */
+const Top = ({ eventPage, theme, name }) => (
+  <header className="live-top">
+    <Link className="live-back" href={eventPage}>
+      ← Event
+    </Link>
+    <ThemeLogo theme={theme} />
+    {name ? <h1>{name}</h1> : null}
+    <span className="live-dot is-red">Live</span>
+  </header>
+);
+
+const pageOf = (eventSlug, eventId) => (eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`);
+
+/** While the room is on its way: its outline, and a word. */
+const Opening = ({ children }) => (
+  <>
+    {children}
+    <section className="live-card" aria-hidden="true">
+      <span className="live-skel is-short" />
+      <span className="live-skel" />
+      <span className="live-skel is-block" />
+    </section>
+    <p className="live-sub" role="status">
+      Opening the room…
+    </p>
+  </>
+);
+
+/** The room didn't load: the hall's Wi-Fi, or a busy API. Try again from here. */
+const Offline = ({ onRetry }) => (
+  <section className="live-card live-offline" role="alert">
+    <h2>The room didn’t load</h2>
+    <p className="live-sub">Check your connection — the hall’s Wi-Fi may be busy — and try again.</p>
+    <button type="button" className="live-btn live-btn--block" onClick={onRetry}>
+      RETRY
+    </button>
+  </section>
+);
+
 /**
  * The room on a phone: the banner, the poll that is up, the quiz if it runs,
  * the questions. Its server half (src/app/events/[slug]/live/page.jsx) finds
  * the event and hands over its id, slug and name, so the top of the room is
  * in the first paint; the feed is pushed after (src/api/liveStream.js), or
  * asked for every 5 seconds where it cannot be.
+ *
+ * When the server could not find the event in time (a busy API with a hall
+ * full of phones scanning the same code), the page still comes, with the
+ * slug alone, and the browser looks the event up itself before opening the
+ * room, offering to try again if that fails too, rather than a server error.
  */
-const Live = ({ eventId, eventSlug = null, eventName = null }) => {
-  const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
+const Live = ({ eventId = null, eventSlug = null, eventName = null }) => {
+  const known = eventId != null && eventId !== "" ? String(eventId) : null;
+  const [found, setFound] = useState(null);
+  const [lookup, setLookup] = useState(known ? "done" : "looking");
+  const find = useCallback(
+    async (fresh = false) => {
+      setLookup("looking");
+      try {
+        const page = await discoverApi.event(eventSlug, { fresh });
+        setFound({ id: String(page.event.id), slug: page.event.slug || eventSlug, name: page.event.name || null });
+        setLookup("done");
+      } catch (e) {
+        setLookup(e?.notFound ? "missing" : "failed");
+      }
+    },
+    [eventSlug]
+  );
+  useEffect(() => {
+    if (!known && eventSlug) find();
+  }, [known, eventSlug, find]);
+
+  if (known) return <Room eventId={known} eventSlug={eventSlug} eventName={eventName} />;
+  if (found) return <Room eventId={found.id} eventSlug={found.slug} eventName={found.name || eventName} />;
+  const top = <Top eventPage={eventSlug ? pageOf(eventSlug) : "/"} theme={null} name={eventName} />;
+  if (lookup === "missing")
+    return (
+      <LiveFrame theme={null}>
+        {top}
+        <section className="live-card" role="alert">
+          <h2>There’s no live room here</h2>
+          <p className="live-sub">This event isn’t public, or its address has changed. Check the code on the screen or the link you were sent.</p>
+          <Link className="live-btn live-btn--block" href="/">
+            Find events
+          </Link>
+        </section>
+      </LiveFrame>
+    );
+  return (
+    <LiveFrame theme={null}>
+      {lookup === "failed" ? (
+        <>
+          {top}
+          <Offline onRetry={() => find(true)} />
+        </>
+      ) : (
+        <Opening>{top}</Opening>
+      )}
+    </LiveFrame>
+  );
+};
+
+/** The room, by the event's id. */
+const Room = ({ eventId, eventSlug = null, eventName = null }) => {
+  const eventPage = pageOf(eventSlug, eventId);
   const [feed, setFeed] = useState(null);
   const [error, setError] = useState(false);
   /** The theme this tab last saw for the room: the first paint's, until the feed brings its own. */
@@ -328,43 +426,20 @@ const Live = ({ eventId, eventSlug = null, eventName = null }) => {
   );
 
   const name = feed?.event?.name || eventName;
-  const top = (
-    <header className="live-top">
-      <Link className="live-back" href={eventPage}>
-        ← Event
-      </Link>
-      <ThemeLogo theme={theme} />
-      {name ? <h1>{name}</h1> : null}
-      <span className="live-dot is-red">Live</span>
-    </header>
-  );
+  const top = <Top eventPage={eventPage} theme={theme} name={name} />;
 
   if (error && !feed) {
     return (
       <LiveFrame theme={theme}>
         {top}
-        <section className="live-card live-offline" role="alert">
-          <h2>The room didn’t load</h2>
-          <p className="live-sub">Check your connection — the hall’s Wi-Fi may be busy — and try again.</p>
-          <button type="button" className="live-btn live-btn--block" onClick={load}>
-            RETRY
-          </button>
-        </section>
+        <Offline onRetry={load} />
       </LiveFrame>
     );
   }
   if (!feed) {
     return (
       <LiveFrame theme={theme}>
-        {top}
-        <section className="live-card" aria-hidden="true">
-          <span className="live-skel is-short" />
-          <span className="live-skel" />
-          <span className="live-skel is-block" />
-        </section>
-        <p className="live-sub" role="status">
-          Opening the room…
-        </p>
+        <Opening>{top}</Opening>
       </LiveFrame>
     );
   }
