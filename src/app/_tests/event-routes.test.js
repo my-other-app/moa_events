@@ -15,7 +15,9 @@ let fetch;
 beforeEach(() => {
   fetch = fakeFetch((url) => {
     const ref = decodeURIComponent(url.pathname.replace("/api/v1/discover/events/", ""));
-    if (ref === "boom") return { status: 503, body: { detail: "down" } };
+    if (ref === "boom" || ref === "503") return { status: 503, body: { detail: "down" } };
+    // What the server's read sees when the API takes longer than it waits (AbortSignal.timeout).
+    if (ref === "slow" || ref === "504") return new DOMException("The operation was aborted due to timeout", "TimeoutError");
     if (ref === "hack-night-04" || ref === "123" || ref === "hack-night-old") return { body: page };
     return { status: 404, body: { detail: "Not found" } };
   });
@@ -81,6 +83,23 @@ describe("the event's own client pages", () => {
     const meta = await route.generateMetadata({ params: params({ slug: "hack-night-04" }) });
     expect(meta.robots).toEqual({ index: false, follow: true });
     expect(meta.alternates.canonical).toBe("https://myotherapp.in/events/hack-night-04");
+  });
+
+  it.each(["slow", "boom"])("/events/%s/live still opens when the API is slow or down: the page comes with the slug, and the browser finds the room", async (slug) => {
+    const route = await import("../events/[slug]/live/page.jsx");
+    const { value } = await outcome(() => route.default({ params: params({ slug }), searchParams: params({}) }));
+    expect(value.type.name).toBe("Live");
+    expect(value.props).toEqual({ eventSlug: slug });
+    const meta = await route.generateMetadata({ params: params({ slug }) });
+    expect(meta.robots).toEqual({ index: false, follow: true });
+    expect(meta.title).toBe("Live");
+  });
+
+  it("the other pages under the event still send a failing API to the error page", async () => {
+    for (const sub of ["register", "compete"]) {
+      const route = await import(/* @vite-ignore */ `../events/[slug]/${sub}/page.jsx`);
+      await expect(route.default({ params: params({ slug: "slow" }), searchParams: params({}) })).rejects.toMatchObject({ name: "ApiError", status: 0 });
+    }
   });
 
   it("hands the form stable pictures, never presigned links, and only what it draws", async () => {
@@ -164,6 +183,17 @@ describe("the old addresses (posters, QR codes on tickets, emails, the app's lin
       redirect: { url: `${to}?ref=x7k2m9pq&sref=site1234`, status: 308 },
     });
     expect(await outcome(() => route.default({ params: params(p), searchParams: params({}) }))).toEqual({ redirect: { url: to, status: 308 } });
+  });
+
+  it.each([
+    ["503", { eventId: "503" }],
+    ["504", { eventId: "504" }],
+    ["slow", { eventSlug: "slow" }],
+  ])("/%s/live opens the room in place when the API is too busy to say where to send it", async (ref, props) => {
+    const route = await import("../[ref]/live/page.jsx");
+    const { value } = await outcome(() => route.default({ params: params({ ref }), searchParams: params({}) }));
+    expect(value.type.name).toBe("Live");
+    expect(value.props).toEqual(props);
   });
 
   it("is a 404 when no public event answers to it, and never looks up the site's own words or junk", async () => {

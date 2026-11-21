@@ -1,0 +1,971 @@
+/*
+ * The customisable live room on a phone (src/components/liveroom/*): the
+ * event's theme, the new question and poll kinds, teams and rounds.
+ *
+ * Nothing here applies to a room without a theme except the new kinds'
+ * own pieces (a type box, an order list, a chart) that never existed
+ * before: an event nobody customised looks exactly as it did (live.css).
+ *
+ * A theme sets custom properties on .live-page (src/utils/liveTheme.js):
+ *   --lt-bg / --lt-on-bg         the background and the text on it
+ *   --lt-bar                     the sticky top's fill over the backdrop
+ *   --lt-accent / --lt-on-accent the accent and the text on it
+ *   --lt-a0…5 / --lt-on-a0…5     the six answer colours and their text
+ *   --lt-scale                   the guest's text size
+ *   --dc-font / --dc-display     the theme's body and display faces
+ * The text colours are the server's, chosen for 4.5:1; cards stay white
+ * surfaces with the site's own text, so nothing reads on a fill it was not
+ * chosen for.
+ */
+
+/* ---------- read to a screen reader, not drawn ---------- */
+
+.live-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- the backdrop (guest.background: "theme") ---------- */
+
+.lt-backdrop {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lt-backdrop {
+    background-attachment: fixed;
+  }
+}
+.live-page.lt-backdrop-on {
+  color: var(--lt-on-bg);
+}
+.lt-backdrop-on .live-top {
+  background: var(--lt-bar);
+  border-bottom-color: transparent;
+}
+.lt-backdrop-on .live-top h1,
+.lt-backdrop-on .live-top a,
+.lt-backdrop-on .live-top .live-back,
+.lt-backdrop-on .live-top .live-dot,
+.lt-backdrop-on .live-top .live-dot.is-red {
+  color: var(--lt-on-bg);
+}
+.lt-backdrop-on .live-top .live-dot::before {
+  background: var(--lt-on-bg);
+}
+.lt-backdrop-on .live-top .live-dot.is-red::before {
+  background: var(--dc-live);
+  box-shadow: 0 0 0 2px var(--lt-on-bg);
+}
+.lt-backdrop-on .live-top a:hover {
+  color: var(--lt-on-bg);
+  text-decoration: underline;
+}
+/* Surfaces keep the site's own text: they are white whatever the backdrop. */
+.lt-backdrop-on .live-card,
+.lt-backdrop-on .live-banner {
+  color: var(--dc-ink);
+}
+.lt-backdrop-on > .live-error {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: var(--dc-radius);
+  background: #fff;
+}
+
+/* ---------- the theme's faces and text size ---------- */
+
+.lt-on .live-top h1,
+.lt-on .live-card h2,
+.lt-on .play-prompt,
+.lt-on .play-flash:not(.is-locked),
+.lt-on .live-btn,
+.lt-on .play-clock,
+.lt-on .play-board .play-pts,
+.lt-on .play-board .play-rank,
+.lt-on .live-option .live-pct,
+.lt-on .live-code,
+.lt-on .play-answer .play-mark {
+  font-weight: var(--lt-display-weight, 400);
+}
+.lt-display-sans .live-top h1 {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+.lt-display-sans .live-card h2 {
+  font-size: calc(21px * var(--lt-scale, 1));
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.lt-display-caps .live-card h2 {
+  font-size: calc(26px * var(--lt-scale, 1));
+}
+.lt-display-sans .play-prompt {
+  font-size: calc(clamp(21px, 5.4vw, 28px) * var(--lt-scale, 1));
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.lt-display-caps .play-prompt {
+  font-size: calc(clamp(28px, 7vw, 38px) * var(--lt-scale, 1));
+}
+.lt-display-sans .play-flash:not(.is-locked) {
+  font-size: calc(22px * var(--lt-scale, 1));
+  letter-spacing: -0.01em;
+}
+.lt-display-sans .live-btn {
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  padding: 12px 20px;
+}
+.lt-display-sans .live-code {
+  letter-spacing: 0.1em;
+}
+.lt-on .play-answer {
+  font-size: calc(17px * var(--lt-scale, 1));
+}
+.lt-on .live-option,
+.lt-on .live-question p,
+.lt-on .live-banner {
+  font-size: calc(15.5px * var(--lt-scale, 1));
+}
+.lt-on .live-card .live-sub {
+  font-size: calc(13.5px * var(--lt-scale, 1));
+}
+
+/* ---------- the accent ---------- */
+
+.lt-on .play-band {
+  background: var(--lt-accent);
+  color: var(--lt-on-accent);
+}
+.lt-on .play-step,
+.lt-on .play-clock,
+.lt-on .play-clock.is-urgent,
+.lt-on .play-clock.is-out {
+  color: var(--lt-on-accent);
+}
+.lt-on .play-clock.is-urgent:not(.is-out) {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.lt-on .play-timebar {
+  background: rgba(127, 127, 127, 0.3);
+  background: color-mix(in srgb, var(--lt-on-accent) 24%, transparent);
+}
+.lt-on .play-timebar > span,
+.lt-on .play-timebar > span.is-urgent {
+  background: var(--lt-on-accent);
+}
+.lt-on .live-card.is-quiz {
+  background: #fff;
+  border-top: 8px solid var(--lt-accent);
+}
+.lt-on .live-btn {
+  background: var(--lt-accent);
+  color: var(--lt-on-accent);
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.16);
+}
+.lt-on .live-btn:hover:not(:disabled) {
+  background: var(--lt-accent);
+  filter: brightness(0.94);
+}
+.lt-on .live-btn.is-ghost {
+  background: #fff;
+  color: var(--dc-ink);
+}
+.lt-on .live-option.is-mine .live-fill,
+.lt-on .play-board li.is-me {
+  background: var(--dc-accent);
+  background: color-mix(in srgb, var(--lt-accent) 38%, #fff);
+}
+.lt-on .play-board.has-podium li.is-p1 {
+  background: var(--lt-accent);
+  color: var(--lt-on-accent);
+}
+.lt-on .play-board.has-podium li.is-p1 .play-rank {
+  background: var(--lt-on-accent);
+  color: var(--lt-accent);
+}
+.lt-on .play-board.has-podium li.is-podium.is-me {
+  background: var(--dc-accent);
+  background: color-mix(in srgb, var(--lt-accent) 38%, #fff);
+  color: var(--dc-ink);
+}
+
+/* ---------- the organiser's logo ---------- */
+
+.lt-logo {
+  flex: 0 0 auto;
+  height: 32px;
+  width: auto;
+  max-width: 96px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+/* Beside a logo on a phone the title has a third of the row: the logo gives a little and the title steps down, then takes two lines. */
+@media (max-width: 480px) {
+  .lt-logo {
+    height: 28px;
+    max-width: 72px;
+  }
+  .live-top:has(.lt-logo) {
+    gap: 10px;
+  }
+  .live-top:has(.lt-logo) h1 {
+    font-size: 17px;
+    line-height: 1.12;
+  }
+}
+
+/* ---------- the clock: a ring, a big number, paused ---------- */
+
+.play-clock.is-big {
+  font-size: 44px;
+}
+.play-clock.is-paused {
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+.play-ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+}
+.play-ring svg {
+  position: absolute;
+  inset: 0;
+}
+.play-ring-track,
+.play-ring-run {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 5;
+}
+.play-ring-track {
+  opacity: 0.22;
+}
+.play-ring-run {
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+.play-ring-n {
+  position: relative;
+  font-size: 20px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.lt-timer-ring .play-head,
+.lt-timer-number .play-head {
+  align-items: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .play-ring-run {
+    transition: none;
+  }
+}
+
+/* The question's own tags: its round, double points, its worth, a poll. */
+.play-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+.play-tag {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.play-tag.is-strong {
+  background: var(--dc-ink);
+  border-color: var(--dc-ink);
+  color: #fff;
+}
+.lt-on .play-tag.is-strong {
+  background: var(--lt-on-accent);
+  border-color: var(--lt-on-accent);
+  color: var(--lt-accent);
+}
+
+.live-card.is-paused .play-answers,
+.live-card.is-paused .lt-order,
+.live-card.is-paused .lt-type {
+  opacity: 0.55;
+}
+.lt-paused {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--dc-radius);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---------- answers drawn in the theme's colours ---------- */
+
+.play-answers.is-grid,
+.play-answers.is-pair {
+  grid-template-columns: 1fr 1fr;
+}
+.play-answers.is-grid .play-answer,
+.play-answers.is-pair .play-answer {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: 96px;
+}
+.play-answers.is-pair .play-answer {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+}
+.play-answer.is-tinted {
+  background: var(--tile);
+  color: var(--tile-on);
+  border-color: transparent;
+  font-weight: 600;
+}
+.play-answer.is-tinted .play-mark {
+  background: transparent;
+  color: var(--tile-on);
+  box-shadow: inset 0 0 0 2px currentColor;
+  border-radius: 999px;
+}
+.lt-answers-letters .play-answer.is-tinted .play-mark {
+  border-radius: var(--dc-radius-sm);
+}
+.lt-answers-shapes .play-answer.is-tinted .play-mark {
+  box-shadow: none;
+}
+.play-answer.is-tinted:hover:not(:disabled) {
+  border-color: var(--dc-ink);
+}
+.play-answer.is-tinted:focus-visible {
+  outline: 3px solid var(--dc-ink);
+  outline-offset: 3px;
+}
+/* Chosen: a ring outside the tile (the colour stays the answer's), and the
+   others step back. A tick says it in words too (the verdict line). */
+.play-answer.is-tinted.is-mine {
+  border-color: transparent;
+  background: var(--tile);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--dc-ink);
+}
+.play-answer.is-tinted.is-mine .play-mark {
+  background: var(--tile-on);
+  color: var(--tile);
+}
+.play-answer.is-tinted.is-dim {
+  opacity: 0.42;
+}
+.play-answer.is-tinted.is-right,
+.play-answer.is-tinted.is-wrong {
+  background: var(--tile);
+  color: var(--tile-on);
+}
+.play-answer.is-tinted.is-right .play-mark,
+.play-answer.is-tinted.is-wrong .play-mark {
+  background: var(--tile-on);
+  color: var(--tile);
+}
+.play-answer.is-tinted .play-verdict-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #fff;
+}
+.play-answer.is-tinted.is-right .play-verdict-mark {
+  color: #047857;
+}
+.play-answer.is-tinted.is-wrong .play-verdict-mark {
+  color: #b91c1c;
+}
+.play-answer.is-missed {
+  border-style: dashed;
+  border-color: #047857;
+}
+.play-answer.is-tinted.is-missed {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px #047857;
+}
+.play-answers.is-grid .play-verdict-mark {
+  align-self: flex-end;
+}
+.lt-shape {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.lt-option-img {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: var(--dc-radius-sm);
+  background: rgba(255, 255, 255, 0.85);
+}
+.live-option.has-image .live-option-text {
+  gap: 10px;
+}
+
+/* A multiple-answer question's toggles. */
+.play-answer[aria-pressed="true"]:not(.is-tinted) {
+  border-color: var(--dc-primary);
+  background: var(--dc-accent);
+}
+.play-hint {
+  margin: -6px 0 12px;
+  font-size: 13.5px;
+  color: var(--dc-text);
+}
+.play-send {
+  margin-top: 12px;
+}
+.play-flash.is-partly {
+  color: #92400e;
+}
+
+/* ---------- type the answer ---------- */
+
+.lt-type input {
+  font-size: 18px;
+  min-height: 52px;
+}
+.lt-typed {
+  display: grid;
+  gap: 8px;
+}
+.lt-typed p {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+}
+.lt-typed-right {
+  box-shadow: inset 0 0 0 1.5px #047857;
+}
+.lt-typed-k {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.lt-typed-v {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- put in order (and a ranking poll) ---------- */
+
+.lt-order {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lt-order-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--dc-radius);
+  border: 2px solid var(--dc-line);
+  background: #fff;
+  color: var(--dc-ink);
+  font-size: calc(16px * var(--lt-scale, 1));
+}
+.lt-order-row.is-tinted {
+  background: var(--tile);
+  color: var(--tile-on);
+  border-color: transparent;
+}
+.lt-order-row.is-right {
+  border-color: #047857;
+}
+.lt-order-row.is-wrong {
+  border-color: #b91c1c;
+}
+.lt-order-row.is-tinted.is-right,
+.lt-order-row.is-tinted.is-wrong {
+  border-color: transparent;
+}
+.lt-order-row.is-tinted .play-verdict-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fff;
+  color: #047857;
+}
+.lt-order-row.is-tinted.is-wrong .play-verdict-mark {
+  color: #b91c1c;
+}
+.lt-order-place {
+  width: 26px;
+  flex: 0 0 auto;
+  font-family: var(--dc-display);
+  font-size: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.lt-order-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lt-order-moves {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.lt-move {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--dc-radius-sm);
+  border: 1.5px solid var(--dc-line);
+  background: #fff;
+  color: var(--dc-ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.lt-move:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lt-move:focus-visible {
+  outline: 3px solid var(--dc-ink);
+  outline-offset: 2px;
+}
+.lt-right-order,
+.lt-room-rank {
+  margin-top: 14px;
+}
+.lt-right-order h3,
+.lt-room-rank h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.lt-right-order ol,
+.lt-room-rank ol {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 4px;
+  list-style: decimal;
+  color: var(--dc-ink);
+  font-size: 15px;
+}
+.lt-room-rank li {
+  display: list-item;
+}
+.lt-rank-avg {
+  margin-left: 8px;
+  font-size: 12.5px;
+  color: var(--dc-muted);
+}
+
+/* ---------- a kind this page does not know ---------- */
+
+.lt-update {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+}
+.lt-update p {
+  margin: 0;
+  font-size: 15px;
+  color: var(--dc-ink);
+}
+
+/* ---------- teams ---------- */
+
+.lt-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  margin-right: 6px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.25);
+  vertical-align: -1px;
+}
+.lt-team-chip {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.lt-team-line {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+.lt-teams-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.lt-teams-pick legend {
+  grid-column: 1 / -1;
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.lt-team-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-radius: var(--dc-radius);
+  border: 1.5px solid var(--dc-line);
+  background: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  cursor: pointer;
+}
+.lt-team-choice input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.lt-team-choice.is-on {
+  border-color: var(--dc-primary);
+  box-shadow: inset 0 0 0 1.5px var(--dc-primary);
+  background: var(--dc-sunken);
+}
+.lt-team-choice:has(input:focus-visible) {
+  outline: 3px solid var(--dc-ink);
+  outline-offset: 2px;
+}
+.lt-team-board {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lt-team-board li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+  color: var(--dc-ink);
+  font-size: 15px;
+}
+.lt-team-board li.is-me {
+  box-shadow: inset 0 0 0 1.5px var(--dc-primary);
+  font-weight: 600;
+}
+.lt-team-board .play-rank {
+  width: 22px;
+  font-family: var(--dc-display);
+  font-size: 18px;
+  color: var(--dc-muted);
+}
+.lt-team-board .play-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lt-team-board small {
+  font-size: 12px;
+  color: var(--dc-muted);
+  font-weight: 400;
+}
+.lt-team-board .play-pts {
+  font-family: var(--dc-display);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.lt-yours {
+  font-weight: 400;
+  color: var(--dc-text);
+}
+.play-score .lt-team-chip {
+  font-size: 13px;
+}
+
+/* ---------- the leaderboard, animated when the theme says so ---------- */
+
+.lt-animate .play-board li,
+.lt-animate .lt-team-board li {
+  animation: lt-rise var(--motion-slow) var(--motion-ease-out) both;
+}
+.lt-animate .play-board li:nth-child(2) {
+  animation-delay: 40ms;
+}
+.lt-animate .play-board li:nth-child(3) {
+  animation-delay: 80ms;
+}
+.lt-animate .play-board li:nth-child(n + 4) {
+  animation-delay: 120ms;
+}
+@keyframes lt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-rise, 8px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lt-animate .play-board li,
+  .lt-animate .lt-team-board li {
+    animation: none;
+  }
+}
+
+/* ---------- poll results: bars, columns, a donut, texts ---------- */
+
+.lt-hidden-note {
+  margin: -4px 0 12px;
+  padding: 9px 12px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+  color: var(--dc-text);
+  font-size: 13.5px;
+}
+.lt-closes {
+  font-weight: 700;
+  color: var(--dc-ink);
+  font-variant-numeric: tabular-nums;
+}
+.live-card.is-closed {
+  border-color: var(--dc-line);
+  box-shadow: none;
+}
+.lt-bars {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lt-bars li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  overflow: hidden;
+  padding: 10px 12px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+  color: var(--dc-ink);
+  font-size: 14.5px;
+}
+.lt-bars li.is-mine {
+  box-shadow: inset 0 0 0 1.5px var(--dc-primary);
+  font-weight: 600;
+}
+.lt-bar-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: #e1e4ea;
+  transition: transform var(--motion-slow) var(--motion-ease-out);
+}
+.lt-bar-label,
+.lt-bar-num {
+  position: relative;
+}
+.lt-bar-num {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--dc-text);
+}
+.lt-columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+.lt-columns li {
+  flex: 1 1 0;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.lt-col-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dc-ink);
+  font-variant-numeric: tabular-nums;
+}
+.lt-col-track {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: var(--dc-radius-sm);
+  background: var(--dc-sunken);
+  overflow: hidden;
+}
+.lt-col-bar {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom center;
+  transition: transform var(--motion-slow) var(--motion-ease-out);
+}
+.lt-col-label {
+  font-size: 12.5px;
+  color: var(--dc-text);
+  overflow-wrap: anywhere;
+}
+/* The legend beside the ring while it has room for its words; on a phone it takes its own row under the ring rather than wrap word by word. */
+.lt-donut {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px 16px;
+  margin-top: 14px;
+}
+.lt-donut svg {
+  flex: 0 0 auto;
+}
+.lt-donut-track {
+  fill: none;
+  stroke: var(--dc-sunken);
+  stroke-width: 18;
+}
+.lt-legend {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lt-legend li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--dc-ink);
+}
+.lt-legend-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.lt-legend-num {
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  color: var(--dc-text);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lt-bar-fill,
+  .lt-col-bar {
+    transition: none;
+  }
+}
+
+/* A rating on numbers: 1–5 in a row, 1–10 in two. */
+.lt-scale {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.lt-scale button {
+  min-height: 52px;
+  border-radius: var(--dc-radius);
+  border: 1.5px solid var(--dc-line);
+  background: var(--dc-sunken);
+  color: var(--dc-ink);
+  font-family: var(--dc-display);
+  font-size: 22px;
+  cursor: pointer;
+  transition: var(--motion-colors);
+}
+.lt-scale button.is-on {
+  background: var(--dc-primary);
+  border-color: var(--dc-primary);
+  color: #fff;
+}
+.lt-scale button:disabled {
+  cursor: default;
+}
+
+/* Open text: what the room said, newest first. */
+.lt-texts {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lt-texts li {
+  padding: 10px 12px;
+  border-radius: var(--dc-radius);
+  background: var(--dc-sunken);
+}
+.lt-texts p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.lt-texts small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--dc-muted);
+}

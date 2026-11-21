@@ -19,6 +19,8 @@ export default defineConfig({
       // server helpers (notFound, redirect) are the real ones.
       { find: /^next\/navigation$/, replacement: src("test/next-navigation.jsx") },
       { find: /^next\/link$/, replacement: src("test/next-link.jsx") },
+      // next/font/google is compiled by Next; in tests every face is a stand-in.
+      { find: /^next\/font\/google$/, replacement: src("test/next-font.js") },
       // Server-only modules import this marker; in tests it is nothing.
       { find: /^server-only$/, replacement: src("test/empty.js") },
       { find: /^@\//, replacement: `${src("")}/` },

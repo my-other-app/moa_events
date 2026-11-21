@@ -3,7 +3,8 @@ import { NetworkInApp } from "@/components/profiles/profileview";
 
 /*
  * /network?event={id}: the link in the morning-after recap (push and email)
- * into the app's Network tab (feature-register/profiles-networking-contract.md).
+ * into the app's Network tab (feature-register/profiles-networking-contract.md);
+ * with &scan=1, a quest's "Open the app to scan" (the scanner is in the same tab).
  * The Network is the app's alone: with the app installed the phone opens it
  * there; this page is for everyone else and says where it lives, with the
  * store badges and, on Android, "Open in the app" (an intent link, ?event=
@@ -20,9 +21,12 @@ export default async function NetworkRoute({ searchParams }) {
   const sp = (await searchParams) || {};
   const raw = Array.isArray(sp.event) ? sp.event[0] : sp.event;
   const eventId = EVENT_ID.test(String(raw ?? "")) ? String(raw) : null;
+  // ?scan=1: a quest's "Open the app to scan" (components/quests).
+  const scanRaw = Array.isArray(sp.scan) ? sp.scan[0] : sp.scan;
+  const scan = scanRaw === "1";
   return (
     <SitePage>
-      <NetworkInApp eventId={eventId} />
+      <NetworkInApp eventId={eventId} scan={scan} />
     </SitePage>
   );
 }

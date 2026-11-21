@@ -18,6 +18,7 @@ import { RevokedNote } from "./revoked";
 import { useRenderedTicket } from "./ticketrender";
 import { usePosterOffer } from "./poster/offer";
 import PosterCta from "./poster/cta";
+import { TicketQuests } from "./quests/questcard";
 
 /**
  * The ticket's type (docs/TICKETING.md), when the event sells more than one:
@@ -346,6 +347,14 @@ const Ticket = ({ ticketid }) => {
       )}
 
       {posterOffer ? <PosterCta href={`/posters/${encodeURIComponent(ticketid)}`} phrase={posterOffer.phrase} made={posterOffer.made} /> : null}
+
+      {/*
+       * The holder's quest for the event (components/quests), when the event
+       * runs one: tasks, progress, rewards and where to collect them, a code
+       * box. Never for a called-off event or a revoked ticket; nothing at all
+       * from an API without quests. Outside #ticket, so the PDF never has it.
+       */}
+      {ticketData.event?.id !== undefined && ticketData.event?.id !== null ? <TicketQuests ticketId={ticketid} event={ticketData.event} skip={cancelled || revoked} /> : null}
 
       {competition?.enabled && ticketData.event?.id && !cancelled && !revoked ? (
         <Link href={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>

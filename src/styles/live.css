@@ -53,9 +53,13 @@
   line-height: 1.05;
   letter-spacing: 0.01em;
   color: var(--dc-ink);
-  white-space: nowrap;
+  /* Two lines before it gives up, between words: a round's or event's name beside the back link, a logo and the player is rarely one line on a phone. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
 
 /* The little "LIVE" / "POLL" / "QUIZ" label with its dot. */
