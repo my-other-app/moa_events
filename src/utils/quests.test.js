@@ -326,6 +326,8 @@ describe("codes", () => {
   it("says why one didn't, with the tries left and the locks", () => {
     expect(describeCodeRefusal(fail(404, { error_code: "QUEST_CODE_WRONG", errors: { left: 4 } }))).toEqual({ tone: "bad", line: "That isn't one of this quest's codes. 4 tries left this hour." });
     expect(describeCodeRefusal(fail(404, { error_code: "QUEST_CODE_WRONG", errors: { left: 0 } }))).toMatchObject({ lockFor: 600 });
+    // The last try with the server's wait: locked for that long, not a guess.
+    expect(describeCodeRefusal(fail(404, { error_code: "QUEST_CODE_WRONG", errors: { left: 0, retry_after: 3540 } }))).toMatchObject({ lockFor: 3540 });
     expect(describeCodeRefusal(fail(429, { error_code: "QUEST_CODE_LOCKED", errors: { retry_after: 1500 } }))).toEqual({ tone: "bad", line: "Too many wrong codes. Try again in 25 minutes.", lockFor: 1500 });
     expect(describeCodeRefusal(fail(409, { error_code: "QUEST_CODE_NOT_OPEN", errors: { opens_at: "2026-11-28T08:30:00Z" } }), NOW).line).toBe("Right code, but it counts from 2:00 PM. Enter it again then.");
     expect(describeCodeRefusal(fail(409, { error_code: "QUEST_CODE_NOT_OPEN", errors: { closes_at: "2026-11-28T04:30:00Z" } }), NOW).line).toBe("Right code, but it stopped counting at 10:00 AM.");

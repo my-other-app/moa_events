@@ -482,7 +482,8 @@ export function describeCodeRefusal(error, now = Date.now()) {
   switch (f.code) {
     case "QUEST_CODE_WRONG": {
       const left = num(errors.left);
-      if (left === 0) return { tone: "bad", line: "That isn't one of this quest's codes, and that was the last try for now. Try again later.", lockFor: 600 };
+      // The last try: the server says when codes count again (an hour from the first wrong one); older servers don't, so a guess.
+      if (left === 0) return { tone: "bad", line: "That isn't one of this quest's codes, and that was the last try for now. Try again later.", lockFor: num(errors.retry_after) ?? 600 };
       return { tone: "bad", line: `That isn't one of this quest's codes.${left !== null ? ` ${plural(left, "try", "tries")} left this hour.` : " Check it and try again."}` };
     }
     case "QUEST_CODE_NOT_OPEN": {
