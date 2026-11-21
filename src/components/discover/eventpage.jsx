@@ -1,6 +1,7 @@
 import { Link } from "@/lib/router";
 import { dateTile, eventUrl, peopleLine, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { EventTickets } from "../register/eventtickets";
+import { EventQuests } from "../quests/questcard";
 import { formatCount, formatPrice, plural, showsHighDemand } from "@/utils/format";
 import { hostNames, hostsOf } from "@/utils/hosts";
 import { confirmsEachPlace } from "@/utils/requests";
@@ -246,6 +247,9 @@ export function EventView({ page, shareRow = null }) {
             registerHref={regState.kind === "open" ? regState.href || null : regState.kind === "live" ? regState.also?.href || null : null}
             approval={event.requires_approval === true}
           />
+
+          {/* The event's quest, read in the browser: the guest's own with a ticket, else what it is (nothing when there's none). */}
+          {cancelled ? null : <EventQuests event={{ id: event.id, slug: event.slug || null, status: event.status }} clubSlug={club?.slug || null} canRegister={regState.kind === "open"} />}
 
           {hasAbout ? (
             <EpSection id="about" title="About this event">

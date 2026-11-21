@@ -1,0 +1,676 @@
+/*
+ * Event quests, as the guest sees them (components/quests): the card on the
+ * ticket's page (white on the ticket's teal, under the poster button) and on
+ * the event's page (between its tickets and its About). DM Sans for text,
+ * Bebas Neue for the big numbers, the app's pale yellow for what's done.
+ * Scoped under .qs (which also carries .dc-scope's reset), so the ticket
+ * page's older global rules (every input full width and grey) stay out.
+ */
+
+.qs {
+  --qs-good: #15803d;
+  --qs-good-soft: #dcfce7;
+  --qs-wait: #92400e;
+  --qs-wait-soft: #fef3c7;
+  --qs-bad: #b91c1c;
+  --qs-off: #6b7280;
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 16px;
+  border: 1px solid var(--dc-line);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--dc-ink);
+}
+
+/* Under the ticket: the poster button's width and look, a little wider for the list. */
+.qs--ticket {
+  max-width: 480px;
+  margin-top: 14px;
+  border-color: transparent;
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.55);
+}
+
+/* On the event's page: a section of its own, before About. */
+.qs--event {
+  margin: 24px 0 8px;
+  scroll-margin-top: calc(var(--ep-header, 64px) + var(--ep-tabs, 48px) + 8px);
+}
+@media (min-width: 768px) {
+  .qs--event {
+    padding: 22px 22px;
+  }
+}
+
+/* ---------- the head ---------- */
+
+.qs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.qs-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.qs-title {
+  margin-top: 2px;
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  color: var(--dc-ink);
+}
+.qs-intro {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-text);
+}
+.qs-score {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: center;
+  min-width: 64px;
+  padding: 6px 10px 4px;
+  border-radius: 12px;
+  background: var(--dc-accent);
+  color: var(--dc-ink);
+  text-align: center;
+}
+.qs-score strong {
+  font-family: var(--dc-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+}
+.qs-score span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.qs-rank {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(17, 24, 39, 0.15);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ---------- progress ---------- */
+
+.qs-progress {
+  display: grid;
+  gap: 8px;
+}
+.qs-meter {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+  overflow: hidden;
+}
+.qs-meter-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--dc-primary);
+  transform-origin: left center;
+}
+.qs-meter-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  opacity: 0.85;
+}
+.qs-next {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--dc-text);
+}
+.qs-next strong {
+  color: var(--dc-ink);
+}
+
+/* ---------- notes: not started, ended, off, no ticket ---------- */
+
+.qs-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--dc-text);
+}
+.qs-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--dc-muted);
+}
+.qs-note strong {
+  color: var(--dc-ink);
+}
+.qs-note--good {
+  background: var(--qs-good-soft);
+  color: #14532d;
+}
+.qs-note--good svg {
+  color: var(--qs-good);
+}
+
+/* ---------- section headings inside the card ---------- */
+
+.qs-h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+}
+.qs-block {
+  display: grid;
+  gap: 10px;
+}
+
+/* ---------- tasks ---------- */
+
+.qs-tasks {
+  display: grid;
+  gap: 0;
+}
+.qs-task {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--dc-line);
+}
+.qs-task:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+.qs-tick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border: 2px solid #9ca3af;
+  border-radius: 999px;
+  color: var(--dc-ink);
+}
+.qs-tick.is-done {
+  border-color: var(--dc-primary);
+  background: var(--dc-primary);
+  color: #fff;
+}
+.qs-task-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.qs-task-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.qs-task.is-done .qs-task-title {
+  color: var(--dc-text);
+}
+.qs-req {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--qs-wait-soft);
+  color: var(--qs-wait);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+}
+.qs-task-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.qs-task-how,
+.qs-task-when {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--dc-text);
+}
+.qs-task-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dc-muted);
+}
+.qs-pts {
+  min-width: 38px;
+  padding: 2px 8px 1px;
+  border-radius: 999px;
+  background: var(--dc-sunken);
+  color: var(--dc-ink);
+  font-family: var(--dc-display);
+  font-size: 18px;
+  line-height: 1.2;
+  text-align: center;
+}
+.qs-task.is-done .qs-pts {
+  background: var(--dc-accent);
+}
+
+/* The one way to go and do it: a small link button, big enough to tap. */
+.qs-act {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 4px;
+  min-height: 36px;
+  margin-top: 4px;
+  padding: 7px 12px 6px;
+  border-radius: 999px;
+  background: var(--dc-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.qs-act:hover {
+  background: var(--dc-primary-hover);
+}
+
+/* A task whose own time hasn't come (or has gone): quieter, still listed. */
+.qs-task.is-later .qs-task-title {
+  color: var(--dc-text);
+}
+.qs-task.is-later .qs-tick {
+  border-style: dashed;
+}
+
+/* ---------- the overview (no ticket): the lists folded under one line ---------- */
+
+.qs-more {
+  border-top: 1px solid var(--dc-line);
+  padding-top: 6px;
+}
+.qs-more-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-ink);
+  cursor: pointer;
+  list-style: none;
+}
+.qs-more-toggle::-webkit-details-marker {
+  display: none;
+}
+.qs-more-toggle span {
+  flex: 1 1 auto;
+}
+.qs-more-chev {
+  transform: rotate(90deg);
+}
+.qs-more[open] .qs-more-chev {
+  transform: rotate(-90deg);
+}
+.qs-more-body {
+  display: grid;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+#quest-code {
+  scroll-margin-top: 96px;
+}
+
+/* ---------- rewards ---------- */
+
+.qs-rewards {
+  display: grid;
+  gap: 10px;
+}
+.qs-milestone {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--dc-line);
+  border-radius: 12px;
+}
+.qs-milestone.is-unlocked {
+  border-color: #bbf7d0;
+  background: #f7fef9;
+}
+.qs-milestone-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+.qs-milestone-name {
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.qs-milestone-at {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--dc-muted);
+}
+.qs-milestone-rewards {
+  display: grid;
+  gap: 10px;
+}
+.qs-milestone-need {
+  font-size: 13px;
+  color: var(--dc-text);
+}
+.qs-reward {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.qs-reward-photo {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--dc-sunken);
+}
+.qs-reward-photo--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dc-muted);
+}
+.qs-reward.is-locked .qs-reward-photo {
+  opacity: 0.6;
+}
+.qs-reward-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.qs-reward-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dc-ink);
+  overflow-wrap: anywhere;
+}
+.qs-reward-size {
+  font-weight: 500;
+  color: var(--dc-text);
+}
+.qs-reward-line {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--dc-text);
+}
+.qs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.qs-pill--locked {
+  background: var(--dc-sunken);
+  color: var(--qs-off);
+}
+.qs-pill--good {
+  background: var(--qs-good-soft);
+  color: #14532d;
+}
+.qs-pill--done {
+  background: var(--dc-primary);
+  color: #fff;
+}
+.qs-pill--off {
+  background: #fee2e2;
+  color: #7f1d1d;
+}
+.qs-pill--wait {
+  background: var(--qs-wait-soft);
+  color: var(--qs-wait);
+}
+
+/* Sizes: one button each; the one kept is filled. */
+.qs-sizes {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.qs-sizes-label {
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dc-ink);
+}
+.qs-sizes-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.qs-size {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px #d1d5db;
+  background: #fff;
+  color: var(--dc-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.qs-size:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px #9ca3af;
+}
+.qs-size.is-on {
+  background: var(--dc-primary);
+  box-shadow: none;
+  color: #fff;
+}
+.qs-size:disabled:not(.is-on) {
+  opacity: 0.45;
+  text-decoration: line-through;
+  cursor: default;
+}
+.qs-sizes-said {
+  min-height: 0;
+  font-size: 13px;
+  color: var(--dc-text);
+}
+.qs-sizes-said:empty {
+  display: none;
+}
+.qs-sizes-said.is-bad {
+  color: var(--qs-bad);
+}
+.qs-sizes-said.is-good {
+  color: var(--qs-good);
+}
+
+/* ---------- entering a code ---------- */
+
+.qs-code {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--dc-sunken);
+}
+.qs-code-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-ink);
+}
+.qs-code-hint {
+  font-size: 13px;
+  color: var(--dc-text);
+}
+.qs-code-row {
+  display: flex;
+  gap: 8px;
+}
+.qs .qs-code-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px #d1d5db;
+  background: #fff;
+  color: var(--dc-ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.qs .qs-code-input::placeholder {
+  color: #9ca3af;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.qs .qs-code-input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 2px var(--qs-bad);
+}
+.qs .qs-code-input:disabled {
+  background: #f9fafb;
+  color: var(--qs-off);
+}
+.qs-code-go {
+  flex: 0 0 auto;
+}
+.qs-code-said {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.qs-code-said:empty {
+  display: none;
+}
+.qs-code-said.is-bad {
+  color: var(--qs-bad);
+}
+.qs-code-said.is-good {
+  color: var(--qs-good);
+  font-weight: 600;
+}
+
+/* ---------- leaderboard ---------- */
+
+.qs-board {
+  border-top: 1px solid var(--dc-line);
+  padding-top: 10px;
+}
+.qs-board-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dc-ink);
+  text-align: left;
+}
+.qs-board-toggle span {
+  flex: 1 1 auto;
+}
+.qs-board-chev {
+  transform: rotate(90deg);
+}
+.qs-board-chev.is-open {
+  transform: rotate(-90deg);
+}
+.qs-board-body {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+.qs-board-body[hidden] {
+  display: none;
+}
+.qs-board-note,
+.qs-board-mine {
+  font-size: 13px;
+  color: var(--dc-text);
+}
+.qs-board-list {
+  display: grid;
+  gap: 2px;
+  counter-reset: none;
+}
+.qs-board-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.qs-board-row.is-me {
+  background: var(--dc-accent);
+}
+.qs-board-rank {
+  font-family: var(--dc-display);
+  font-size: 18px;
+  color: var(--dc-muted);
+}
+.qs-board-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dc-ink);
+}
+.qs-board-you {
+  color: var(--dc-text);
+}
+.qs-board-points {
+  font-family: var(--dc-display);
+  font-size: 18px;
+  color: var(--dc-ink);
+}
+
+/* ---------- the wait ---------- */
+
+.qs-wait {
+  min-height: 120px;
+  border-color: var(--dc-line);
+  background: linear-gradient(90deg, #f9fafb, #f3f4f6, #f9fafb);
+}
