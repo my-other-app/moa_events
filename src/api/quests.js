@@ -1,6 +1,6 @@
 import apiClient from "./client";
 import { apiFailure } from "@/utils/ticketing";
-import { parseClaim, parseLeaderboard, parseQuestCard } from "@/utils/quests";
+import { parseClaim, parseLeaderboard, parsePausedCard, parseQuestCard } from "@/utils/quests";
 
 /**
  * A guest's quest (feature-register/quests/CONTRACT.md §8), from the
@@ -8,8 +8,10 @@ import { parseClaim, parseLeaderboard, parseQuestCard } from "@/utils/quests";
  * guest token the registration left (client.js decides, as for the ticket
  * page). With no token the API answers the overview (no `me`).
  *
- * `card` is null for "nothing to show" (no quest, switched off, an API
- * without quests: a 404) and throws for anything else (no connection, a
+ * `card` is null for "nothing to show" (no quest, switched off with nothing
+ * held for the guest, an API without quests: a 404), a paused card
+ * (`{paused: true, …}`) when the quest is off but a reward is still held
+ * for them, and throws for anything else (no connection, a
  * server error), so a card already on the page stays while it can't be
  * read again. Every call throws apiFailure()'s shape; utils/quests.js says
  * what each refusal means.
@@ -22,10 +24,10 @@ const fail = (error) => {
 };
 
 export const questsApi = {
-  /** GET /events/{id}/quest: the card, or null for none. */
+  /** GET /events/{id}/quest: the card, a paused card (off, something still held), or null for none. */
   card: (eventId) =>
     apiClient.get(base(eventId)).then(
-      (r) => parseQuestCard(r?.data),
+      (r) => parseQuestCard(r?.data) ?? parsePausedCard(r?.data),
       (error) => {
         if (error?.response?.status === 404) return null;
         return fail(error);

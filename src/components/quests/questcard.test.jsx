@@ -12,7 +12,7 @@ import { overviewCard, questCard } from "@/test/questFixture";
 vi.mock("@/api/quests", () => ({ questsApi: { card: vi.fn(), code: vi.fn(), size: vi.fn(), leaderboard: vi.fn() } }));
 
 const { questsApi } = await import("@/api/quests");
-const { parseQuestCard, parseClaim } = await import("@/utils/quests");
+const { parseQuestCard, parseClaim, parsePausedCard } = await import("@/utils/quests");
 const { AuthContext } = await import("@/auth/context");
 const { TicketQuests, EventQuests, REVISIT_MS } = await import("./questcard.jsx");
 
@@ -314,5 +314,31 @@ describe("on the event's page", () => {
     const { container } = onEvent();
     await waitFor(() => expect(questsApi.card).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("a quest switched off with a reward still held", () => {
+  const held = () =>
+    parsePausedCard({
+      enabled: false,
+      paused: { title: "DevDays Quest", rewards: [{ claim_id: "c-1", name: "T-shirt", status: "reserved", variant_label: "M" }], collect_at: [{ name: "Swag desk" }] },
+    });
+
+  it("shows under the ticket only what is held and where, with nothing to do", async () => {
+    questsApi.card.mockResolvedValue(held());
+    onTicket();
+    const box = await card();
+    expect(within(box).getByText("Quests are paused.")).toBeInTheDocument();
+    expect(within(box).getByText("Your T-shirt (M) is still held for you — collect it at Swag desk.")).toBeInTheDocument();
+    expect(within(box).queryByRole("list")).toBeNull();
+    expect(within(box).queryByRole("link")).toBeNull();
+    expect(within(box).queryByRole("textbox")).toBeNull();
+  });
+
+  it("shows the same on the event's page", async () => {
+    questsApi.card.mockResolvedValue(held());
+    onEvent({}, SIGNED_IN);
+    const box = await card();
+    expect(within(box).getByText("Your T-shirt (M) is still held for you — collect it at Swag desk.")).toBeInTheDocument();
   });
 });

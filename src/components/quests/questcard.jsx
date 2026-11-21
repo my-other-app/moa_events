@@ -8,7 +8,7 @@ import { isBot } from "@/seo/bots";
 import { codeDoneLine, describeCodeRefusal, describeSizeRefusal, questView, whatsNew, withChoices, withClaim } from "@/utils/quests";
 import { minutesWord } from "@/utils/questwords";
 import { useAndroid } from "../profiles/openinapp";
-import { QuestView } from "./questview";
+import { QuestPaused, QuestView } from "./questview";
 
 /** While the card is on screen and the quest is on, it is read again this often (the server ticks tasks as they happen). */
 export const REFRESH_MS = 2 * 60 * 1000;
@@ -153,8 +153,9 @@ function QuestCardBody({ card, ctx, eventId, setCard, reload, fresh }) {
 
 /**
  * Under the ticket (components/ticket.jsx): the holder's quest for the
- * ticket's event. Nothing for a quest that's off, an API without quests,
- * or a card that isn't the holder's (no `me`: the ticket is shown with a
+ * ticket's event. A quest switched off while a reward is still held for
+ * them shows only that (where to collect it). Nothing for a quest that's
+ * off otherwise, an API without quests, or a card that isn't the holder's (no `me`: the ticket is shown with a
  * token that isn't registered for the event). `skip` for a called-off event
  * or a revoked ticket, as the poster button.
  */
@@ -169,6 +170,7 @@ export function TicketQuests({ ticketId, event, skip = false }) {
     () => ({ where: "ticket", eventId: eventId === null ? null : String(eventId), event: eventId !== null ? { id: eventId, slug: event?.slug || null } : null, ticketId, android, signedIn }),
     [eventId, event?.slug, ticketId, android, signedIn],
   );
+  if (card?.paused) return <QuestPaused paused={card} where="ticket" />;
   if (!card || !card.me) return null;
   return <QuestCardBody card={card} ctx={ctx} eventId={String(eventId)} setCard={setCard} reload={reload} fresh={fresh} />;
 }
@@ -205,6 +207,8 @@ export function EventQuests({ event, clubSlug = null, canRegister = false }) {
     [eventId, event.id, event.slug, clubSlug, android, signedIn, canRegister],
   );
   if (!card) return null;
+  // Switched off, with a reward still held for this guest: only that, and where to collect it.
+  if (card.paused) return <QuestPaused paused={card} where="event" />;
   if (!card.me && (ended || card.tasks.length === 0)) return null;
   return <QuestCardBody card={card} ctx={ctx} eventId={eventId} setCard={setCard} reload={reload} fresh={fresh} />;
 }

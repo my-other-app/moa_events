@@ -4,7 +4,9 @@ import {
   describeCodeRefusal,
   describeSizeRefusal,
   parseLeaderboard,
+  parsePausedCard,
   parseQuestCard,
+  pausedView,
   questStatus,
   questView,
   whatsNew,
@@ -279,6 +281,8 @@ describe("rewards", () => {
     expect(reward(claim({ status: "waitlisted", waitlist_position: 3 })).line).toMatch(/number 3 in line/);
     expect(reward(claim({ status: "sold_out" }))).toMatchObject({ state: "sold_out", line: "These ran out just before you unlocked it." });
     expect(reward(claim({ status: "collected", variant_label: "M", collected_at: "2026-11-28T04:44:00Z" }))).toMatchObject({ state: "collected", line: "Collected at 10:14 AM." });
+    // Where it was handed over, never by whom.
+    expect(reward(claim({ status: "collected", collected_at: "2026-11-28T04:44:00Z", door: "Swag desk" })).line).toBe("Collected at Swag desk at 10:14 AM.");
     expect(reward(claim({ status: "released" })).state).toBe("locked");
   });
 
@@ -355,5 +359,47 @@ describe("sizes", () => {
     expect(describeSizeRefusal(fail(409, { error_code: "QUEST_CLAIM_NOT_RESERVED" }))).toMatchObject({ reload: true });
     expect(describeSizeRefusal(fail(422, { errors: { choices: [{ label: "S", free: 1 }] } }))).toEqual({ tone: "bad", line: "That isn't one of the sizes. Pick one of these.", choices: [{ label: "S", free: 1 }] });
     expect(describeSizeRefusal(new Error("offline")).line).toMatch(/connection/);
+  });
+});
+
+describe("tidy-ups after the screenshots", () => {
+  it("says a task the organisers marked done was marked by them", () => {
+    const card = questCard();
+    card.tasks[0].me = { count: 1, done: true, done_at: "2026-11-28T03:42:00Z", source: "grant" };
+    expect(task(view(card), "t-in").doneLine).toBe("Marked done by the organisers at 9:12 AM");
+    card.tasks[0].me = { count: 1, done: true, done_at: null, source: "grant" };
+    expect(task(view(card), "t-in").doneLine).toBe("Marked done by the organisers");
+    // Earned ones are as they were.
+    card.tasks[0].me = { count: 1, done: true, done_at: "2026-11-28T03:42:00Z", source: "station" };
+    expect(task(view(card), "t-in").doneLine).toBe("Done at 9:12 AM");
+  });
+
+  const paused = (rewards, over = {}) => ({ enabled: false, paused: { title: "DevDays Quest", rewards, collect_at: [{ door_id: "d-9", name: "Swag desk" }], ...over } });
+  const row = (o) => ({ claim_id: "c-1", reward_id: "r-1", milestone: "Tier 2", name: "T-shirt", status: "reserved", needs_size: false, variant_label: "M", choices: [], waitlist_position: null, collected_at: null, collected_by: null, door: null, ...o });
+
+  it("reads a quest switched off with something held as a paused card, and nothing else", () => {
+    expect(parsePausedCard(paused([row()]))).toEqual({ paused: true, title: "DevDays Quest", held: [{ name: "T-shirt", size: "M", needsSize: false }], waiting: [], desks: ["Swag desk"] });
+    for (const raw of [null, { enabled: false }, { enabled: false, paused: null }, paused([]), paused([row({ status: "collected" })]), { ...questCard(), paused: { rewards: [row()] } }]) expect(parsePausedCard(raw)).toBeNull();
+    // Never read as a live card.
+    expect(parseQuestCard(paused([row()]))).toBeNull();
+  });
+
+  it("says what is still held and where, and the place in line", () => {
+    expect(pausedView(parsePausedCard(paused([row()])))).toEqual({
+      title: "DevDays Quest",
+      line: "Quests are paused.",
+      lines: [{ key: "held", icon: "gift", tone: "good", line: "Your T-shirt (M) is still held for you — collect it at Swag desk." }],
+    });
+    const two = pausedView(parsePausedCard(paused([row({ name: "Sticker pack", variant_label: null }), row({ claim_id: "c-2", needs_size: true, variant_label: null }), row({ claim_id: "c-3", name: "Hoodie", status: "waitlisted", variant_label: null, waitlist_position: 2 })], { collect_at: [] })));
+    expect(two.lines.map((l) => l.line)).toEqual([
+      "Your Sticker pack and T-shirt are still held for you — collect them at the swag desk. Say your size there.",
+      "You're still number 2 in line for the Hoodie: one is kept for you as soon as one frees up.",
+    ]);
+  });
+
+  it("keeps the leaderboard's ranks as the server gives them", () => {
+    const b = parseLeaderboard({ rows: [{ rank: 1, name: "A K.", score: 40 }, { rank: 2, name: "B K.", score: 40 }, { rank: 3, name: "C K.", score: 40 }], me: { rank: 2, score: 40 } });
+    expect(b.rows.map((r) => r.rank)).toEqual([1, 2, 3]);
+    expect(b.me).toEqual({ rank: 2, points: 40 });
   });
 });

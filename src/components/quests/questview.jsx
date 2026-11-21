@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { pausedView } from "@/utils/quests";
 import { CodeEntry } from "./codeentry";
 import { QuestBoard } from "./board";
 import { QuestIcon } from "./icons";
@@ -105,6 +106,39 @@ export function QuestView({ quest, where = "ticket", onCode = null, onPickSize =
       )}
 
       {quest.leaderboard && loadBoard ? <QuestBoard load={loadBoard} mode={quest.mode} /> : null}
+    </section>
+  );
+}
+
+/**
+ * The quest switched off while a reward is still held (or waited for) for
+ * this guest (utils/quests.js parsePausedCard): the card shrinks to what is
+ * kept for them and where to collect it. Nothing to do, nothing to tick.
+ */
+export function QuestPaused({ paused, where = "ticket" }) {
+  const id = useId();
+  const titleId = `${id}-title`;
+  const v = pausedView(paused);
+  return (
+    <section className={`qs qs--paused dc-scope qs--${where}`} aria-labelledby={titleId} id="quests">
+      <header className="qs-head">
+        <div>
+          <p className="qs-eyebrow">
+            <QuestIcon name="quest" size={14} />
+            Quest
+          </p>
+          <h2 className="qs-title" id={titleId}>
+            {v.title}
+          </h2>
+          <p className="qs-intro">{v.line}</p>
+        </div>
+      </header>
+      {v.lines.map((n) => (
+        <p key={n.key} className={`qs-note${n.tone === "good" ? " qs-note--good" : ""}`}>
+          <QuestIcon name={n.icon} size={18} />
+          <span>{n.line}</span>
+        </p>
+      ))}
     </section>
   );
 }

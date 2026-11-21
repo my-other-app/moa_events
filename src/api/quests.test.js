@@ -59,6 +59,11 @@ describe("the card", () => {
     expect(seen[1].auth).toBeUndefined();
   });
 
+  it("is a paused card for a quest switched off while a reward is still held", async () => {
+    serve((config) => reply(config, 200, { enabled: false, paused: { title: "DevDays Quest", rewards: [{ claim_id: "c-1", name: "T-shirt", status: "reserved", variant_label: "M" }], collect_at: [{ name: "Swag desk" }] } }));
+    expect(await questsApi.card(77)).toMatchObject({ paused: true, held: [{ name: "T-shirt", size: "M" }], desks: ["Swag desk"] });
+  });
+
   it("is null for a quest that's off, or an API without quests; a problem is thrown", async () => {
     serve((config) => reply(config, 200, { enabled: false }));
     expect(await questsApi.card(77)).toBeNull();

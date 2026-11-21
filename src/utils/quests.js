@@ -13,7 +13,9 @@ import { apiFailure } from "./ticketing";
  *
  * An API without quests answers 404 with no code; an event without a quest,
  * or with it off, answers {enabled: false}: both read as "off", and the
- * pages show nothing more than they did.
+ * pages show nothing more than they did. Off while something is still held
+ * for the guest (contract v1.3: {enabled: false, paused: {...}}) reads as a
+ * paused card (parsePausedCard): a line on what is held and where.
  */
 
 const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
@@ -101,6 +103,8 @@ function readClaim(v) {
     choices,
     waitlistPosition: num(c.waitlist_position) === null ? null : whole(c.waitlist_position),
     collectedAt: iso(c.collected_at),
+    // Where it was handed over ("Swag desk"); never who.
+    door: str(c.door),
   };
 }
 
@@ -183,7 +187,61 @@ export function parseQuestCard(raw) {
   };
 }
 
-/** GET …/quest/leaderboard (§8.4): `{rows: [{rank, name, points, me}], me: {rank, points} | null}`. */
+/**
+ * The quest switched off while a reward is still held, or waited for, for
+ * this guest (§8.1 `paused`, v1.3): `{paused: true, title, held, waiting,
+ * desks}`, or null for anything else (a live card, plain off, not a card).
+ * `held`: `[{name, size, needsSize}]`; `waiting`: `[{name, position}]`.
+ */
+export function parsePausedCard(raw) {
+  const c = obj(raw);
+  const p = obj(c?.paused);
+  if (!c || c.enabled === true || !p) return null;
+  const rows = arr(p.rewards)
+    .map((r) => {
+      const o = obj(r);
+      const status = str(o?.status);
+      return o && (status === "reserved" || status === "waitlisted")
+        ? { status, name: str(o.name) || "Your reward", size: str(o.variant_label), needsSize: o.needs_size === true, position: num(o.waitlist_position) === null ? null : whole(o.waitlist_position) }
+        : null;
+    })
+    .filter(Boolean);
+  if (!rows.length) return null;
+  return {
+    paused: true,
+    title: str(p.title),
+    held: rows.filter((r) => r.status === "reserved").map(({ name, size, needsSize }) => ({ name, size, needsSize })),
+    waiting: rows.filter((r) => r.status === "waitlisted").map(({ name, position }) => ({ name, position })),
+    desks: arr(p.collect_at)
+      .map((d) => str(obj(d)?.name))
+      .filter(Boolean),
+  };
+}
+
+/**
+ * What a paused card says: "Quests are paused." and, for what is held,
+ * "Your T-shirt (M) is still held for you — collect it at Swag desk.";
+ * for the waiting list, the place in line.
+ */
+export function pausedView(p) {
+  const lines = [];
+  if (p.held.length) {
+    const names = rewardList(p.held.map((r) => (r.size ? `${r.name} (${r.size})` : r.name)));
+    const one = p.held.length === 1;
+    const size = p.held.some((r) => r.needsSize) ? " Say your size there." : "";
+    lines.push({ key: "held", icon: "gift", tone: "good", line: `Your ${names} ${one ? "is" : "are"} still held for you — collect ${one ? "it" : "them"} at ${desksLine(p.desks)}.${size}` });
+  }
+  for (const w of p.waiting) {
+    lines.push({
+      key: `wait-${w.name}`,
+      icon: "clock",
+      line: w.position ? `You're still number ${w.position} in line for the ${w.name}: one is kept for you as soon as one frees up.` : `You're still on the waiting list for the ${w.name}: one is kept for you as soon as one frees up.`,
+    });
+  }
+  return { title: p.title || "Event quest", line: "Quests are paused.", lines };
+}
+
+/** GET …/quest/leaderboard (§8.4): `{rows: [{rank, name, points, me}], me: {rank, points} | null}`. Ranks are the server's (distinct, ties by who got there first): never re-ranked here. */
 export function parseLeaderboard(raw) {
   const b = obj(raw);
   const rows = arr(b?.rows)
@@ -282,6 +340,13 @@ function howLine(task, ctx) {
   return say ? say(task) : null;
 }
 
+/** "Done at 10:14 AM", or for a task the organisers ticked by hand, "Marked done by the organisers at 10:14 AM". */
+function doneLine(me, now) {
+  const when = me?.doneAt && whenShort(me.doneAt, now) ? atWhen(me.doneAt, now) : "";
+  if (me?.source === "grant") return when ? `Marked done by the organisers ${when}` : "Marked done by the organisers";
+  return when ? `Done ${when}` : null;
+}
+
 /* ---------- rewards ---------- */
 
 function rewardState(reward, milestone) {
@@ -308,8 +373,11 @@ function rewardLine(state, reward, desks, now, open) {
         : "None free right now: one is kept for you as soon as one frees up.";
     case "sold_out":
       return c ? "These ran out just before you unlocked it." : "All gone: first come, first served.";
-    case "collected":
-      return c?.collectedAt ? `Collected ${atWhen(c.collectedAt, now)}.` : "Collected.";
+    case "collected": {
+      // "Collected at Swag desk at 10:14 AM.": where, never who.
+      const where = c?.door ? ` at ${c.door}` : "";
+      return c?.collectedAt ? `Collected${where} ${atWhen(c.collectedAt, now)}.` : `Collected${where}.`;
+    }
     default:
       return null;
   }
@@ -365,7 +433,7 @@ export function questView(card, ctx = {}, now = Date.now()) {
       when: done || status === "ended" ? null : windowLine(t.startsAt, t.endsAt, now),
       locked: shut,
       action: me && open && !done && !shut && !revoked ? actionFor(t, c) : null,
-      doneLine: done && t.me?.doneAt && whenShort(t.me.doneAt, now) ? `Done ${atWhen(t.me.doneAt, now)}` : null,
+      doneLine: done ? doneLine(t.me, now) : null,
     };
   });
 
