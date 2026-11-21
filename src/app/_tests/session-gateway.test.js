@@ -122,7 +122,7 @@ describe("which token goes", () => {
   it("sends the account's token when signed in, never the guest's beside it, and nothing else of the browser's", async () => {
     const a = access();
     on("GET", "/api/v1/events/info/68", () => Response.json({ id: 68 }, { headers: { "set-cookie": "access_token=x; HttpOnly", "access-control-allow-origin": "https://myotherapp.in", etag: '"e1"' } }));
-    const res = await ask("/api/v1/events/info/68?x=1", { cookies: { ...sessionCookie(a), [names.guest]: access({ sid: "g", user: 99 }), other: "1" }, headers: { "x-site-token": "nope", authorization: "Bearer page-script", "if-none-match": '"e0"', "x-live-key": "k1" } });
+    const res = await ask("/api/v1/events/info/68?x=1", { cookies: { ...sessionCookie(a), [names.guest]: access({ sid: "g", user: 99 }), other: "1" }, headers: { "x-site-token": "nope", authorization: "Bearer page-script", "if-none-match": '"e0"', "x-live-key": "k1", "x-live-version": "2" } });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: 68 });
     const [call] = calls;
@@ -135,6 +135,8 @@ describe("which token goes", () => {
     expect(call.headers.get("user-agent")).toBe("TestBrowser/1");
     expect(call.headers.get("if-none-match")).toBe('"e0"');
     expect(call.headers.get("x-live-key")).toBe("k1");
+    // The live room's client version goes on, so the API answers this release's bodies.
+    expect(call.headers.get("x-live-version")).toBe("2");
     expect(res.headers.get("x-moa-as")).toBe("user");
     expect(res.headers.get("etag")).toBe('"e1"');
     // Nothing of the API's cookies or CORS comes back.

@@ -54,7 +54,7 @@ export const UPSTREAM_TIMEOUT_MS = 60 * 1000;
 /** As big as the proxy in front lets a request be (Caddy's 10 MB). */
 export const MAX_BODY = 10 * 1024 * 1024;
 
-const FORWARDED = ["accept", "accept-language", "content-type", "if-none-match", "if-modified-since", "if-match", "idempotency-key", "x-live-key", "x-live-player", "user-agent"];
+const FORWARDED = ["accept", "accept-language", "content-type", "if-none-match", "if-modified-since", "if-match", "idempotency-key", "x-live-key", "x-live-player", "x-live-version", "user-agent"];
 const DROPPED = new Set(["set-cookie", "content-encoding", "content-length", "transfer-encoding", "connection", "keep-alive", "server", "strict-transport-security"]);
 
 /** Where a sign-in's tokens come back: they become the session. */

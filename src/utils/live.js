@@ -7,6 +7,13 @@
  */
 const KEY = "moa.live.key";
 
+/**
+ * The live room's client version this site is built for (CONTRACT.md 0.3):
+ * sent as `X-Live-Version` on every live call and as `v` on the room's and
+ * the quiz's streams. An API from before ignores it.
+ */
+export const LIVE_VERSION = "2";
+
 const random = () => {
   const bytes = new Uint8Array(18);
   (globalThis.crypto || {}).getRandomValues?.(bytes);
@@ -57,4 +64,10 @@ export function forgetPlayer(eventId) {
 export function roomIsActive(feed) {
   if (!feed) return false;
   return Boolean(feed.banner || feed.poll || feed.quiz?.live || feed.qa?.has_questions || (feed.questions && feed.questions.length > 0));
+}
+
+/** The API's code for a refusal (`error_code`, CONTRACT.md 0.2), or null. */
+export function refusalCode(error) {
+  const code = error?.response?.data?.error_code;
+  return typeof code === "string" ? code : null;
 }

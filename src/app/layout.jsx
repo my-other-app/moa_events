@@ -24,6 +24,7 @@ import "@/styles/registerbutton.css";
 import "@/styles/download.css";
 import "@/styles/notfound.css";
 import "@/styles/live.css";
+import "@/styles/liveroom.css";
 import "@/styles/compete.css";
 import "@/styles/calendar.css";
 import "@/styles/pages.css";

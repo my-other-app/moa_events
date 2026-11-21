@@ -1,8 +1,19 @@
 import apiClient from "./client";
-import { liveKey } from "@/utils/live";
+import { LIVE_VERSION, liveKey } from "@/utils/live";
 
-const keyed = () => ({ headers: { "X-Live-Key": liveKey() } });
-const played = (playerKey) => ({ headers: { "X-Live-Player": playerKey } });
+/**
+ * This site reads the live room as a client of the customisable room
+ * (CONTRACT.md 0.3): every live call says so with `X-Live-Version: 2`, and
+ * the API then answers with the question and poll kinds, the round's state
+ * and the theme. An API from before ignores the header and answers as it
+ * always did; every new field is optional here, so the room and the quiz
+ * still work on it exactly as before.
+ */
+export { LIVE_VERSION };
+const V2 = { "X-Live-Version": LIVE_VERSION };
+
+const keyed = () => ({ headers: { "X-Live-Key": liveKey(), ...V2 } });
+const played = (playerKey) => ({ headers: { "X-Live-Player": playerKey, ...V2 } });
 const base = (eventId) => `/api/v1/events/${eventId}/live`;
 
 /** Set once the API was found to have no strip of its own (one from before it): the strip is read from the feed. */
@@ -37,6 +48,31 @@ export const resetBannerForTests = () => {
 };
 
 /**
+ * What a player sends for the question's kind (CONTRACT 5.3): a key alone
+ * (single, true/false, a poll question, and every client from before), or
+ * the kind's own field (`option_keys`, `text`, `order`).
+ */
+const answerBody = (response) => {
+    if (typeof response === "string") return { option_key: response };
+    if (response && typeof response === "object") {
+        for (const field of ["option_key", "option_keys", "text", "order"]) {
+            if (response[field] != null) return { [field]: response[field] };
+        }
+    }
+    return { option_key: response };
+};
+
+/** A poll answer: today's `{value}`, or a multiple choice's `values`, a ranking's `order`, an open text's `name` beside its value. */
+const respondBody = (answer) => {
+    if (answer && typeof answer === "object" && !Array.isArray(answer)) {
+        const out = {};
+        for (const field of ["value", "values", "order", "name"]) if (answer[field] != null && answer[field] !== "") out[field] = answer[field];
+        return out;
+    }
+    return { value: answer };
+};
+
+/**
  * The room: the banner, the poll that is up, the questions, whether a quiz
  * runs. A visitor signed in (or holding a registration's guest token) is sent
  * as that person: their vote, question and poll answer are theirs on every
@@ -51,14 +87,50 @@ export const liveApi = {
 
     vote: async (eventId, questionId) => (await apiClient.post(`${base(eventId)}/questions/${questionId}/vote`, {}, keyed())).data,
 
-    respond: async (eventId, pollId, value) => (await apiClient.post(`${base(eventId)}/polls/${pollId}/respond`, { value }, keyed())).data,
+    respond: async (eventId, pollId, answer) => (await apiClient.post(`${base(eventId)}/polls/${pollId}/respond`, respondBody(answer), keyed())).data,
 
-    /** With this browser's key: joining again from it (a reload, a second tab) is the same player. */
-    joinQuiz: async (code, name) => (await apiClient.post("/api/v1/live/quiz/join", { code, name, player_key: liveKey() })).data,
+    /**
+     * With this browser's key: joining again from it (a reload, a second tab,
+     * the next round) is the same person. `team`: a round whose players pick
+     * their team; left out, the API assigns one.
+     */
+    joinQuiz: async (code, name, team) =>
+        (await apiClient.post("/api/v1/live/quiz/join", { code, name, player_key: liveKey(), ...(team ? { team } : {}) }, { headers: V2 })).data,
+
+    /**
+     * The round running with a join code, before joining (CONTRACT 5.2, v1.3):
+     * its teams (to pick one), whether names are the registered ones, whether
+     * it has started and takes late players. null for an unknown code, and
+     * on an API from before the lookup.
+     */
+    lookupQuiz: async (code) => {
+        try {
+            return (await apiClient.get("/api/v1/live/quiz/lookup", { params: { code }, skipAuth: true, headers: V2 })).data;
+        } catch (error) {
+            const status = error?.response?.status;
+            if (status === 404 || status === 405 || status === 422) return null;
+            throw error;
+        }
+    },
 
     playState: async (eventId, playerKey) => (await apiClient.get(`${base(eventId)}/quiz/play`, played(playerKey))).data,
 
-    answer: async (eventId, playerKey, optionKey) => (await apiClient.post(`${base(eventId)}/quiz/answer`, { option_key: optionKey }, played(playerKey))).data,
+    answer: async (eventId, playerKey, response) => (await apiClient.post(`${base(eventId)}/quiz/answer`, answerBody(response), played(playerKey))).data,
+
+    /**
+     * The room's theme, the same for everyone (CONTRACT 1.4): what the quiz
+     * page draws in. null where the API has none to give (an API from before
+     * themes answers 404).
+     */
+    fetchTheme: async (eventId) => {
+        try {
+            return (await apiClient.get(`${base(eventId)}/theme/public`, { skipAuth: true, headers: V2 })).data;
+        } catch (error) {
+            const status = error?.response?.status;
+            if (status === 404 || status === 405) return null;
+            throw error;
+        }
+    },
 
     fetchSurvey: async (eventId, registrationId, k) => (await apiClient.get(`/api/v1/events/${eventId}/feedback/${registrationId}`, { params: { k } })).data,
 

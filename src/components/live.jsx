@@ -4,21 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { discoverApi } from "@/api/discover";
 import { errorLine, liveApi } from "@/api/live";
 import { subscribe } from "@/api/liveStream";
-import { currentPlayer, rememberPlayer } from "@/utils/live";
+import { useAuth } from "@/auth/context";
+import { LiveFrame, ThemeLogo } from "@/components/liveroom/frame";
+import PollCard from "@/components/liveroom/poll";
+import { currentPlayer, refusalCode, rememberPlayer } from "@/utils/live";
+import { guestTheme, rememberTheme, rememberedTheme } from "@/utils/liveTheme";
+
+export { PollCard };
 
 const KIND = { schedule: "Schedule change", room: "Room change", general: "Update" };
-
-/** Word sizes from counts: the most said word is twice the size of the least. */
-const sizes = (words) => {
-  if (!words.length) return [];
-  const max = Math.max(...words.map((w) => w.count));
-  const min = Math.min(...words.map((w) => w.count));
-  return words.map((w) => ({ ...w, px: 14 + (max === min ? 8 : (18 * (w.count - min)) / (max - min)) }));
-};
-
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * What is on right now, as a row of chips under the room's title: the state
@@ -32,7 +29,7 @@ const Happening = ({ feed }) => {
   else if (status === "closed" || status === "archived") chips.push({ key: "live", label: "Event has ended", tone: "off" });
   else chips.push({ key: "live", label: "Event hasn’t started", tone: "off" });
   if (feed.quiz?.live) chips.push({ key: "quiz", label: "Quiz running", href: "#live-quiz", tone: "on" });
-  if (feed.poll) chips.push({ key: "poll", label: "Poll open", href: "#live-poll", tone: "on" });
+  if (feed.poll) chips.push({ key: "poll", label: feed.poll.status === "closed" ? "Poll results" : "Poll open", href: "#live-poll", tone: feed.poll.status === "closed" ? "off" : "on" });
   if (feed.qa?.open) chips.push({ key: "qa", label: "Q&A open", href: "#live-qa", tone: "on" });
   else if ((feed.questions || []).length) chips.push({ key: "qa", label: "Q&A closed", href: "#live-qa", tone: "off" });
   return (
@@ -52,128 +49,71 @@ const Happening = ({ feed }) => {
   );
 };
 
-export const PollCard = ({ eventId, poll, onChange }) => {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [word, setWord] = useState("");
-  const r = poll.results || {};
-  const answered = poll.my_response != null && poll.my_response !== "";
-  const send = async (value) => {
-    setBusy(true);
-    setError(null);
-    try {
-      onChange(await liveApi.respond(eventId, poll.id, value));
-      setWord("");
-    } catch (e) {
-      setError(errorLine(e, "That did not go through. Try again."));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <section className="live-card is-live" id="live-poll" aria-labelledby="poll-heading">
-      <p className="live-eyebrow">
-        <span className="live-dot">Poll</span>
-      </p>
-      <h2 id="poll-heading">{poll.prompt}</h2>
-      <p className="live-sub" role="status">
-        {plural(r.responses || 0, "answer", "answers")} so far{answered ? " · you answered" : ""}
-      </p>
-      {poll.kind === "choice" && (
-        <>
-          <div className="live-options">
-            {(r.choices || []).map((c) => {
-              const mine = poll.my_response === c.label;
-              const pct = Math.min(100, Math.max(0, c.pct || 0));
-              return (
-                <button key={c.label} type="button" className={`live-option${mine ? " is-mine" : ""}`} disabled={busy} aria-pressed={mine} onClick={() => send(c.label)}>
-                  <span className="live-fill" style={{ transform: `scaleX(${pct / 100})` }} aria-hidden="true" />
-                  <span className="live-option-text">
-                    {mine && (
-                      <span className="live-tick" aria-hidden="true">
-                        ✓
-                      </span>
-                    )}
-                    {c.label}
-                  </span>
-                  <span className="live-option-num">
-                    <span className="live-pct">{c.pct}%</span>
-                    <span className="live-count">{plural(c.count || 0, "vote", "votes")}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {answered && (
-            <p className="live-said" role="status">
-              You voted for <strong>{poll.my_response}</strong>. Tap another to change it.
-            </p>
-          )}
-        </>
-      )}
-      {poll.kind === "words" && (
-        <>
-          {(r.words || []).length > 0 && (
-            <div className="live-words" aria-label="What the room said">
-              {sizes(r.words).map((w) => (
-                <span key={w.word} style={{ fontSize: w.px }}>
-                  {w.word}
-                </span>
-              ))}
-            </div>
-          )}
-          <form
-            className="live-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (word.trim().length >= 2) send(word.trim());
-            }}
-          >
-            <input value={word} onChange={(e) => setWord(e.target.value)} maxLength={40} placeholder={answered ? `You said “${poll.my_response}” — change it?` : "A word or two"} aria-label="Your word" />
-            <button type="submit" className="live-btn" disabled={busy || word.trim().length < 2}>
-              Send
-            </button>
-          </form>
-        </>
-      )}
-      {poll.kind === "rating" && (
-        <>
-          <div className="live-stars" role="group" aria-label="Rate from 1 to 5">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} type="button" className={Number(poll.my_response) >= n ? "is-on" : ""} aria-label={`${n} of 5`} disabled={busy} onClick={() => send(String(n))}>
-                <span aria-hidden="true">★</span>
-              </button>
-            ))}
-          </div>
-          {r.rating?.average != null && (
-            <p className="live-note" role="status">
-              Room average {r.rating.average} of 5
-            </p>
-          )}
-        </>
-      )}
-      {error && <p className="live-error">{error}</p>}
-    </section>
-  );
-};
+/** How long the code box rests before the round behind the code is looked up. */
+const LOOKUP_AFTER_MS = 400;
 
-const JoinQuiz = ({ eventId, title }) => {
+/**
+ * The round behind a typed join code (CONTRACT 5.2, v1.3): looked up once
+ * the box holds 4 to 8 digits and rests, the answer for the code as it now
+ * stands. null while there is none (an unknown code, an API from before).
+ */
+function useRoundLookup(code) {
+  const [found, setFound] = useState(null);
+  const wanted = /^\d{4,8}$/.test(code) ? code : null;
+  useEffect(() => {
+    setFound(null);
+    if (!wanted) return undefined;
+    let gone = false;
+    const timer = setTimeout(() => {
+      Promise.resolve()
+        .then(() => liveApi.lookupQuiz(wanted))
+        .then((round) => !gone && setFound(round ? { ...round, code: wanted } : null))
+        .catch(() => !gone && setFound(null));
+    }, LOOKUP_AFTER_MS);
+    return () => {
+      gone = true;
+      clearTimeout(timer);
+    };
+  }, [wanted]);
+  return found && found.code === wanted ? found : null;
+}
+
+/**
+ * The door to the quiz: the code on the screen and a name. Once the code is
+ * typed, what the round asks of a new player (CONTRACT 3.1 `players`,
+ * `teams`): a team to pick, or the registered name instead of a nickname,
+ * and a word when it has started and takes no one new. Every refusal is the
+ * API's own sentence; one that needs the guest signed in offers the sign-in.
+ */
+const JoinQuiz = ({ eventId, quiz }) => {
   const router = useRouter();
+  const auth = useAuth();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const [team, setTeam] = useState(null);
   const [error, setError] = useState(null);
+  const [signIn, setSignIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const player = currentPlayer(eventId);
+  const round = useRoundLookup(code.trim());
+  const list = round?.teams?.mode === "pick" && Array.isArray(round.teams.list) && round.teams.list.length >= 2 ? round.teams.list : null;
+  const registered = round?.players?.names === "registered";
+  const late = Boolean(round?.started && round?.players?.late_join === false);
+  // A team picked for another code's round is not this one's.
+  const picked = list && list.some((t) => t.key === team) ? team : null;
   const join = async (e) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setSignIn(false);
+    const who = registered ? name.trim() || auth.user?.name || "Guest" : name.trim();
     try {
-      const p = await liveApi.joinQuiz(code.trim(), name.trim());
+      const p = picked ? await liveApi.joinQuiz(code.trim(), who, picked) : await liveApi.joinQuiz(code.trim(), who);
       rememberPlayer(p.event_id, p);
       router.push(`/play/${p.event_id}`);
     } catch (err) {
       setError(errorLine(err, "Could not join. Check the code on the screen."));
+      if (refusalCode(err) === "QUIZ_REGISTERED_ONLY" && auth.enabled && !auth.user) setSignIn(true);
     } finally {
       setBusy(false);
     }
@@ -183,8 +123,10 @@ const JoinQuiz = ({ eventId, title }) => {
       <p className="live-eyebrow">
         <span className="live-dot">Quiz</span>
       </p>
-      <h2 id="quiz-heading">{title || "The quiz is on"}</h2>
-      <p className="live-sub">Type the code on the screen and your name. Fast right answers score most.</p>
+      <h2 id="quiz-heading">{quiz?.title || "The quiz is on"}</h2>
+      <p className="live-sub">
+        {registered ? "Type the code on the screen. You play under the name you registered with." : "Type the code on the screen and your name. Fast right answers score most."}
+      </p>
       {player ? (
         <button type="button" className="live-btn live-btn--block" onClick={() => router.push(`/play/${eventId}`)}>
           Back in as {player.name}
@@ -192,11 +134,33 @@ const JoinQuiz = ({ eventId, title }) => {
       ) : (
         <form className="live-form" onSubmit={join}>
           <input className="live-code" inputMode="numeric" pattern="[0-9]*" maxLength={8} value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code on the screen" aria-label="Join code" />
-          <input maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name for the quiz" />
-          <button type="submit" className="live-btn live-btn--block" disabled={busy || code.trim().length < 4 || !name.trim()}>
+          {!registered && <input maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name for the quiz" />}
+          {list && (
+            <fieldset className="lt-teams-pick">
+              <legend>Pick your team</legend>
+              {list.map((t) => (
+                <label key={t.key} className={`lt-team-choice${picked === t.key ? " is-on" : ""}`}>
+                  <input type="radio" name="quiz-team" value={t.key} checked={picked === t.key} onChange={() => setTeam(t.key)} />
+                  <span className="lt-swatch" style={{ background: t.color }} aria-hidden="true" />
+                  <span>{t.name}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {late && (
+            <p className="live-note" role="status">
+              This round has started and takes no new players. If you were already playing, join again to carry on.
+            </p>
+          )}
+          <button type="submit" className="live-btn live-btn--block" disabled={busy || code.trim().length < 4 || (!registered && !name.trim())}>
             Join the quiz
           </button>
           {error && <p className="live-error">{error}</p>}
+          {signIn && (
+            <button type="button" className="live-btn live-btn--block is-ghost" onClick={() => auth.openSignIn()}>
+              Sign in
+            </button>
+          )}
         </form>
       )}
     </section>
@@ -315,17 +279,125 @@ const Waiting = () => (
   </section>
 );
 
+/** The top of the room: the way back to the event, the organiser's logo, the event's name. */
+const Top = ({ eventPage, theme, name }) => (
+  <header className="live-top">
+    <Link className="live-back" href={eventPage}>
+      ← Event
+    </Link>
+    <ThemeLogo theme={theme} />
+    {name ? <h1>{name}</h1> : null}
+    <span className="live-dot is-red">Live</span>
+  </header>
+);
+
+const pageOf = (eventSlug, eventId) => (eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`);
+
+/** While the room is on its way: its outline, and a word. */
+const Opening = ({ children }) => (
+  <>
+    {children}
+    <section className="live-card" aria-hidden="true">
+      <span className="live-skel is-short" />
+      <span className="live-skel" />
+      <span className="live-skel is-block" />
+    </section>
+    <p className="live-sub" role="status">
+      Opening the room…
+    </p>
+  </>
+);
+
+/** The room didn't load: the hall's Wi-Fi, or a busy API. Try again from here. */
+const Offline = ({ onRetry }) => (
+  <section className="live-card live-offline" role="alert">
+    <h2>The room didn’t load</h2>
+    <p className="live-sub">Check your connection — the hall’s Wi-Fi may be busy — and try again.</p>
+    <button type="button" className="live-btn live-btn--block" onClick={onRetry}>
+      RETRY
+    </button>
+  </section>
+);
+
 /**
  * The room on a phone: the banner, the poll that is up, the quiz if it runs,
  * the questions. Its server half (src/app/events/[slug]/live/page.jsx) finds
  * the event and hands over its id, slug and name, so the top of the room is
  * in the first paint; the feed is pushed after (src/api/liveStream.js), or
  * asked for every 5 seconds where it cannot be.
+ *
+ * When the server could not find the event in time (a busy API with a hall
+ * full of phones scanning the same code), the page still comes, with the
+ * slug alone, and the browser looks the event up itself before opening the
+ * room, offering to try again if that fails too, rather than a server error.
  */
-const Live = ({ eventId, eventSlug = null, eventName = null }) => {
-  const eventPage = eventSlug ? `/events/${encodeURIComponent(eventSlug)}` : `/${eventId}`;
+const Live = ({ eventId = null, eventSlug = null, eventName = null }) => {
+  const known = eventId != null && eventId !== "" ? String(eventId) : null;
+  const [found, setFound] = useState(null);
+  const [lookup, setLookup] = useState(known ? "done" : "looking");
+  const find = useCallback(
+    async (fresh = false) => {
+      setLookup("looking");
+      try {
+        const page = await discoverApi.event(eventSlug, { fresh });
+        setFound({ id: String(page.event.id), slug: page.event.slug || eventSlug, name: page.event.name || null });
+        setLookup("done");
+      } catch (e) {
+        setLookup(e?.notFound ? "missing" : "failed");
+      }
+    },
+    [eventSlug]
+  );
+  useEffect(() => {
+    if (!known && eventSlug) find();
+  }, [known, eventSlug, find]);
+
+  if (known) return <Room eventId={known} eventSlug={eventSlug} eventName={eventName} />;
+  if (found) return <Room eventId={found.id} eventSlug={found.slug} eventName={found.name || eventName} />;
+  const top = <Top eventPage={eventSlug ? pageOf(eventSlug) : "/"} theme={null} name={eventName} />;
+  if (lookup === "missing")
+    return (
+      <LiveFrame theme={null}>
+        {top}
+        <section className="live-card" role="alert">
+          <h2>There’s no live room here</h2>
+          <p className="live-sub">This event isn’t public, or its address has changed. Check the code on the screen or the link you were sent.</p>
+          <Link className="live-btn live-btn--block" href="/">
+            Find events
+          </Link>
+        </section>
+      </LiveFrame>
+    );
+  return (
+    <LiveFrame theme={null}>
+      {lookup === "failed" ? (
+        <>
+          {top}
+          <Offline onRetry={() => find(true)} />
+        </>
+      ) : (
+        <Opening>{top}</Opening>
+      )}
+    </LiveFrame>
+  );
+};
+
+/** The room, by the event's id. */
+const Room = ({ eventId, eventSlug = null, eventName = null }) => {
+  const eventPage = pageOf(eventSlug, eventId);
   const [feed, setFeed] = useState(null);
   const [error, setError] = useState(false);
+  /** The theme this tab last saw for the room: the first paint's, until the feed brings its own. */
+  const [kept, setKept] = useState(null);
+  useEffect(() => setKept(rememberedTheme(eventId)), [eventId]);
+  // The room's theme (an API from before themes sends none: today's look), kept for the quiz page.
+  const wrapper = feed ? feed.theme : kept;
+  const theme = guestTheme(wrapper);
+  const version = feed && feed.theme ? `${feed.theme.custom}:${feed.theme.version}` : null;
+  useEffect(() => {
+    if (version) rememberTheme(eventId, feed.theme);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, version]);
 
   /** One read now: "Retry", and after a question is asked. */
   const load = useCallback(async () => {
@@ -354,50 +426,28 @@ const Live = ({ eventId, eventSlug = null, eventName = null }) => {
   );
 
   const name = feed?.event?.name || eventName;
-  const top = (
-    <header className="live-top">
-      <Link className="live-back" href={eventPage}>
-        ← Event
-      </Link>
-      {name ? <h1>{name}</h1> : null}
-      <span className="live-dot is-red">Live</span>
-    </header>
-  );
+  const top = <Top eventPage={eventPage} theme={theme} name={name} />;
 
   if (error && !feed) {
     return (
-      <div className="live-page dc-scope">
+      <LiveFrame theme={theme}>
         {top}
-        <section className="live-card live-offline" role="alert">
-          <h2>The room didn’t load</h2>
-          <p className="live-sub">Check your connection — the hall’s Wi-Fi may be busy — and try again.</p>
-          <button type="button" className="live-btn live-btn--block" onClick={load}>
-            RETRY
-          </button>
-        </section>
-      </div>
+        <Offline onRetry={load} />
+      </LiveFrame>
     );
   }
   if (!feed) {
     return (
-      <div className="live-page dc-scope">
-        {top}
-        <section className="live-card" aria-hidden="true">
-          <span className="live-skel is-short" />
-          <span className="live-skel" />
-          <span className="live-skel is-block" />
-        </section>
-        <p className="live-sub" role="status">
-          Opening the room…
-        </p>
-      </div>
+      <LiveFrame theme={theme}>
+        <Opening>{top}</Opening>
+      </LiveFrame>
     );
   }
 
   const nothingOn = !feed.banner && !feed.poll && !feed.quiz?.live && (feed.questions || []).length === 0 && !feed.qa?.open;
 
   return (
-    <div className="live-page dc-scope">
+    <LiveFrame theme={theme}>
       {top}
       {error && (
         <p className="live-reconnecting" role="status">
@@ -411,8 +461,8 @@ const Live = ({ eventId, eventSlug = null, eventName = null }) => {
           {feed.banner.text}
         </div>
       )}
-      {feed.quiz?.live && <JoinQuiz eventId={eventId} title={feed.quiz.title} />}
-      {feed.poll && <PollCard eventId={eventId} poll={feed.poll} onChange={(p) => setFeed((f) => ({ ...f, poll: p }))} />}
+      {feed.quiz?.live && <JoinQuiz eventId={eventId} quiz={feed.quiz} />}
+      {feed.poll && <PollCard key={feed.poll.id} eventId={eventId} poll={feed.poll} theme={theme} onChange={(p) => setFeed((f) => ({ ...f, poll: p }))} />}
       <Questions
         eventId={eventId}
         feed={feed}
@@ -435,7 +485,7 @@ const Live = ({ eventId, eventSlug = null, eventName = null }) => {
           </ul>
         </section>
       )}
-    </div>
+    </LiveFrame>
   );
 };
 
