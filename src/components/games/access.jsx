@@ -6,7 +6,7 @@ import { gamesApi } from "@/api/games";
 import { hasGuest, isSignedIn } from "@/auth/session";
 
 const signedIn = () => isSignedIn();
-import { playableGames } from "@/utils/games";
+import { notPlayingReason, playableGames } from "@/utils/games";
 import { dropSession, readSession, saveSession, sessionOver, takeFragmentSession } from "./store";
 import GameShell from "./shell";
 
@@ -42,6 +42,8 @@ export function useGameAccess(eventId, { api = gamesApi, openFromAccount = true 
       if (!names || playableGames(names).length === 0) return set({ status: "closed", names, token: null, reason: null });
       const kept = readSession(eventId);
       if (kept) return set({ status: "in", names, token: kept.token, reason: null });
+      // /public already says who can't play (reads with the normal auth); no session call for them.
+      if (names.me && names.me.canPlay === false) return set({ status: "out", names, token: null, reason: notPlayingReason(names) });
       if (openFromAccount && (hasGuest() || signedIn())) {
         try {
           const s = await api.openSession(eventId);

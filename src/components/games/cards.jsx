@@ -30,7 +30,7 @@ export function Reveal({ hero, gameName, onAdd, share = defaultShare }) {
     <section className={`gm-reveal gm-reveal--${tier}`} aria-label={`Your ${gameName} reveal`}>
       <div className="gm-rays" aria-hidden="true" />
       <p className="gm-banner" role="status" data-tier={tier}>
-        {TIER_BANNER[tier]}
+        {hero.already ? "YOUR HERO" : TIER_BANNER[tier]}
       </p>
       <HeroCard hero={hero} size="lg" burst />
       {hero.holders != null ? (

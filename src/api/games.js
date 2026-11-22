@@ -26,9 +26,10 @@ import {
  * from a signed-in browser (`openSession`) is the one call that does use
  * apiClient, so the normal auth goes along.
  *
- * Every call throws apiFailure()'s shape plus `data` (the answer's body,
- * where PIN_WRONG's attempts_left and PIN_LOCKED's locked_until are) and,
- * for a refusal that says so, `retryAfter` from `retry_after`.
+ * Every call throws apiFailure()'s shape: `code` (error_code) and `errors`
+ * (the body's own `errors`: PIN_WRONG's attempts_left, PIN_LOCKED's
+ * locked_until, RATE_LIMITED's retry_after, NOT_ENOUGH_POINTS' cost), with
+ * `retryAfter` taken from errors.retry_after when the refusal has one.
  */
 const plain = axios.create({ baseURL: API_BASE_URL, headers: { "Content-Type": "application/json" } });
 
@@ -38,9 +39,8 @@ const auth = (token) => (token ? { headers: { Authorization: `Game ${token}` } }
 
 export function gameFailure(error) {
   const f = apiFailure(error);
-  const data = error?.response?.data;
-  const ra = Number(data?.retry_after);
-  return { ...f, data: data && typeof data === "object" ? data : null, retryAfter: Number.isFinite(ra) && ra > 0 ? ra : f.retryAfter };
+  const ra = Number(f.errors?.retry_after);
+  return { ...f, retryAfter: Number.isFinite(ra) && ra > 0 ? ra : f.retryAfter };
 }
 
 const fail = (error) => {
@@ -49,9 +49,13 @@ const fail = (error) => {
 const body = (r) => r?.data;
 
 export const gamesApi = {
-  /** GET /{event}/public: what the landing pages need; null when the event has no games (404). */
+  /**
+   * GET /{event}/public with the normal auth (an account, or the guest's own token):
+   * what the landing pages need, plus `me.can_play` for this reader. Makes no
+   * session. null when the event has no games (404).
+   */
   names: (eventId) =>
-    plain.get(`${base(eventId)}/public`).then(
+    apiClient.get(`${base(eventId)}/public`).then(
       (r) => parseNames(body(r)),
       (e) => (e?.response?.status === 404 ? null : fail(e)),
     ),
@@ -71,7 +75,7 @@ export const gamesApi = {
   code: (eventId, token) =>
     plain.get(`${base(eventId)}/me/code`, auth(token)).then((r) => {
       const d = body(r) || {};
-      return { url: d.url || d.qr_url || d.badge_url || null, pin: d.pin != null ? String(d.pin) : null };
+      return { url: d.url || null, token: d.token || null, pin: d.pin != null ? String(d.pin) : null };
     }, fail),
 
   reveal: (eventId, token) => plain.post(`${base(eventId)}/cards/reveal`, {}, auth(token)).then((r) => parseReveal(body(r)), fail),

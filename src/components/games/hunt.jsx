@@ -51,7 +51,7 @@ export function HuntView({ hunt, onScan, onHint, hinting, pending }) {
       <div className="gm-stats">
         <div className="gm-stat">
           <b>{hunt.points}</b>
-          <span>Points</span>
+          <span>{hunt.totalPoints ? `Points of ${hunt.totalPoints}` : "Points"}</span>
         </div>
         <div className="gm-stat">
           <b>
@@ -73,7 +73,7 @@ export function HuntView({ hunt, onScan, onHint, hinting, pending }) {
       {hunt.status === "live" || hunt.status === "paused" ? (
         <section className="gm-panel" aria-label={hunt.mode === "free" ? "Clues" : "Your clue"}>
           <h2 className="gm-title">{hunt.mode === "free" ? "All clues" : "Your clue"}</h2>
-          {clues.length === 0 ? <p className="gm-note">{hunt.found > 0 && hunt.found >= hunt.total ? "You found them all!" : "No clue right now."}</p> : null}
+          {clues.length === 0 ? <p className="gm-note">{hunt.complete ? "You found them all!" : "No clue right now."}</p> : null}
           {hunt.mode === "free" ? (
             <ul className="gm-list">
               {clues.map((c) => (
@@ -83,7 +83,13 @@ export function HuntView({ hunt, onScan, onHint, hinting, pending }) {
                     {c.clue}
                     {c.zone ? ` (${c.zone})` : ""}
                   </span>
-                  {c.found ? <span>Found</span> : null}
+                  {c.found ? (
+                    <span>Found</span>
+                  ) : c.hasHint || c.hint ? (
+                    <button type="button" className="gm-btn gm-btn--ghost" onClick={() => onHint(c.id)} disabled={!live || hinting} aria-label={`Hint for clue ${c.number ?? ""}`}>
+                      {c.hint ? "Show hint" : `Hint${c.hintCost ? ` (-${c.hintCost} pts)` : ""}`}
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -91,6 +97,7 @@ export function HuntView({ hunt, onScan, onHint, hinting, pending }) {
             clues.map((c) => (
               <p key={c.id || "c"} className="gm-clue">
                 {c.clue}
+                {c.zone ? <span className="gm-sub"> ({c.zone})</span> : null}
                 {c.hint ? <span className="gm-sub"> Hint: {c.hint}</span> : null}
               </p>
             ))
@@ -99,9 +106,11 @@ export function HuntView({ hunt, onScan, onHint, hinting, pending }) {
             <button type="button" className="gm-btn" onClick={onScan} disabled={!live}>
               Scan a hunt code
             </button>
-            <button type="button" className="gm-btn gm-btn--ghost" onClick={onHint} disabled={!live || hinting || clues.length === 0}>
-              Buy a hint{hunt.hintCost ? ` (-${hunt.hintCost} pts)` : ""}
-            </button>
+            {hunt.mode === "free" ? null : (
+              <button type="button" className="gm-btn gm-btn--ghost" onClick={() => onHint(clues[0]?.id)} disabled={!live || hinting || !clues[0]?.hasHint}>
+                Buy a hint{(clues[0]?.hintCost ?? hunt.hintCost) ? ` (-${clues[0]?.hintCost ?? hunt.hintCost} pts)` : ""}
+              </button>
+            )}
           </div>
         </section>
       ) : null}
@@ -111,11 +120,8 @@ export function HuntView({ hunt, onScan, onHint, hinting, pending }) {
           <ul className="gm-list">
             {hunt.recent.map((r, i) => (
               <li key={i}>
-                <span>
-                  {r.name}
-                  {r.label ? ` found ${r.label}` : " found a code"}
-                </span>
-                {r.points != null ? <span>+{r.points}</span> : null}
+                <span>{r.name} found a code</span>
+                {r.at ? <time dateTime={r.at}>{new Date(r.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time> : null}
               </li>
             ))}
           </ul>
@@ -201,10 +207,11 @@ export function HuntGame({ eventId, eventRef, token, names, end, api = gamesApi,
     queue.current?.add(code);
   }, []);
 
-  const buyHint = async () => {
+  const buyHint = async (pointId) => {
     setHinting(true);
     try {
-      const r = await api.hint(eventId, token, hunt?.clue?.id || undefined);
+      // Ordered mode names the one clue; free mode must say which.
+      const r = await api.hint(eventId, token, pointId || hunt?.clue?.id || undefined);
       setToast({ tone: "info", text: r?.hint ? `Hint: ${r.hint}` : "Hint bought." });
       await refresh();
     } catch (f) {

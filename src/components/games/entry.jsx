@@ -4,37 +4,76 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { gamesApi } from "@/api/games";
-import { playableGames, playPath } from "@/utils/games";
-import { useGameAccess } from "./access";
+import { canPlay, playableGames, playPath } from "@/utils/games";
+import { readSession, saveSession } from "./store";
 
 /**
  * "Play <game name>" for the event's page and the guest's ticket: one link per
- * game that is on, shown only when the guest is checked in (a game session
- * could be made for them) and at least one game is on. Nothing otherwise,
- * and nothing at all from an API without games. On the ticket (`withCode`)
- * it also shows the guest's game QR and PIN. A section of its own: the
- * games stand apart from every other module of the event.
+ * game that is on, shown only when GET /public (read with the normal auth)
+ * says `me.can_play`. Deciding never makes a game session: that call is
+ * made when the guest taps Play (the play page's gate) or, on the ticket,
+ * "Show my game QR". Nothing at all from an API without games, or for a
+ * reader who can't play. A section of its own: the games stand apart from
+ * every other module of the event.
  */
 export default function PlayEntry({ eventId, eventRef, withCode = false, skip = false, api = gamesApi }) {
-  const access = useGameAccess(skip ? null : eventId, { api });
+  const [names, setNames] = useState(null);
   const [code, setCode] = useState(null);
-  const ready = !skip && access.status === "in";
+  const [busy, setBusy] = useState(false);
+  const [codeError, setCodeError] = useState(false);
 
   useEffect(() => {
-    if (!withCode || !ready) return undefined;
+    if (skip || eventId == null) return undefined;
     let alive = true;
-    api.code(eventId, access.token).then(
+    // Started inside a promise: a failing read (or no API at all) just leaves the section out.
+    Promise.resolve()
+      .then(() => api.names(eventId))
+      .then(
+      (n) => alive && setNames(n),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, [api, eventId, skip]);
+
+  const ready = !skip && canPlay(names);
+
+  // A session this browser already holds shows the code with no tap; it never makes one.
+  useEffect(() => {
+    if (!withCode || !ready) return undefined;
+    const kept = readSession(eventId);
+    if (!kept) return undefined;
+    let alive = true;
+    api.code(eventId, kept.token).then(
       (c) => alive && setCode(c),
       () => {},
     );
     return () => {
       alive = false;
     };
-  }, [withCode, ready, api, eventId, access.token]);
+  }, [withCode, ready, api, eventId]);
+
+  const showCode = async () => {
+    setBusy(true);
+    setCodeError(false);
+    try {
+      let kept = readSession(eventId);
+      if (!kept) {
+        const s = await api.openSession(eventId);
+        if (!s) throw new Error("no session");
+        saveSession(eventId, s);
+        kept = s;
+      }
+      setCode(await api.code(eventId, kept.token));
+    } catch {
+      setCodeError(true);
+    }
+    setBusy(false);
+  };
 
   if (!ready) return null;
-  const games = playableGames(access.names);
-  if (games.length === 0) return null;
+  const games = playableGames(names);
   return (
     <section className={`gm-entry${withCode ? " gm-entry--ticket" : ""}`} aria-label="Play">
       <div className="gm-entry-links">
@@ -52,6 +91,17 @@ export default function PlayEntry({ eventId, eventRef, withCode = false, skip = 
           {code.pin ? (
             <p>
               Game PIN <strong>{code.pin}</strong>
+            </p>
+          ) : null}
+        </div>
+      ) : withCode ? (
+        <div className="gm-entry-code">
+          <button type="button" className="gm-btn gm-btn--ghost" onClick={showCode} disabled={busy}>
+            {busy ? "Getting your code..." : "Show my game QR"}
+          </button>
+          {codeError ? (
+            <p className="gm-err" role="alert">
+              Couldn't get your code. Try again.
             </p>
           ) : null}
         </div>
