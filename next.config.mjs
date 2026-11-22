@@ -158,6 +158,9 @@ export function siteHeaders(enforce = cspEnforced()) {
 }
 export const SITE_HEADERS = siteHeaders();
 
+/** The player pages of the games add-on: the camera may be used (to scan QR codes) by this site only. */
+export const GAME_CAMERA_HEADERS = [{ key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self), browsing-topics=()" }];
+
 /**
  * The find pages kept a minute at the edge, then served stale for five
  * while they are made again. Each header is read by one edge alone, and
@@ -212,6 +215,9 @@ const nextConfig = {
     return [
       // First: every later block that sets the same header wins over it.
       { source: "/:path*", headers: SITE_HEADERS },
+      // The games' scan screens read QR codes with the camera: this origin alone, on the player pages.
+      { source: "/play/:path*", headers: GAME_CAMERA_HEADERS },
+      { source: "/g/:path*", headers: GAME_CAMERA_HEADERS },
       { source: "/events", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
       { source: "/clubs", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },
       { source: "/topics/:slug", missing: PAGE_LOADS_ONLY, headers: EDGE_HEADERS },

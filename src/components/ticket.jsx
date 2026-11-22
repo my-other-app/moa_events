@@ -19,6 +19,7 @@ import { useRenderedTicket } from "./ticketrender";
 import { usePosterOffer } from "./poster/offer";
 import PosterCta from "./poster/cta";
 import { TicketQuests } from "./quests/questcard";
+import PlayEntry from "./games/entry";
 
 /**
  * The ticket's type (docs/TICKETING.md), when the event sells more than one:
@@ -355,6 +356,11 @@ const Ticket = ({ ticketid }) => {
        * from an API without quests. Outside #ticket, so the PDF never has it.
        */}
       {ticketData.event?.id !== undefined && ticketData.event?.id !== null ? <TicketQuests ticketId={ticketid} event={ticketData.event} skip={cancelled || revoked} /> : null}
+
+      {/* Games: their own section beside the quest. "Play <name>" plus the guest's game QR and PIN, when a game is on and they are checked in. Outside #ticket, so the PDF never has it. */}
+      {ticketData.event?.id !== undefined && ticketData.event?.id !== null && !cancelled && !revoked ? (
+        <PlayEntry eventId={String(ticketData.event.id)} eventRef={ticketData.event.slug || String(ticketData.event.id)} withCode />
+      ) : null}
 
       {competition?.enabled && ticketData.event?.id && !cancelled && !revoked ? (
         <Link href={`/${ticketData.event.id}/compete`} className="live-btn" style={{ display: "inline-flex", marginTop: 12, textDecoration: "none" }}>
