@@ -2,6 +2,7 @@ import { Link } from "@/lib/router";
 import { dateTile, eventUrl, peopleLine, registerState, scheduleLines, seatsLeft, summary } from "@/utils/eventpage";
 import { EventTickets } from "../register/eventtickets";
 import { EventQuests } from "../quests/questcard";
+import PlayEntry from "../games/entry";
 import { formatCount, formatPrice, plural, showsHighDemand } from "@/utils/format";
 import { hostNames, hostsOf } from "@/utils/hosts";
 import { confirmsEachPlace } from "@/utils/requests";
@@ -250,6 +251,9 @@ export function EventView({ page, shareRow = null }) {
 
           {/* The event's quest, read in the browser: the guest's own with a ticket, else what it is (nothing when there's none). */}
           {cancelled ? null : <EventQuests event={{ id: event.id, slug: event.slug || null, status: event.status }} clubSlug={club?.slug || null} canRegister={regState.kind === "open"} />}
+
+          {/* Games (their own section, not part of the quest): "Play <name>" for a checked-in guest when a game is on. */}
+          {cancelled ? null : <PlayEntry eventId={String(event.id)} eventRef={event.slug || String(event.id)} />}
 
           {hasAbout ? (
             <EpSection id="about" title="About this event">

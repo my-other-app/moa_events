@@ -11,3 +11,5 @@ export const Poppins = font;
 export const Space_Grotesk = font;
 export const Inter = font;
 export const Noto_Sans = font;
+export const Unbounded = font;
+export const Plus_Jakarta_Sans = font;

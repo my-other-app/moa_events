@@ -39,6 +39,7 @@ import "@/styles/help.css";
 import "@/styles/developers.css";
 import "@/styles/poster.css";
 import "@/styles/quests.css";
+import "@/styles/games.css";
 import "@/styles/motion.css";
 
 /*
