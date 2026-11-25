@@ -331,6 +331,40 @@ describe("the venue screen", () => {
     expect(screen.getByRole("heading", { name: "Treasure Run" })).toBeInTheDocument();
     expect(screen.getByRole("timer", { name: "Treasure Run timer" })).toBeInTheDocument();
   });
+  it("everyone (board_rows 0): podium plus every other player in one scrollable list", () => {
+    const s = parseScreen(data({ board_rows: 0, boards: { cards: { rows: rows(400), of: 400 }, hunt: null } }));
+    expect(s.rows).toBe(0);
+    const { container } = render(<ScreenView screen={s} />);
+    expect(container.querySelectorAll(".gms-pod")).toHaveLength(3);
+    const list = container.querySelector('.gms-rows[data-layout="rest"]');
+    expect(list.querySelectorAll("li")).toHaveLength(397);
+    expect(list).toHaveAttribute("tabindex", "0");
+  });
+  it("both games: two boards side by side, each with its own podium", () => {
+    const s = parseScreen(data({ board_rows: 0, hunt: { on: true, name: "Treasure Run" }, boards: { cards: { rows: rows(20) }, hunt: { rows: rows(12) } } }));
+    const { container } = render(<ScreenView screen={s} />);
+    expect(container.querySelectorAll(".gms-board--compact")).toHaveLength(2);
+    expect(container.querySelectorAll(".gms-pod")).toHaveLength(6);
+    expect(screen.getByText("Hero Cards · Treasure Run")).toBeInTheDocument();
+  });
+  it("custom colours become CSS variables over the theme; bad ones are dropped", () => {
+    const s = parseScreen(data({ colors: { background: "#101010", surface: "#202020", text: "#fafafa", accent: "#ff0066", gold: "#ffd700", silver: "nope", bronze: null } }));
+    expect(s.colors.silver).toBeNull();
+    const { container } = render(<ScreenView screen={s} />);
+    const shell = container.querySelector(".gm--screen");
+    expect(shell.style.getPropertyValue("--gm-bg")).toBe("#101010");
+    expect(shell.style.getPropertyValue("--gm-card")).toBe("#202020");
+    expect(shell.style.getPropertyValue("--gm-ink")).toBe("#fafafa");
+    expect(shell.style.getPropertyValue("--gm-accent")).toBe("#ff0066");
+    expect(shell.style.getPropertyValue("--gms-gold")).toBe("#ffd700");
+    expect(shell.style.getPropertyValue("--gms-silver")).toBe("");
+  });
+  it("an empty board invites people to join", () => {
+    render(<ScreenView screen={parseScreen(data({ boards: { cards: { rows: [] }, hunt: null }, feed: [] }))} />);
+    expect(screen.getByText("No scores yet")).toBeInTheDocument();
+    expect(screen.getByText("Scan the code to get on the board")).toBeInTheDocument();
+    expect(screen.getByText("The latest moves show up here")).toBeInTheDocument();
+  });
   it("an empty board says so", () => {
     render(<BoardView title="Hero Cards" rows={[]} layout="podium" limit={10} />);
     expect(screen.getByText("No scores yet")).toBeInTheDocument();
