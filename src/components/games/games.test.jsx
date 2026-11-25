@@ -306,6 +306,34 @@ describe("the venue screen", () => {
     ...over,
   });
 
+  it("logo strip: the host club and the partners with logos, in order", () => {
+    const s = parseScreen(
+      data({
+        club: { name: "GDG Kochi", logo_url: "https://cdn.example.com/club.png" },
+        partners: [
+          { name: "Google", logo_url: "https://cdn.example.com/g.png", kind: "sponsor", label: "Title" },
+          { name: "No Logo", logo_url: null, kind: "partner", label: null },
+          { name: "Acme", logo_url: "https://cdn.example.com/a.png", kind: "partner", label: null },
+        ],
+      }),
+    );
+    render(<ScreenView screen={s} />);
+    const strip = screen.getByRole("contentinfo", { name: "Hosts and partners" });
+    expect(within(strip).getByText("Hosted by")).toBeInTheDocument();
+    expect(within(strip).getByRole("img", { name: "GDG Kochi" })).toHaveAttribute("src", "https://cdn.example.com/club.png");
+    expect(within(strip).getAllByRole("listitem").map((li) => li.querySelector("img").getAttribute("alt"))).toEqual(["Google", "Acme"]);
+  });
+  it("logo strip: hidden without a club logo or partners, and the partners are capped", () => {
+    const { container, unmount } = render(<ScreenView screen={parseScreen(data({ club: { name: "GDG Kochi", logo_url: null }, partners: [] }))} />);
+    expect(container.querySelector(".gms-logos")).toBeNull();
+    unmount();
+    const many = Array.from({ length: 20 }, (_, i) => ({ name: `P${i}`, logo_url: `https://cdn.example.com/${i}.png` }));
+    const s = parseScreen(data({ partners: many }));
+    expect(s.club).toBeNull();
+    render(<ScreenView screen={s} />);
+    expect(screen.queryByText("Hosted by")).toBeNull();
+    expect(screen.getByRole("contentinfo", { name: "Hosts and partners" }).querySelectorAll("li")).toHaveLength(12);
+  });
   it("podium: top 3 on a podium, 4-10 below, with ▲/▼", () => {
     const { container } = render(<ScreenView screen={parseScreen(data())} />);
     expect(container.querySelectorAll(".gms-pod")).toHaveLength(3);

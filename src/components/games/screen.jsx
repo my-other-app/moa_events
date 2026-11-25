@@ -255,6 +255,33 @@ function HuntClock({ hunt, name }) {
   );
 }
 
+/** The foot of the screen: the host club's logo on the left, the partners' logos on the right. Nothing when there are neither. */
+export function LogoStrip({ club, partners }) {
+  if (!club && partners.length === 0) return null;
+  return (
+    <footer className="gms-logos" aria-label="Hosts and partners">
+      {club ? (
+        <div className="gms-logos-host">
+          <span className="gms-logos-tag">Hosted by</span>
+          <img src={club.logo} alt={club.name} />
+        </div>
+      ) : null}
+      {partners.length > 0 ? (
+        <div className="gms-logos-partners">
+          <span className="gms-logos-tag">Partners</span>
+          <ul>
+            {partners.map((p, i) => (
+              <li key={`${i}-${p.name}`}>
+                <img src={p.logo} alt={p.name} title={p.label || p.name} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </footer>
+  );
+}
+
 /** The venue screen itself: the whole window, never wider or taller than it, at any size. */
 export function ScreenView({ screen }) {
   const on = ["cards", "hunt"].filter((k) => screen.games[k]);
@@ -295,6 +322,7 @@ export function ScreenView({ screen }) {
           ) : null}
         </div>
         {screen.ticker ? <Ticker feed={screen.feed} /> : null}
+        <LogoStrip club={screen.club} partners={screen.partners || []} />
       </div>
     </GameShell>
   );
