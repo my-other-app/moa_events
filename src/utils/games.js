@@ -460,11 +460,33 @@ export function parseScreen(d, now = Date.now()) {
     feed: (Array.isArray(x.feed) ? x.feed : []).slice(0, 3).map((f, i) => ({ id: f?.id ?? i, message: str(f?.message) || "" })).filter((f) => f.message),
     hunt: timer ? parseTimer(timer, now, x.server_now) : null,
     club: obj(x.club) && str(x.club.logo_url) ? { name: str(x.club.name) || "", logo: str(x.club.logo_url) } : null,
+    cohosts: (Array.isArray(x.cohosts) ? x.cohosts : [])
+      .map((c) => ({ name: str(c?.name) || "", logo: str(c?.logo_url) }))
+      .filter((c) => c.logo)
+      .slice(0, SCREEN_PARTNERS_MAX),
     partners: (Array.isArray(x.partners) ? x.partners : [])
-      .map((p) => ({ name: str(p?.name) || "", logo: str(p?.logo_url), label: str(p?.label) }))
+      .map((p) => ({ name: str(p?.name) || "", logo: str(p?.logo_url), label: str(p?.label), kind: str(p?.kind) }))
       .filter((p) => p.logo)
       .slice(0, SCREEN_PARTNERS_MAX),
+    footerImage: str(x.footer_image_url),
   };
+}
+
+/**
+ * The foot's logos in groups, as in the event's emails: "Hosted by" (the
+ * club, then its co-hosts), then one group per partner label in the order
+ * they first come (no label: "Sponsors" or "Partners" by kind).
+ */
+export function logoGroups({ club, cohosts = [], partners = [] }) {
+  const hosts = [club, ...cohosts].filter((c) => c && c.logo);
+  const groups = hosts.length ? [{ caption: "Hosted by", logos: hosts }] : [];
+  for (const p of partners) {
+    const caption = (p.label || "").trim() || (p.kind === "sponsor" ? "Sponsors" : "Partners");
+    const g = groups.find((x) => x.caption !== "Hosted by" && x.caption.toLowerCase() === caption.toLowerCase());
+    if (g) g.logos.push(p);
+    else groups.push({ caption, logos: [p] });
+  }
+  return groups;
 }
 
 /* ---------- entry points ---------- */
