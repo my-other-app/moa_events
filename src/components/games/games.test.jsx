@@ -321,7 +321,36 @@ describe("the venue screen", () => {
     const strip = screen.getByRole("contentinfo", { name: "Hosts and partners" });
     expect(within(strip).getByText("Hosted by")).toBeInTheDocument();
     expect(within(strip).getByRole("img", { name: "GDG Kochi" })).toHaveAttribute("src", "https://cdn.example.com/club.png");
-    expect(within(strip).getAllByRole("listitem").map((li) => li.querySelector("img").getAttribute("alt"))).toEqual(["Google", "Acme"]);
+    expect([...strip.querySelectorAll("img")].map((i) => i.getAttribute("alt"))).toEqual(["GDG Kochi", "Google", "Acme"]);
+  });
+  it("logo strip: grouped like the email footer, co-hosts under Hosted by, partners by label then kind", () => {
+    const s = parseScreen(
+      data({
+        club: { name: "GDG Kochi", logo_url: "https://cdn.example.com/club.png" },
+        cohosts: [{ name: "WTM", logo_url: "https://cdn.example.com/wtm.png" }, { name: "Bare", logo_url: null }],
+        partners: [
+          { name: "Google", logo_url: "https://cdn.example.com/g.png", kind: "sponsor", label: null },
+          { name: "Uni", logo_url: "https://cdn.example.com/u.png", kind: "partner", label: "Academia Partner" },
+          { name: "Acme", logo_url: "https://cdn.example.com/a.png", kind: "partner", label: null },
+          { name: "College", logo_url: "https://cdn.example.com/c.png", kind: "partner", label: "academia partner" },
+        ],
+      }),
+    );
+    const { container } = render(<ScreenView screen={s} />);
+    const groups = [...container.querySelectorAll(".gms-logos-group")].map((g) => [g.querySelector(".gms-logos-tag").textContent, [...g.querySelectorAll("img")].map((i) => i.alt)]);
+    expect(groups).toEqual([
+      ["Hosted by", ["GDG Kochi", "WTM"]],
+      ["Sponsors", ["Google"]],
+      ["Academia Partner", ["Uni", "College"]],
+      ["Partners", ["Acme"]],
+    ]);
+  });
+  it("logo strip: the organiser's footer image stands in for the logos", () => {
+    const s = parseScreen(data({ club: { name: "GDG Kochi", logo_url: "https://cdn.example.com/club.png" }, footer_image_url: "https://cdn.example.com/strip.png" }));
+    render(<ScreenView screen={s} />);
+    const strip = screen.getByRole("contentinfo", { name: "Hosts and partners" });
+    expect([...strip.querySelectorAll("img")].map((i) => i.getAttribute("src"))).toEqual(["https://cdn.example.com/strip.png"]);
+    expect(within(strip).queryByText("Hosted by")).toBeNull();
   });
   it("logo strip: hidden without a club logo or partners, and the partners are capped", () => {
     const { container, unmount } = render(<ScreenView screen={parseScreen(data({ club: { name: "GDG Kochi", logo_url: null }, partners: [] }))} />);

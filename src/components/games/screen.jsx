@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { gamesApi, screenStreamUrl } from "@/api/games";
 import { SITE_URL } from "@/config";
-import { clock, msLeft } from "@/utils/games";
+import { clock, logoGroups, msLeft } from "@/utils/games";
 import GameShell from "./shell";
 
 export const SCREEN_POLL_MS = 10 * 1000;
@@ -255,29 +255,34 @@ function HuntClock({ hunt, name }) {
   );
 }
 
-/** The foot of the screen: the host club's logo on the left, the partners' logos on the right. Nothing when there are neither. */
-export function LogoStrip({ club, partners }) {
-  if (!club && partners.length === 0) return null;
+/**
+ * The foot of the screen, as the event's email footer: each group a caption
+ * over its logos, the groups centred in one row with rules between them; or
+ * the organiser's own wide image instead. Nothing when there is neither.
+ */
+export function LogoStrip({ screen }) {
+  if (screen.footerImage)
+    return (
+      <footer className="gms-logos gms-logos--image" aria-label="Hosts and partners">
+        <img src={screen.footerImage} alt="Hosts and partners" />
+      </footer>
+    );
+  const groups = logoGroups(screen);
+  if (groups.length === 0) return null;
   return (
     <footer className="gms-logos" aria-label="Hosts and partners">
-      {club ? (
-        <div className="gms-logos-host">
-          <span className="gms-logos-tag">Hosted by</span>
-          <img src={club.logo} alt={club.name} />
-        </div>
-      ) : null}
-      {partners.length > 0 ? (
-        <div className="gms-logos-partners">
-          <span className="gms-logos-tag">Partners</span>
+      {groups.map((g) => (
+        <div className="gms-logos-group" key={g.caption}>
+          <span className="gms-logos-tag">{g.caption}</span>
           <ul>
-            {partners.map((p, i) => (
-              <li key={`${i}-${p.name}`}>
-                <img src={p.logo} alt={p.name} title={p.label || p.name} />
+            {g.logos.map((l, i) => (
+              <li key={`${i}-${l.name}`}>
+                <img src={l.logo} alt={l.name} title={l.label || l.name} />
               </li>
             ))}
           </ul>
         </div>
-      ) : null}
+      ))}
     </footer>
   );
 }
@@ -322,7 +327,7 @@ export function ScreenView({ screen }) {
           ) : null}
         </div>
         {screen.ticker ? <Ticker feed={screen.feed} /> : null}
-        <LogoStrip club={screen.club} partners={screen.partners || []} />
+        <LogoStrip screen={screen} />
       </div>
     </GameShell>
   );
