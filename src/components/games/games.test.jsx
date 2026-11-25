@@ -345,7 +345,9 @@ describe("the venue screen", () => {
     const { container } = render(<ScreenView screen={s} />);
     expect(container.querySelectorAll(".gms-board--compact")).toHaveLength(2);
     expect(container.querySelectorAll(".gms-pod")).toHaveLength(6);
-    expect(screen.getByText("Hero Cards · Treasure Run")).toBeInTheDocument();
+    // Each game named once, on its own board: no repeat of the names under the event title.
+    expect(screen.getAllByText("Hero Cards")).toHaveLength(1);
+    expect(screen.getAllByText("Treasure Run")).toHaveLength(1);
   });
   it("custom colours become CSS variables over the theme; bad ones are dropped", () => {
     const s = parseScreen(data({ colors: { background: "#101010", surface: "#202020", text: "#fafafa", accent: "#ff0066", gold: "#ffd700", silver: "nope", bronze: null } }));

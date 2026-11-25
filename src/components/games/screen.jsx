@@ -268,7 +268,6 @@ export function ScreenView({ screen }) {
         <header className="gms-head">
           <div className="gms-titles">
             <h1>{screen.event.name}</h1>
-            {on.length ? <p>{on.map((k) => screen.games[k].name).join(" · ")}</p> : null}
           </div>
           {screen.logo ? <img src={screen.logo} alt="" /> : null}
         </header>

@@ -568,10 +568,10 @@
   text-overflow: ellipsis;
 }
 .gms-head img {
-  height: calc(var(--u) * 5);
-  max-width: calc(var(--u) * 16);
+  height: calc(var(--u) * 6);
+  max-width: calc(var(--u) * 26);
   object-fit: contain;
-  border-radius: calc(var(--u) * 0.8);
+  object-position: right center;
   flex: none;
 }
 .gms-main {

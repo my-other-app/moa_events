@@ -414,7 +414,8 @@ export const contrast = (a, b) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 /** Black or white, whichever reads better on `fill`. */
-export const inkOn = (fill) => (contrast(fill, "#000000") >= contrast(fill, "#FFFFFF") ? "#000000" : "#FFFFFF");
+// White text wherever it reads (3:1, as for large bold text: labels, badges); black only on light fills.
+export const inkOn = (fill) => (contrast(fill, "#FFFFFF") >= 3 ? "#FFFFFF" : "#000000");
 
 /** The CSS variables a set of custom colours sets over the theme. */
 export function colorVars(colors) {
