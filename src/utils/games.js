@@ -430,6 +430,9 @@ export function colorVars(colors) {
   return v;
 }
 
+/** The most partner logos the screen's foot shows. */
+export const SCREEN_PARTNERS_MAX = 12;
+
 export function parseScreen(d, now = Date.now()) {
   const x = obj(d) || {};
   const ev = obj(x.event) || {};
@@ -456,6 +459,11 @@ export function parseScreen(d, now = Date.now()) {
     boards: { cards: parseBoard(boards.cards), hunt: parseBoard(boards.hunt) },
     feed: (Array.isArray(x.feed) ? x.feed : []).slice(0, 3).map((f, i) => ({ id: f?.id ?? i, message: str(f?.message) || "" })).filter((f) => f.message),
     hunt: timer ? parseTimer(timer, now, x.server_now) : null,
+    club: obj(x.club) && str(x.club.logo_url) ? { name: str(x.club.name) || "", logo: str(x.club.logo_url) } : null,
+    partners: (Array.isArray(x.partners) ? x.partners : [])
+      .map((p) => ({ name: str(p?.name) || "", logo: str(p?.logo_url), label: str(p?.label) }))
+      .filter((p) => p.logo)
+      .slice(0, SCREEN_PARTNERS_MAX),
   };
 }
 
