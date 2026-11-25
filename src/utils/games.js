@@ -389,6 +389,46 @@ export function parseBoard(d) {
  * say which games are on (`{on, name}` or null); `boards.<game>.rows`; `feed`
  * is the latest three {id, message}; `hunt_timer` carries the clock.
  */
+const SCREEN_ROWS = [0, 5, 7, 10, 25, 50];
+export const SCREEN_COLOR_KEYS = ["background", "surface", "text", "accent", "gold", "silver", "bronze"];
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/** The organiser's own screen colours: only valid hex values survive; null keys keep the theme's. */
+export function colorsOf(c) {
+  const x = obj(c) || {};
+  const out = {};
+  for (const k of SCREEN_COLOR_KEYS) out[k] = HEX.test(x[k] || "") ? x[k] : null;
+  return out;
+}
+
+const lum = (hex) => {
+  const ch = (i) => {
+    const s = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch(1) + 0.7152 * ch(3) + 0.0722 * ch(5);
+};
+/** WCAG contrast ratio of two #RRGGBB colours. */
+export const contrast = (a, b) => {
+  const [hi, lo] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (hi + 0.05) / (lo + 0.05);
+};
+/** Black or white, whichever reads better on `fill`. */
+export const inkOn = (fill) => (contrast(fill, "#000000") >= contrast(fill, "#FFFFFF") ? "#000000" : "#FFFFFF");
+
+/** The CSS variables a set of custom colours sets over the theme. */
+export function colorVars(colors) {
+  const c = colorsOf(colors);
+  const v = {};
+  if (c.background) Object.assign(v, { "--gm-bg": c.background, "--gm-bg2": c.background });
+  if (c.surface) Object.assign(v, { "--gm-card": c.surface, "--gm-line": `color-mix(in srgb, ${c.surface} 70%, ${inkOn(c.surface)} 30%)` });
+  const text = c.text || (c.background ? inkOn(c.background) : null);
+  if (text) Object.assign(v, { "--gm-ink": text, "--gm-soft": `color-mix(in srgb, ${text} 75%, transparent)` });
+  if (c.accent) Object.assign(v, { "--gm-accent": c.accent, "--gm-on-accent": inkOn(c.accent) });
+  for (const m of ["gold", "silver", "bronze"]) if (c[m]) v[`--gms-${m}`] = c[m];
+  return v;
+}
+
 export function parseScreen(d, now = Date.now()) {
   const x = obj(d) || {};
   const ev = obj(x.event) || {};
@@ -404,7 +444,9 @@ export function parseScreen(d, now = Date.now()) {
     accent: /^#[0-9a-fA-F]{6}$/.test(x.accent || "") ? x.accent : null,
     logo: str(x.logo_url),
     layout: x.board_layout === "list" ? "list" : "podium",
-    rows: [5, 7, 10].includes(Number(x.board_rows)) ? Number(x.board_rows) : 10,
+    // 0 is "everyone": the screen lists the whole board and scrolls it.
+    rows: SCREEN_ROWS.includes(Number(x.board_rows)) ? Number(x.board_rows) : 10,
+    colors: colorsOf(x.colors),
     ticker: x.ticker_on !== false,
     joinBox: x.join_box_on !== false,
     joinUrl: str(x.join_url),
